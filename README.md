@@ -1,6 +1,6 @@
 # AntiHunter Command & Control Pro
 
-AntiHunter Command & Control PRO is the companion operations platform for the AntiHunter mesh firmware. Flash your ESP32-S3 detection nodes with the AntiHunter builds, then connect them here to orchestrate the entire perimeter defense mission. The Command Center ingests every heartbeat, target hit, triangulation update, and vibration alert from the mesh, renders nodes and geofences on a live map, automates scan/baseline/triangulation workflows, and drives alarm cues, exports, and audit trails—all in a pure Node.js + TypeScript stack designed to keep operators inside one real-time pane of glass.
+AntiHunter Command & Control PRO is the companion operations platform for the AntiHunter mesh firmware. Flash your AntiHunter detection nodes with the AntiHunter builds, then connect them here to orchestrate the entire perimeter defense mission. The Command Center ingests every heartbeat, target hit, triangulation update, and vibration alert from the mesh, renders nodes and geofences on a live map, automates scan/baseline/triangulation workflows, and drives alarm cues, exports, and audit trails.
 
 
 
