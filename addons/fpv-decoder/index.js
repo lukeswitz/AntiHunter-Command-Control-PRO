@@ -2,7 +2,7 @@
 
 class StubFpvDecoder {
   constructor(options = {}) {
-    this.options = options;
+    this.config = this.normalizeOptions(options);
     this.running = false;
     this.frameListeners = new Set();
     this.interval = undefined;
@@ -47,6 +47,10 @@ class StubFpvDecoder {
     this.frameListeners.clear();
   }
 
+  updateConfig(options = {}) {
+    this.config = this.normalizeOptions({ ...this.config, ...options });
+  }
+
   buildSvgFrame() {
     const width = 360;
     const height = 240;
@@ -69,6 +73,9 @@ class StubFpvDecoder {
       <text x="50%" y="66%" font-size="16" fill="#ffffff" text-anchor="middle" font-family="Arial, sans-serif">
         ${new Date(timestamp).toISOString()}
       </text>
+      <text x="50%" y="82%" font-size="14" fill="#ffffff" text-anchor="middle" font-family="Arial, sans-serif">
+        ${this.describeConfig()}
+      </text>
     </svg>`;
 
     return {
@@ -78,6 +85,41 @@ class StubFpvDecoder {
       mimeType: 'image/svg+xml',
       data: Buffer.from(svg, 'utf8'),
       timestamp,
+    };
+  }
+
+  describeConfig() {
+    const parts = [];
+    if (typeof this.config.frequencyMHz === 'number') {
+      parts.push(`${this.config.frequencyMHz.toFixed(1)} MHz`);
+    }
+    if (typeof this.config.bandwidthMHz === 'number') {
+      parts.push(`${this.config.bandwidthMHz.toFixed(1)} MHz BW`);
+    }
+    if (typeof this.config.gainDb === 'number') {
+      parts.push(`${this.config.gainDb.toFixed(1)} dB`);
+    }
+    const sourceLabel = this.config.source ?? 'default';
+    parts.push(`src:${sourceLabel}`);
+    return parts.join(' / ');
+  }
+
+  normalizeOptions(options) {
+    return {
+      source: options.source ?? 'soapy-litexm2sdr',
+      channel: typeof options.channel === 'number' ? options.channel : 0,
+      frequencyMHz:
+        typeof options.frequencyMHz === 'number' && Number.isFinite(options.frequencyMHz)
+          ? options.frequencyMHz
+          : null,
+      bandwidthMHz:
+        typeof options.bandwidthMHz === 'number' && Number.isFinite(options.bandwidthMHz)
+          ? options.bandwidthMHz
+          : null,
+      gainDb:
+        typeof options.gainDb === 'number' && Number.isFinite(options.gainDb)
+          ? options.gainDb
+          : null,
     };
   }
 }

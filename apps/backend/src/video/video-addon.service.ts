@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 
-import type { FpvAddonStatus, FpvFramePayload } from './video.types';
+import type { FpvAddonStatus, FpvConfig, FpvFramePayload } from './video.types';
 
 type FpvDecoderModule = typeof import('@command-center/fpv-decoder');
 type FpvDecoderFactory = FpvDecoderModule['createFpvDecoder'];
@@ -27,13 +27,29 @@ export class VideoAddonService implements OnModuleInit, OnModuleDestroy {
   private stopHandle?: () => Promise<void> | void;
   private lastFrame?: FpvFramePayload;
 
-  private status: FpvAddonStatus = {
-    enabled: false,
-    available: false,
-    framesReceived: 0,
-  };
+  private config: FpvConfig;
+  private status: FpvAddonStatus;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {
+    this.config = {
+      frequencyMHz: this.sanitizeNumber(
+        this.configService.get<number>('video.fpvDefaultFrequencyMHz'),
+        5760,
+      ),
+      bandwidthMHz: this.sanitizeNumber(
+        this.configService.get<number>('video.fpvDefaultBandwidthMHz'),
+        10,
+      ),
+      gainDb: this.sanitizeNumber(this.configService.get<number>('video.fpvDefaultGainDb'), 40),
+    };
+
+    this.status = {
+      enabled: false,
+      available: false,
+      framesReceived: 0,
+      config: { ...this.config },
+    };
+  }
 
   async onModuleInit(): Promise<void> {
     const enabled = this.configService.get<boolean>('video.fpvEnabled', false);
@@ -52,7 +68,7 @@ export class VideoAddonService implements OnModuleInit, OnModuleDestroy {
   }
 
   getStatus(): FpvAddonStatus {
-    return { ...this.status };
+    return { ...this.status, config: { ...this.config } };
   }
 
   getLastFrame(): FpvFramePayload | undefined {
@@ -64,6 +80,31 @@ export class VideoAddonService implements OnModuleInit, OnModuleDestroy {
     return () => {
       this.frameEmitter.off('frame', listener);
     };
+  }
+
+  getConfig(): FpvConfig {
+    return { ...this.config };
+  }
+
+  async updateConfig(update: Partial<FpvConfig>): Promise<FpvConfig> {
+    const next: FpvConfig = {
+      frequencyMHz: this.sanitizeNumber(update.frequencyMHz, this.config.frequencyMHz),
+      bandwidthMHz: this.sanitizeNumber(update.bandwidthMHz, this.config.bandwidthMHz),
+      gainDb: this.sanitizeNumber(update.gainDb, this.config.gainDb),
+    };
+    this.config = next;
+    this.status.config = { ...this.config };
+
+    if (this.decoderInstance?.updateConfig) {
+      try {
+        this.decoderInstance.updateConfig(this.toDecoderOptions());
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`FPV decoder updateConfig failed: ${message}`);
+      }
+    }
+
+    return this.getConfig();
   }
 
   private async tryInitializeDecoder(): Promise<void> {
@@ -83,7 +124,7 @@ export class VideoAddonService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      this.decoderInstance = factory({ source: 'soapy-litexm2sdr' });
+      this.decoderInstance = factory(this.toDecoderOptions());
       this.decoderFrameUnsubscribe = this.decoderInstance.onFrame((rawFrame) => {
         this.handleIncomingFrame(rawFrame);
       });
@@ -96,8 +137,18 @@ export class VideoAddonService implements OnModuleInit, OnModuleDestroy {
         this.stopHandle = () => this.decoderInstance?.stop?.();
       }
 
+      if (this.decoderInstance?.updateConfig) {
+        try {
+          this.decoderInstance.updateConfig(this.toDecoderOptions());
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`FPV decoder updateConfig failed: ${message}`);
+        }
+      }
+
       this.status.available = true;
       this.status.message = 'FPV decoder addon loaded';
+      this.status.config = { ...this.config };
       this.logger.log('FPV decoder addon initialized (stub)');
     } catch (error) {
       const message =
@@ -157,6 +208,27 @@ export class VideoAddonService implements OnModuleInit, OnModuleDestroy {
       this.decoderInstance = undefined;
       this.stopHandle = undefined;
       this.lastFrame = undefined;
+      this.status.config = { ...this.config };
     }
+  }
+
+  private toDecoderOptions() {
+    return {
+      source: 'soapy-litexm2sdr',
+      channel: 0,
+      frequencyMHz: this.config.frequencyMHz ?? undefined,
+      bandwidthMHz: this.config.bandwidthMHz ?? undefined,
+      gainDb: this.config.gainDb ?? undefined,
+    };
+  }
+
+  private sanitizeNumber(value: unknown, fallback: number | null): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (value === null) {
+      return null;
+    }
+    return fallback;
   }
 }

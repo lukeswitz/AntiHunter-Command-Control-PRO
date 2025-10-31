@@ -1,9 +1,16 @@
+export interface FpvConfig {
+  frequencyMHz: number | null;
+  bandwidthMHz: number | null;
+  gainDb: number | null;
+}
+
 export interface FpvAddonStatus {
   enabled: boolean;
   available: boolean;
   message?: string;
   framesReceived: number;
   lastFrameAt?: string;
+  config: FpvConfig;
 }
 
 export interface FpvFramePayload {

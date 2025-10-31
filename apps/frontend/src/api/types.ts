@@ -148,6 +148,13 @@ export interface FpvStatus {
   message?: string | null;
   framesReceived: number;
   lastFrameAt?: string | null;
+  config: FpvConfig;
+}
+
+export interface FpvConfig {
+  frequencyMHz: number | null;
+  bandwidthMHz: number | null;
+  gainDb: number | null;
 }
 
 export interface FpvFrame {

@@ -22,15 +22,20 @@ export interface FpvFrame {
   timestamp: number;
 }
 
+export interface FpvDecoderOptions {
+  source?: string;
+  channel?: number;
+  frequencyMHz?: number | null;
+  bandwidthMHz?: number | null;
+  gainDb?: number | null;
+}
+
 export interface FpvDecoder {
   start(): Promise<{ stop(): Promise<void> | void }>;
   stop(): Promise<void> | void;
   onFrame(listener: (frame: FpvFrame) => void): () => void;
-}
-
-export interface FpvDecoderOptions {
-  source?: string;
-  channel?: number;
+  updateConfig(options: FpvDecoderOptions): void;
 }
 
 export function createFpvDecoder(options?: FpvDecoderOptions): FpvDecoder;
+

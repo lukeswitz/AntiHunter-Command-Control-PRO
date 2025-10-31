@@ -1,5 +1,6 @@
-import { Controller, Get, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Put } from '@nestjs/common';
 
+import { UpdateFpvConfigDto } from './dto/update-fpv-config.dto';
 import { VideoAddonService } from './video-addon.service';
 
 @Controller('video')
@@ -18,5 +19,15 @@ export class VideoController {
       throw new NotFoundException('No FPV frame captured yet');
     }
     return frame;
+  }
+
+  @Get('fpv/config')
+  getConfig() {
+    return this.videoAddonService.getConfig();
+  }
+
+  @Put('fpv/config')
+  updateConfig(@Body() dto: UpdateFpvConfigDto) {
+    return this.videoAddonService.updateConfig(dto);
   }
 }
