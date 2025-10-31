@@ -10,7 +10,6 @@ import type {
   SerialState,
   SiteSummary,
   MqttSiteConfig,
-  FpvStatus,
   TakConfig,
   TakProtocol,
 } from '../api/types';
@@ -140,11 +139,6 @@ export function ConfigPage() {
   const mqttSitesQuery = useQuery({
     queryKey: ['mqttSites'],
     queryFn: () => apiClient.get<MqttSiteConfig[]>('/mqtt/sites'),
-  });
-
-  const fpvStatusQuery = useQuery({
-    queryKey: ['fpvStatus'],
-    queryFn: () => apiClient.get<FpvStatus>('/video/fpv/status'),
   });
 
   const takConfigQuery = useQuery({
@@ -592,7 +586,6 @@ export function ConfigPage() {
   const takLastConnected = takConfig?.lastConnected
     ? new Date(takConfig.lastConnected).toLocaleString()
     : 'Never';
-  const fpvStatus = fpvStatusQuery.data;
   const takToggleDisabled = updateTakConfigMutation.isPending;
 
   const handleVolumeChange =
@@ -1717,67 +1710,6 @@ export function ConfigPage() {
             )}
           </div>
         </section>
-
-        <section className="config-card">
-          <header>
-            <h2>FPV Decoder Addon</h2>
-            <p>Optional NTSC/FPV video ingest. Install the addon package to activate.</p>
-          </header>
-          <div className="config-card__body">
-            {fpvStatusQuery.isLoading ? (
-              <div>Checking addon status…</div>
-            ) : fpvStatusQuery.isError ? (
-              <div className="form-error">
-                Unable to retrieve addon status. Verify the backend is reachable.
-              </div>
-            ) : fpvStatus ? (
-              <>
-                <div className="config-row">
-                  <span className="config-label">Enabled</span>
-                  <span className="config-value">{fpvStatus.enabled ? 'Yes' : 'No'}</span>
-                </div>
-                <div className="config-row">
-                  <span className="config-label">Addon Loaded</span>
-                  <span className="config-value">
-                    {fpvStatus.available ? 'Ready' : 'Not available'}
-                  </span>
-                </div>
-                <div className="config-row">
-                  <span className="config-label">Frames Received</span>
-                  <span className="config-value">{fpvStatus.framesReceived}</span>
-                </div>
-                <div className="config-row">
-                  <span className="config-label">Last Frame</span>
-                  <span className="config-value">
-                    {fpvStatus.lastFrameAt ? new Date(fpvStatus.lastFrameAt).toLocaleString() : '—'}
-                  </span>
-                </div>
-                {fpvStatus.message ? (
-                  <div
-                    className={
-                      fpvStatus.available
-                        ? 'form-hint'
-                        : fpvStatus.enabled
-                          ? 'form-error'
-                          : 'form-hint'
-                    }
-                  >
-                    {fpvStatus.message}
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <div className="form-hint">Addon status unavailable.</div>
-            )}
-            <div className="config-hint">
-              Install with <code>pnpm install --filter @command-center/fpv-decoder</code> and set{' '}
-              <code>FPV_DECODER_ENABLED=true</code> to enable the decoder. The current
-              implementation is a scaffold—replace the addon with a real SDR/NTSC pipeline to stream
-              frames into the Command Center.
-            </div>
-          </div>
-        </section>
-
         <section className="config-card">
           <header>
             <h2>MQTT Federation</h2>

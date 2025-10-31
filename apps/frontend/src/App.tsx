@@ -10,6 +10,7 @@ import { SidebarNav } from './components/sidebar-nav';
 import { SocketBridge } from './components/socket-bridge';
 import { TerminalDrawer } from './components/terminal-drawer';
 import { DEFAULT_ALERT_COLORS, extractAlertColors } from './constants/alert-colors';
+import { AddonsPage } from './pages/AddonsPage';
 import { CommandConsolePage } from './pages/CommandConsolePage';
 import { ConfigPage } from './pages/ConfigPage';
 import { ExportsPage } from './pages/ExportsPage';
@@ -74,6 +75,7 @@ export default function App() {
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/console" element={<CommandConsolePage />} />
               <Route path="/config" element={<ConfigPage />} />
+              <Route path="/addons" element={<AddonsPage />} />
               <Route path="/exports" element={<ExportsPage />} />
               <Route path="/scheduler" element={<SchedulerPage />} />
               <Route path="/account" element={<UserPage />} />

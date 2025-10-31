@@ -2,11 +2,10 @@
 
 AntiHunter Command & Control PRO is the companion operations platform for the AntiHunter SIGINT mesh network. Flash your AntiHunter detection nodes with the AntiHunter builds, then connect them here to orchestrate the entire perimeter defense mission. The Command Center ingests every heartbeat, target hit, triangulation update, and vibration alert from the mesh, renders nodes and geofences on a live map, automates scan/baseline/triangulation workflows, and drives alarm cues, exports, and audit trails.
 
-
-
 > **Firmware note:** The companion firmware for mesh detection nodes lives in [lukeswitz/AntiHunter](https://github.com/lukeswitz/AntiHunter). Flash those builds to your field hardware before connecting them to this Command Center.
 
 > **Early Release:** This is a beta build. Expect stability issues, breaking changes, and evolving features.
+
 ---
 
 ## Table of Contents
@@ -52,64 +51,73 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 Each primary view ships with rich operator context. Replace the placeholder images below with real screenshots once the UI is finalized.
 
 #### Map
+
 Tracks live nodes, renders trails and geofences, and highlights alerts in real time.
 
 ![Map view showing live nodes and radius overlays](images/Map.png)
 
 #### Console
+
 Launch commands, manage templates, and review command acknowledgements/audits.
 
 ![Console view with command orchestration](images/Console.png)
 
 #### Inventory
+
 Review discovered devices, signal strength history, vendor resolutions, and export datasets.
 
 ![Inventory view listing detected devices](images/InventoryFilled.png)
 
 #### Targets
+
 Promote detections to tracked targets, view triangulation results, and manage status notes.
 
 ![Targets view with active detections](images/TargetsFilled.png)
 
 #### Geofence
+
 Create and edit geofences, tune alarm behavior, and jump to polygons on the map.
 
 ![Geofence management interface](images/GeoFenceFilled.png)
 
 #### Nodes
+
 Audit node health, connectivity, and telemetry history with quick map focus actions.
 
 ![Nodes list with health indicators](images/NodesFilled.png)
 
 #### Scheduler
+
 Plan recurring scans, FOREVER tasks, and automated detection sequences.
 
 ![Scheduler automation dashboard](images/Scheduler.png)
 
 #### Config
+
 Adjust system defaults (alarms, detection presets, serial ports, site federation) from a single pane.
 
 ![Configuration panel with system defaults](images/Config.png)
 
 #### Exports
+
 Generate CSV/GeoJSON bundles for inventory, targets, commands, and audit logs.
 
 ![Exports module with CSV and GeoJSON actions](images/Exports.png)
 
 #### Account
+
 Manage your profile, theme preferences, and admin-level user management tasks.
 
 ![Account preferences and admin tools](images/Account.png)
 
-
 ## Architecture
 
-| Layer      | Technology | Notes |
-|------------|------------|-------|
-| **Backend** | NestJS, Prisma, Socket.IO | REST + WS APIs, serial ingest worker, command queue, alarm service |
-| **Database** | PostgreSQL | Prisma migrations, seeds for singleton config tables, audit trail |
-| **Frontend** | React (Vite), Zustand, React Query, Leaflet (map) | SPA with map, targets, inventory, console, config modules |
-| **Tooling** | pnpm workspace, TypeScript strict mode, ESLint/Prettier | developer experience, linting, formatting |
+| Layer        | Technology                                              | Notes                                                              |
+| ------------ | ------------------------------------------------------- | ------------------------------------------------------------------ |
+| **Backend**  | NestJS, Prisma, Socket.IO                               | REST + WS APIs, serial ingest worker, command queue, alarm service |
+| **Database** | PostgreSQL                                              | Prisma migrations, seeds for singleton config tables, audit trail  |
+| **Frontend** | React (Vite), Zustand, React Query, Leaflet (map)       | SPA with map, targets, inventory, console, config modules          |
+| **Tooling**  | pnpm workspace, TypeScript strict mode, ESLint/Prettier | developer experience, linting, formatting                          |
 
 Data flows from serial workers → Prisma (nodes/device tables) → WS events → Zustand stores → React components. Commands and alarms run in the opposite direction, bubbling from the UI down to the serial layer.
 
@@ -199,20 +207,20 @@ ALLOW_ERASE_FORCE=false
 
 Optional environment flags:
 
-| Variable | Description |
-|----------|-------------|
-| `JWT_SECRET` | If auth is enabled later |
-| `SITE_ID` | Default site for ingest |
-| `WS_MAX_CLIENTS` | Socket.IO connection limit |
-| `SERIAL_PROTOCOL` | Parser profile (`meshtastic-like`, `nmea-like`, etc.) |
-| `TAK_ENABLED` | `true` to boot the TAK bridge automatically |
-| `TAK_PROTOCOL` | TAK transport (`UDP`, `TCP`, or `HTTPS`) |
-| `TAK_HOST` | TAK core hostname or IP |
-| `TAK_PORT` | Port that matches the TAK protocol (e.g., 6969/8088/8443) |
-| `TAK_TLS` | `true` when TLS certificates are required |
-| `TAK_USERNAME` | Optional basic-auth username for TAK gateways |
-| `TAK_PASSWORD` | Optional basic-auth password (otherwise set via UI) |
-| `TAK_API_KEY` | Optional API key for HTTPS-based TAK cores |
+| Variable          | Description                                               |
+| ----------------- | --------------------------------------------------------- |
+| `JWT_SECRET`      | If auth is enabled later                                  |
+| `SITE_ID`         | Default site for ingest                                   |
+| `WS_MAX_CLIENTS`  | Socket.IO connection limit                                |
+| `SERIAL_PROTOCOL` | Parser profile (`meshtastic-like`, `nmea-like`, etc.)     |
+| `TAK_ENABLED`     | `true` to boot the TAK bridge automatically               |
+| `TAK_PROTOCOL`    | TAK transport (`UDP`, `TCP`, or `HTTPS`)                  |
+| `TAK_HOST`        | TAK core hostname or IP                                   |
+| `TAK_PORT`        | Port that matches the TAK protocol (e.g., 6969/8088/8443) |
+| `TAK_TLS`         | `true` when TLS certificates are required                 |
+| `TAK_USERNAME`    | Optional basic-auth username for TAK gateways             |
+| `TAK_PASSWORD`    | Optional basic-auth password (otherwise set via UI)       |
+| `TAK_API_KEY`     | Optional API key for HTTPS-based TAK cores                |
 
 Frontend currently consumes backend settings via API, so no extra `.env` is needed.
 
@@ -233,22 +241,22 @@ The backend ships with a TAK bridge that translates node/alert telemetry into Cu
 
 **Stream controls (defaults):**
 
-| Toggle | Default | CoT payload | Notes |
-|--------|---------|-------------|-------|
-| Node telemetry | ✅ | `AHCC-NODE-*` | Emits live node markers with last message metadata. |
-| Target detections | ✅ | `AHCC-TARGET-*` | Sends MAC detections/triangulation estimates (includes RSSI/confidence). |
-| Command acknowledgements | ⛔ | `AHCC-CMDACK-*` | Forward only if your TAK users need live command audit. |
-| Command results | ⛔ | `AHCC-CMDRES-*` | Large payloads trimmed to 240 characters in CoT detail. |
-| Alert: Info | ⛔ | `AHCC-ALERT-*` | Keep off unless you need every heartbeat-level notification. |
-| Alert: Notice | ✅ |  | Targets promoted, triangulation updates, baselines. |
-| Alert: Alert | ✅ |  | Vibration, deauth, drone detections. |
-| Alert: Critical | ✅ |  | ERASE, tamper, high-priority events. |
+| Toggle                   | Default | CoT payload     | Notes                                                                    |
+| ------------------------ | ------- | --------------- | ------------------------------------------------------------------------ |
+| Node telemetry           | ✅      | `AHCC-NODE-*`   | Emits live node markers with last message metadata.                      |
+| Target detections        | ✅      | `AHCC-TARGET-*` | Sends MAC detections/triangulation estimates (includes RSSI/confidence). |
+| Command acknowledgements | ⛔      | `AHCC-CMDACK-*` | Forward only if your TAK users need live command audit.                  |
+| Command results          | ⛔      | `AHCC-CMDRES-*` | Large payloads trimmed to 240 characters in CoT detail.                  |
+| Alert: Info              | ⛔      | `AHCC-ALERT-*`  | Keep off unless you need every heartbeat-level notification.             |
+| Alert: Notice            | ✅      |                 | Targets promoted, triangulation updates, baselines.                      |
+| Alert: Alert             | ✅      |                 | Vibration, deauth, drone detections.                                     |
+| Alert: Critical          | ✅      |                 | ERASE, tamper, high-priority events.                                     |
 
 All events are tagged under `<detail><ahcc*>…` blocks so TAK filters/overlays can key off `site`, `node`, `mac`, `status`, and more. Partial failures (e.g., TAK server offline) are logged with `TAK_BRIDGE drop (…)` lines in the backend output. If you see persistent drops, restart the bridge from the Config page after verifying connectivity.
 
 ### Optional Addons
 
-- **FPV Decoder (experimental):** Optional NTSC/FPV ingest pipeline scaffolded as `@command-center/fpv-decoder`. Install it with `pnpm install --filter @command-center/fpv-decoder` (or create a helper script such as `pnpm addon:fpv`), then enable the backend bridge by setting `FPV_DECODER_ENABLED=true`. The Config → “FPV Decoder Addon” card surfaces whether the addon loaded and how many frames have been observed. Replace the stub implementation in `addons/fpv-decoder` with a real SoapySDR/NTSC demodulator when you are ready to stream live video frames into the Command Center.
+- **FPV Decoder (experimental):** Optional NTSC/FPV ingest pipeline scaffolded as `@command-center/fpv-decoder`. Install it with `pnpm install --filter @command-center/fpv-decoder` (or create a helper script such as `pnpm addon:fpv`), then enable the backend bridge by setting `FPV_DECODER_ENABLED=true`. The Add-ons -> "FPV Decoder (Experimental)" card surfaces whether the addon loaded and how many frames have been observed. Replace the stub implementation in `addons/fpv-decoder` with a real SoapySDR/NTSC demodulator when you are ready to stream live video frames into the Command Center.
 
 ## Database & Migrations
 
@@ -334,10 +342,10 @@ docker compose --env-file docker/.env.local up -d
 
 On first boot the seed script provisions:
 
-| Variable | Default | Override |
-|----------|---------|----------|
-| `ADMIN_EMAIL` | `admin@example.com` | set `ADMIN_EMAIL` in your env file |
-| `ADMIN_PASSWORD` | `admin` | set `ADMIN_PASSWORD` in your env file |
+| Variable         | Default             | Override                              |
+| ---------------- | ------------------- | ------------------------------------- |
+| `ADMIN_EMAIL`    | `admin@example.com` | set `ADMIN_EMAIL` in your env file    |
+| `ADMIN_PASSWORD` | `admin`             | set `ADMIN_PASSWORD` in your env file |
 
 Log in at `http://localhost:8080` with those credentials and change the password immediately.
 
@@ -365,7 +373,7 @@ Add `--volumes` if you also want to delete the Postgres data volume.
 - **Serial passthrough (Linux):** add the following to the `backend` service and ensure the container user can access the device:
   ```yaml
   devices:
-    - "/dev/ttyUSB0:/dev/ttyUSB0"
+    - '/dev/ttyUSB0:/dev/ttyUSB0'
   group_add:
     - dialout
   ```
@@ -411,13 +419,13 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 
 ## Useful Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm lint` | ESLint across backend + frontend |
-| `pnpm format` | Prettier writes |
-| `pnpm --filter @command-center/backend prisma:studio` | Inspect DB via Prisma Studio |
-| `pnpm --filter @command-center/backend prisma:seed` | Reseed config rows |
-| `pnpm --filter @command-center/frontend preview` | Preview SPA production build |
+| Command                                               | Description                      |
+| ----------------------------------------------------- | -------------------------------- |
+| `pnpm lint`                                           | ESLint across backend + frontend |
+| `pnpm format`                                         | Prettier writes                  |
+| `pnpm --filter @command-center/backend prisma:studio` | Inspect DB via Prisma Studio     |
+| `pnpm --filter @command-center/backend prisma:seed`   | Reseed config rows               |
+| `pnpm --filter @command-center/frontend preview`      | Preview SPA production build     |
 
 ## Operations & Maintenance
 
@@ -429,17 +437,14 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 
 ## Troubleshooting
 
-| Symptom | Suggested Fix |
-|---------|----------------|
-| **Frontend shows a blank page or 404 after deploy** | Ensure the SPA is served from the `/` root and that your reverse proxy rewrites unknown routes to `index.html`. In Docker, the bundled Nginx config already handles this. |
-| **Cannot log in with default credentials** | Confirm the seed ran: the backend container logs should show “Running database migrations…”. If you customized `ADMIN_EMAIL`/`ADMIN_PASSWORD`, restart the backend with the new env values. |
-| **Backend returns `ECONNREFUSED` for Postgres** | Check `docker compose logs postgres`; the DB must be healthy before the backend starts. If running locally, verify `DATABASE_URL` matches your Postgres host/port and that migrations were applied. |
-| **Serial device not detected** | On Windows note the `COM` port, on Linux grant access (`sudo usermod -aG dialout $USER` then re-login). Update the Config page or `.env` `SERIAL_DEVICE` with the correct path and restart the backend. |
-| **No alerts despite telemetry** | Confirm devices flashed with the companion firmware send events, sockets are connected (check `/healthz`), and that the alert filters on the terminal/alert drawer are not silencing the severity you expect. |
-| **Custom alarm audio silent or too loud** | After uploading a WAV file, adjust per-level volume sliders and click “Test”. If volume does not change, refresh the page to reload cached audio. Supported formats: 16-bit PCM WAV. |
-| **Docker push fails due to upstream changes** | Run `git pull --rebase origin main` locally, resolve conflicts, then `git push`. This keeps your fork in sync before building new images. |
+| Symptom                                             | Suggested Fix                                                                                                                                                                                                 |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Frontend shows a blank page or 404 after deploy** | Ensure the SPA is served from the `/` root and that your reverse proxy rewrites unknown routes to `index.html`. In Docker, the bundled Nginx config already handles this.                                     |
+| **Cannot log in with default credentials**          | Confirm the seed ran: the backend container logs should show “Running database migrations…”. If you customized `ADMIN_EMAIL`/`ADMIN_PASSWORD`, restart the backend with the new env values.                   |
+| **Backend returns `ECONNREFUSED` for Postgres**     | Check `docker compose logs postgres`; the DB must be healthy before the backend starts. If running locally, verify `DATABASE_URL` matches your Postgres host/port and that migrations were applied.           |
+| **Serial device not detected**                      | On Windows note the `COM` port, on Linux grant access (`sudo usermod -aG dialout $USER` then re-login). Update the Config page or `.env` `SERIAL_DEVICE` with the correct path and restart the backend.       |
+| **No alerts despite telemetry**                     | Confirm devices flashed with the companion firmware send events, sockets are connected (check `/healthz`), and that the alert filters on the terminal/alert drawer are not silencing the severity you expect. |
+| **Custom alarm audio silent or too loud**           | After uploading a WAV file, adjust per-level volume sliders and click “Test”. If volume does not change, refresh the page to reload cached audio. Supported formats: 16-bit PCM WAV.                          |
+| **Docker push fails due to upstream changes**       | Run `git pull --rebase origin main` locally, resolve conflicts, then `git push`. This keeps your fork in sync before building new images.                                                                     |
 
 ---
-
-
-

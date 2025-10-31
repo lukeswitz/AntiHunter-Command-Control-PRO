@@ -6,6 +6,7 @@ import {
   MdWifiTethering,
   MdTerminal,
   MdSettings,
+  MdExtension,
   MdDownload,
   MdEventNote,
   MdOutlineAreaChart,
@@ -28,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/nodes', label: 'Nodes', icon: MdSensors },
   { to: '/scheduler', label: 'Scheduler', icon: MdEventNote },
   { to: '/config', label: 'Config', icon: MdSettings },
+  { to: '/addons', label: 'Add-ons', icon: MdExtension },
   { to: '/exports', label: 'Exports', icon: MdDownload },
   { to: '/account', label: 'Account', icon: MdPerson },
 ];
