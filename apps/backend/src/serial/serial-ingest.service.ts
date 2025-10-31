@@ -6,9 +6,9 @@ import { SerialParseResult, SerialTargetDetected } from './serial.types';
 import { CommandsService } from '../commands/commands.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { NodesService } from '../nodes/nodes.service';
+import { TakService } from '../tak/tak.service';
 import { TargetTrackingService } from '../tracking/target-tracking.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
-import { TakService } from '../tak/tak.service';
 
 @Injectable()
 export class SerialIngestService implements OnModuleInit, OnModuleDestroy {

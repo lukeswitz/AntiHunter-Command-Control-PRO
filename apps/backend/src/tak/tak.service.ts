@@ -1,13 +1,12 @@
-import { randomUUID } from 'crypto';
-
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { TakProtocol } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import * as dgram from 'dgram';
 import * as net from 'net';
 
 import { TakConfigService, TakConfig } from './tak-config.service';
-import { parseCotEvent } from './utils/cot-parser';
 import { buildCotEvent } from './utils/cot-builder';
+import { parseCotEvent } from './utils/cot-parser';
 import { NodesService } from '../nodes/nodes.service';
 import type { NodeSnapshot } from '../nodes/nodes.types';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
