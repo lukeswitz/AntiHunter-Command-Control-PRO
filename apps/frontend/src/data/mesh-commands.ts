@@ -37,7 +37,8 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'STATUS',
     group: 'Status',
-    description: 'Reports system status (mode, scan state, hits, targets, unique MACs, temperature, uptime, GPS).',
+    description:
+      'Reports system status (mode, scan state, hits, targets, unique MACs, temperature, uptime, GPS).',
     defaultTarget: '@ALL',
     parameters: [],
     examples: [

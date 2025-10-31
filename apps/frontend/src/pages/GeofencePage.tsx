@@ -90,15 +90,17 @@ export function GeofencePage() {
           </p>
         </div>
         <p className="panel__subtitle">
-          Geofences trigger custom alarms when tracked drones or devices enter or exit defined zones. Use the map to draw
-          new boundaries and manage alarm behaviour here.
+          Geofences trigger custom alarms when tracked drones or devices enter or exit defined
+          zones. Use the map to draw new boundaries and manage alarm behaviour here.
         </p>
       </header>
 
       {geofences.length === 0 ? (
         <div className="empty-state">
           <MdWarningAmber size={48} />
-          <p>No geofences yet. Use the "Create Geofence" button on the map to draw one.</p>
+          <p>
+            No geofences yet. Use the &quot;Create Geofence&quot; button on the map to draw one.
+          </p>
         </div>
       ) : (
         <div className="geofence-list">
@@ -114,7 +116,11 @@ export function GeofencePage() {
                   <div className="geofence-meta">
                     <span>{geofence.polygon.length} vertices</span>
                     <span>
-                      Created {new Date(geofence.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                      Created{' '}
+                      {new Date(geofence.createdAt).toLocaleString(undefined, {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      })}
                     </span>
                   </div>
                 </div>
@@ -130,7 +136,11 @@ export function GeofencePage() {
                   <button type="button" onClick={() => handleFocus(index)}>
                     <MdMyLocation /> Focus
                   </button>
-                  <button type="button" className="danger" onClick={() => handleDelete(geofence.id)}>
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => handleDelete(geofence.id)}
+                  >
                     <MdDelete /> Delete
                   </button>
                 </div>
@@ -148,7 +158,10 @@ export function GeofencePage() {
                 </label>
                 <label>
                   Alarm level
-                  <select value={geofence.alarm.level} onChange={(event) => handleLevelChange(geofence.id, event)}>
+                  <select
+                    value={geofence.alarm.level}
+                    onChange={(event) => handleLevelChange(geofence.id, event)}
+                  >
                     {ALARM_LEVELS.map((level) => (
                       <option key={level} value={level}>
                         {level}
@@ -157,7 +170,10 @@ export function GeofencePage() {
                   </select>
                 </label>
                 <label className="geofence-card__message">
-                  Alarm message <span className="hint">(use tokens: {'{entity}'}, {'{geofence}'}, {'{type}'}, {'{event}'})</span>
+                  Alarm message{' '}
+                  <span className="hint">
+                    (use tokens: {'{entity}'}, {'{geofence}'}, {'{type}'}, {'{event}'})
+                  </span>
                   <textarea
                     rows={3}
                     value={geofence.alarm.message}

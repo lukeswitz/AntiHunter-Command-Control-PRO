@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import type { AlarmLevel } from '../api/types';
 import type { NodeSummary } from './node-store';
+import type { AlarmLevel } from '../api/types';
 
 export interface GeofenceVertex {
   lat: number;
@@ -51,16 +51,14 @@ interface GeofenceStoreState {
   geofences: Geofence[];
   states: GeofenceStateMap;
   highlighted: Record<string, number>;
-  addGeofence: (
-    geofence: {
-      id?: string;
-      name: string;
-      description?: string | null;
-      color?: string;
-      polygon: GeofenceVertex[];
-      alarm: GeofenceAlarmConfig;
-    },
-  ) => Geofence;
+  addGeofence: (geofence: {
+    id?: string;
+    name: string;
+    description?: string | null;
+    color?: string;
+    polygon: GeofenceVertex[];
+    alarm: GeofenceAlarmConfig;
+  }) => Geofence;
   updateGeofence: (id: string, update: GeofenceUpdate) => void;
   deleteGeofence: (id: string) => void;
   setAlarmEnabled: (id: string, enabled: boolean) => void;
@@ -188,16 +186,15 @@ export const useGeofenceStore = create<GeofenceStoreState>()(
               lat,
               lon,
               level: geofence.alarm.level,
-              message:
-                geofence.alarm.message?.trim().length
-                  ? formatMessage(geofence.alarm.message, {
-                      geofence: geofence.name,
-                      entity: node.name ?? nodeId,
-                      node: node.name ?? nodeId,
-                      type: 'node',
-                      event: 'enter',
-                    })
-                  : `${node.name ?? nodeId} entered geofence ${geofence.name}`,
+              message: geofence.alarm.message?.trim().length
+                ? formatMessage(geofence.alarm.message, {
+                    geofence: geofence.name,
+                    entity: node.name ?? nodeId,
+                    node: node.name ?? nodeId,
+                    type: 'node',
+                    event: 'enter',
+                  })
+                : `${node.name ?? nodeId} entered geofence ${geofence.name}`,
               transition: 'enter',
             });
           } else if (!inside && previous && geofence.alarm.triggerOnExit) {
@@ -210,16 +207,15 @@ export const useGeofenceStore = create<GeofenceStoreState>()(
               lat,
               lon,
               level: geofence.alarm.level,
-              message:
-                geofence.alarm.message?.trim().length
-                  ? formatMessage(geofence.alarm.message, {
-                      geofence: geofence.name,
-                      entity: node.name ?? nodeId,
-                      node: node.name ?? nodeId,
-                      type: 'node',
-                      event: 'exit',
-                    })
-                  : `${node.name ?? nodeId} exited geofence ${geofence.name}`,
+              message: geofence.alarm.message?.trim().length
+                ? formatMessage(geofence.alarm.message, {
+                    geofence: geofence.name,
+                    entity: node.name ?? nodeId,
+                    node: node.name ?? nodeId,
+                    type: 'node',
+                    event: 'exit',
+                  })
+                : `${node.name ?? nodeId} exited geofence ${geofence.name}`,
               transition: 'exit',
             });
           }
@@ -353,14 +349,20 @@ function pointInPolygon(lat: number, lon: number, polygon: GeofenceVertex[]): bo
   return inside;
 }
 
-function formatMessage(template: string | undefined, context: {
-  geofence: string;
-  entity: string;
-  node: string;
-  type: string;
-  event: 'enter' | 'exit';
-}): string {
-  const message = template && template.trim().length > 0 ? template : `{entity} ${context.event}s geofence {geofence}`;
+function formatMessage(
+  template: string | undefined,
+  context: {
+    geofence: string;
+    entity: string;
+    node: string;
+    type: string;
+    event: 'enter' | 'exit';
+  },
+): string {
+  const message =
+    template && template.trim().length > 0
+      ? template
+      : `{entity} ${context.event}s geofence {geofence}`;
   return message
     .replace(/\{geofence\}/gi, context.geofence)
     .replace(/\{entity\}/gi, context.entity)

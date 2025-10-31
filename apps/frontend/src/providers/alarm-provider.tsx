@@ -1,5 +1,13 @@
-import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  createContext,
+  PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 
 import { apiClient } from '../api/client';
 import type { AlarmConfig, AlarmLevel, AlarmSettingsResponse } from '../api/types';
@@ -153,7 +161,12 @@ export function AlarmProvider({ children }: PropsWithChildren) {
     },
   });
 
-  const uploadSoundMutation = useMutation<AlarmSettingsResponse, Error, { level: AlarmLevel; file: File }, { previous?: AlarmSettingsResponse; level: AlarmLevel }>({
+  const uploadSoundMutation = useMutation<
+    AlarmSettingsResponse,
+    Error,
+    { level: AlarmLevel; file: File },
+    { previous?: AlarmSettingsResponse; level: AlarmLevel }
+  >({
     mutationFn: ({ level, file }: { level: AlarmLevel; file: File }) => {
       const formData = new FormData();
       formData.append('file', file);
@@ -211,47 +224,56 @@ export function AlarmProvider({ children }: PropsWithChildren) {
   });
 
   const removeSoundMutation = useMutation({
-    mutationFn: (level: AlarmLevel) => apiClient.delete<AlarmSettingsResponse>(`/alarms/sounds/${level}`),
+    mutationFn: (level: AlarmLevel) =>
+      apiClient.delete<AlarmSettingsResponse>(`/alarms/sounds/${level}`),
     onSuccess: (data) => queryClient.setQueryData(['alarms'], data),
   });
 
-  const play = (level: AlarmLevel) => {
-    const config = configRef.current ?? settingsQuery.data?.config;
-    const now = Date.now();
+  const play = useCallback(
+    (level: AlarmLevel) => {
+      const config = configRef.current ?? settingsQuery.data?.config;
+      const now = Date.now();
 
-    if (config) {
-      const gap = gapForLevel(config, level);
-      if (gap > 0 && now - lastPlayedRef.current[level] < gap) {
-        return;
-      }
-
-      if (isWithinDndWindow(config, level)) {
-        return;
-      }
-
-      if (typeof document !== 'undefined' && document.hidden && !config.backgroundAllowed && level !== 'CRITICAL') {
-        return;
-      }
-    }
-
-    const audio = audioRefs.current[level];
-    const volume = configToVolume(config, level) ?? 60;
-    if (audio) {
-      audio.volume = volume / 100;
-      audio.currentTime = 0;
-      void audio.play().catch((error) => {
-        if (typeof window !== 'undefined') {
-          // eslint-disable-next-line no-console -- surface playback issues for operators
-          console.warn(`Failed to play alarm ${level}:`, error);
+      if (config) {
+        const gap = gapForLevel(config, level);
+        if (gap > 0 && now - lastPlayedRef.current[level] < gap) {
+          return;
         }
-        createFallbackTone(level, volume);
-      });
+
+        if (isWithinDndWindow(config, level)) {
+          return;
+        }
+
+        if (
+          typeof document !== 'undefined' &&
+          document.hidden &&
+          !config.backgroundAllowed &&
+          level !== 'CRITICAL'
+        ) {
+          return;
+        }
+      }
+
+      const audio = audioRefs.current[level];
+      const volume = configToVolume(config, level) ?? 60;
+      if (audio) {
+        audio.volume = volume / 100;
+        audio.currentTime = 0;
+        void audio.play().catch((error) => {
+          if (typeof window !== 'undefined') {
+            // eslint-disable-next-line no-console -- surface playback issues for operators
+            console.warn(`Failed to play alarm ${level}:`, error);
+          }
+          createFallbackTone(level, volume);
+        });
+        lastPlayedRef.current[level] = now;
+        return;
+      }
+      createFallbackTone(level, volume);
       lastPlayedRef.current[level] = now;
-      return;
-    }
-    createFallbackTone(level, volume);
-    lastPlayedRef.current[level] = now;
-  };
+    },
+    [settingsQuery.data],
+  );
 
   const value = useMemo<AlarmContextValue>(
     () => ({
@@ -262,7 +284,14 @@ export function AlarmProvider({ children }: PropsWithChildren) {
       uploadSound: (level, file) => uploadSoundMutation.mutate({ level, file }),
       removeSound: (level) => removeSoundMutation.mutate(level),
     }),
-    [settingsQuery.data, settingsQuery.isLoading, updateConfigMutation, uploadSoundMutation, removeSoundMutation],
+    [
+      settingsQuery.data,
+      settingsQuery.isLoading,
+      play,
+      updateConfigMutation,
+      uploadSoundMutation,
+      removeSoundMutation,
+    ],
   );
 
   return <AlarmContext.Provider value={value}>{children}</AlarmContext.Provider>;
@@ -351,4 +380,3 @@ function parseTimeToMinutes(value: string | null | undefined): number | null {
   }
   return hours * 60 + minutes;
 }
-

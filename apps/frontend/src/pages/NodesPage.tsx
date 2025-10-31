@@ -1,10 +1,9 @@
-
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiClient } from '../api/client';
-import { useNodeStore } from '../stores/node-store';
 import { useMapCommandStore } from '../stores/map-command-store';
+import { useNodeStore } from '../stores/node-store';
 
 const ONLINE_THRESHOLD_MS = 11 * 60 * 1000; // 11 minutes
 
@@ -95,7 +94,9 @@ export function NodesPage() {
                     </div>
                   </td>
                   <td>
-                    <span className={`status-badge ${row.online ? 'status-online' : 'status-offline'}`}>
+                    <span
+                      className={`status-badge ${row.online ? 'status-online' : 'status-offline'}`}
+                    >
                       {row.online ? 'Online' : 'Offline'}
                     </span>
                   </td>
@@ -103,7 +104,9 @@ export function NodesPage() {
                     {row.siteLabel ? (
                       <span
                         className="site-chip"
-                        style={row.siteColor ? { background: row.siteColor, color: '#fff' } : undefined}
+                        style={
+                          row.siteColor ? { background: row.siteColor, color: '#fff' } : undefined
+                        }
                       >
                         {row.siteLabel}
                       </span>
@@ -114,7 +117,9 @@ export function NodesPage() {
                   <td>
                     <div className="node-meta">
                       <span>{row.lastSeenDisplay}</span>
-                      {row.lastSeenRelative && <span className="muted">{row.lastSeenRelative}</span>}
+                      {row.lastSeenRelative && (
+                        <span className="muted">{row.lastSeenRelative}</span>
+                      )}
                     </div>
                   </td>
                   <td>

@@ -1,14 +1,10 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+﻿import { useMutation } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { apiClient } from '../api/client';
 import { CommandResponse } from '../api/types';
+import { SchedulerEvent, SchedulerLogEntry, useSchedulerStore } from '../stores/scheduler-store';
 import { useTemplateStore, CommandTemplate } from '../stores/template-store';
-import {
-  SchedulerEvent,
-  SchedulerLogEntry,
-  useSchedulerStore,
-} from '../stores/scheduler-store';
 
 function beginningOfWeek(date: Date): Date {
   const clone = new Date(date);
@@ -66,14 +62,17 @@ export function SchedulerPage() {
   const [formNote, setFormNote] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const addLog = useCallback((message: string, level: SchedulerLogEntry['level'] = 'info') => {
-    appendLog({
-      id: `log-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      timestamp: new Date().toISOString(),
-      message,
-      level,
-    });
-  }, [appendLog]);
+  const addLog = useCallback(
+    (message: string, level: SchedulerLogEntry['level'] = 'info') => {
+      appendLog({
+        id: `log-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: new Date().toISOString(),
+        message,
+        level,
+      });
+    },
+    [appendLog],
+  );
 
   const mutation = useMutation({
     mutationFn: (body: { target: string; name: string; params: string[] }) =>
@@ -230,10 +229,7 @@ export function SchedulerPage() {
           },
           {
             onSuccess: () => {
-              addLog(
-                `Executed ${template.label} at ${dateKey} ${timeKey}.`,
-                'success',
-              );
+              addLog(`Executed ${template.label} at ${dateKey} ${timeKey}.`, 'success');
               markExecuted(event.id, now.toISOString());
             },
             onError: (error) => {
@@ -276,8 +272,8 @@ export function SchedulerPage() {
         <div>
           <h1 className="panel__title">Scheduler</h1>
           <p className="panel__subtitle">
-            Plan ahead by attaching command templates to specific times. Start the scheduler to let the system dispatch
-            commands automatically.
+            Plan ahead by attaching command templates to specific times. Start the scheduler to let
+            the system dispatch commands automatically.
           </p>
         </div>
         <div className="scheduler-controls">
@@ -320,7 +316,13 @@ export function SchedulerPage() {
             <section key={dayKey} className="scheduler-day">
               <header className="scheduler-day__header">
                 <div>
-                  <h2>{day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</h2>
+                  <h2>
+                    {day.toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </h2>
                   <span>{dayEvents.length} scheduled</span>
                 </div>
                 <div className="scheduler-day__actions">
@@ -370,15 +372,26 @@ export function SchedulerPage() {
             <div className="scheduler-dialog__form">
               <label>
                 Date
-                <input type="date" value={formDate} onChange={(event) => setFormDate(event.target.value)} />
+                <input
+                  type="date"
+                  value={formDate}
+                  onChange={(event) => setFormDate(event.target.value)}
+                />
               </label>
               <label>
                 Time
-                <input type="time" value={formTime} onChange={(event) => setFormTime(event.target.value)} />
+                <input
+                  type="time"
+                  value={formTime}
+                  onChange={(event) => setFormTime(event.target.value)}
+                />
               </label>
               <label>
                 Command Template
-                <select value={formTemplateId} onChange={(event) => setFormTemplateId(event.target.value)}>
+                <select
+                  value={formTemplateId}
+                  onChange={(event) => setFormTemplateId(event.target.value)}
+                >
                   <option value="" disabled>
                     Select template
                   </option>
@@ -430,12 +443,3 @@ export function SchedulerPage() {
     </section>
   );
 }
-
-
-
-
-
-
-
-
-

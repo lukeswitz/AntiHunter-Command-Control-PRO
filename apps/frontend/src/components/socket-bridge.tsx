@@ -1,14 +1,14 @@
-import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
+import type { AlarmLevel, Target } from '../api/types';
 import { useAlarm } from '../providers/alarm-provider';
 import { useSocket } from '../providers/socket-provider';
 import { useAlertStore } from '../stores/alert-store';
-import { canonicalNodeId, NodeDiffPayload, NodeSummary, useNodeStore } from '../stores/node-store';
-import { TerminalEntry, TerminalLevel, useTerminalStore } from '../stores/terminal-store';
 import { useGeofenceStore } from '../stores/geofence-store';
 import type { GeofenceEvent } from '../stores/geofence-store';
-import type { AlarmLevel, Target } from '../api/types';
+import { canonicalNodeId, NodeDiffPayload, NodeSummary, useNodeStore } from '../stores/node-store';
+import { TerminalEntry, TerminalLevel, useTerminalStore } from '../stores/terminal-store';
 
 const NOTIFICATION_CATEGORIES = new Set(['gps', 'status', 'console']);
 
@@ -108,7 +108,7 @@ export function SocketBridge() {
               const confidence =
                 typeof targetDetails.confidence === 'number'
                   ? targetDetails.confidence
-                  : target.trackingConfidence ?? null;
+                  : (target.trackingConfidence ?? null);
               const updatedAt = targetDetails.detectedAt ?? target.updatedAt;
               if (
                 Math.abs(target.lat - lat) > 1e-6 ||
@@ -137,13 +137,22 @@ export function SocketBridge() {
           : undefined;
         const lat = targetDetails.lat ?? node?.lat;
         const lon = targetDetails.lon ?? node?.lon;
-        if (typeof lat === 'number' && Number.isFinite(lat) && typeof lon === 'number' && Number.isFinite(lon)) {
-          const entityId = targetDetails.mac ?? targetDetails.nodeId ?? `target-${targetDetails.detectedAt ?? Date.now()}`;
+        if (
+          typeof lat === 'number' &&
+          Number.isFinite(lat) &&
+          typeof lon === 'number' &&
+          Number.isFinite(lon)
+        ) {
+          const entityId =
+            targetDetails.mac ??
+            targetDetails.nodeId ??
+            `target-${targetDetails.detectedAt ?? Date.now()}`;
           const entityType = targetDetails.deviceType ?? 'target';
-          const entityLabel = [targetDetails.deviceType, targetDetails.mac ?? targetDetails.nodeId]
-            .filter(Boolean)
-            .join(' ')
-            .trim() || entityId;
+          const entityLabel =
+            [targetDetails.deviceType, targetDetails.mac ?? targetDetails.nodeId]
+              .filter(Boolean)
+              .join(' ')
+              .trim() || entityId;
           const geofenceEvents = useGeofenceStore.getState().processCoordinateEvent({
             entityId,
             entityLabel,
@@ -178,7 +187,8 @@ export function SocketBridge() {
 
       const command = payload as { id?: string; name?: string; status?: string };
       const status = String(command.status ?? 'UNKNOWN').toUpperCase();
-      const level: TerminalLevel = status === 'ERROR' ? 'critical' : status === 'OK' ? 'notice' : 'info';
+      const level: TerminalLevel =
+        status === 'ERROR' ? 'critical' : status === 'OK' ? 'notice' : 'info';
       const name = command.name ?? command.id ?? 'command';
 
       const entry: TerminalEntryInput = {
@@ -233,12 +243,7 @@ function isInitPayload(payload: unknown): payload is InitPayload {
 }
 
 function isNodeDiffPayload(payload: unknown): payload is NodeDiffPayload {
-  return (
-    typeof payload === 'object' &&
-    payload !== null &&
-    'type' in payload &&
-    'node' in payload
-  );
+  return typeof payload === 'object' && payload !== null && 'type' in payload && 'node' in payload;
 }
 
 function parseEventPayload(payload: unknown): TerminalEntryInput {
@@ -268,7 +273,10 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
 
       let terminalLevel = alarmLevelToTerminal(levelRaw as AlarmLevel | undefined);
       let isNotification =
-        !levelRaw || levelRaw === 'INFO' || levelRaw === 'NOTICE' || (category ? NOTIFICATION_CATEGORIES.has(category) : false);
+        !levelRaw ||
+        levelRaw === 'INFO' ||
+        levelRaw === 'NOTICE' ||
+        (category ? NOTIFICATION_CATEGORIES.has(category) : false);
 
       const isVibration = category === 'vibration' || messageUpper.includes('VIBRATION');
       if (isVibration) {
@@ -294,8 +302,8 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
         typeof rawValue === 'string'
           ? rawValue
           : rawValue != null
-          ? JSON.stringify(rawValue)
-          : JSON.stringify(payload);
+            ? JSON.stringify(rawValue)
+            : JSON.stringify(payload);
       return {
         message,
         level: 'info',
@@ -347,7 +355,8 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
 
     if ('line' in base) {
       const { line, type } = base as { line: string; type?: string };
-      const level: TerminalLevel = type === 'critical' ? 'critical' : type === 'alert' ? 'alert' : 'info';
+      const level: TerminalLevel =
+        type === 'critical' ? 'critical' : type === 'alert' ? 'alert' : 'info';
       return { message: line, level, source: type ?? 'raw' };
     }
 
@@ -416,8 +425,8 @@ function extractTargetDetails(payload: unknown): TargetEventDetails | null {
     typeof base.confidence === 'number'
       ? base.confidence
       : typeof base.tracking?.confidence === 'number'
-      ? base.tracking.confidence
-      : undefined;
+        ? base.tracking.confidence
+        : undefined;
 
   return {
     mac: base.mac,
@@ -426,7 +435,12 @@ function extractTargetDetails(payload: unknown): TargetEventDetails | null {
     deviceType: base.deviceType,
     lat: toNumber(base.lat),
     lon: toNumber(base.lon),
-    detectedAt: typeof base.timestamp === 'string' ? base.timestamp : typeof base.ts === 'string' ? base.ts : undefined,
+    detectedAt:
+      typeof base.timestamp === 'string'
+        ? base.timestamp
+        : typeof base.ts === 'string'
+          ? base.ts
+          : undefined,
     confidence: typeof trackingConfidence === 'number' ? trackingConfidence : undefined,
   };
 }

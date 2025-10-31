@@ -1,6 +1,6 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+﻿import { useQuery } from '@tanstack/react-query';
 import { Map as LeafletMap, latLngBounds } from 'leaflet';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   MdCenterFocusStrong,
   MdTimeline,
@@ -11,22 +11,21 @@ import {
   MdUndo,
   MdCancel,
   MdCheckCircle,
-  MdSignalCellularAlt,
 } from 'react-icons/md';
 
-import { CommandCenterMap, type IndicatorSeverity } from '../components/map/CommandCenterMap';
 import { apiClient } from '../api/client';
+import type { AlarmLevel, AppSettings, Target } from '../api/types';
+import { CommandCenterMap, type IndicatorSeverity } from '../components/map/CommandCenterMap';
+import { extractAlertColors } from '../constants/alert-colors';
+import type { AlertColorConfig } from '../constants/alert-colors';
 import { useAlertStore } from '../stores/alert-store';
+import { useAuthStore } from '../stores/auth-store';
+import { GeofenceVertex, useGeofenceStore } from '../stores/geofence-store';
+import { useMapCommandStore } from '../stores/map-command-store';
 import { useMapPreferences } from '../stores/map-store';
 import { canonicalNodeId, useNodeStore } from '../stores/node-store';
 import { useTargetStore } from '../stores/target-store';
 import type { TargetMarker } from '../stores/target-store';
-import { useMapCommandStore } from '../stores/map-command-store';
-import { GeofenceVertex, useGeofenceStore } from '../stores/geofence-store';
-import type { AlarmLevel, AppSettings, Target } from '../api/types';
-import { extractAlertColors } from '../constants/alert-colors';
-import type { AlertColorConfig } from '../constants/alert-colors';
-import { useAuthStore } from '../stores/auth-store';
 
 const GEOFENCE_HIGHLIGHT_MS = 10_000;
 
@@ -90,9 +89,7 @@ export function MapPage() {
         tracking: trackingEntry?.active ?? false,
         trackingSince: trackingEntry?.since ?? null,
         trackingConfidence:
-          typeof target.trackingConfidence === 'number'
-            ? target.trackingConfidence
-            : undefined,
+          typeof target.trackingConfidence === 'number' ? target.trackingConfidence : undefined,
         history: [
           {
             lat: target.lat,
@@ -114,7 +111,6 @@ export function MapPage() {
     toggleRadius,
     toggleFollow,
     toggleTargets,
-    toggleCoverage,
   } = useMapPreferences();
 
   const nodeList = useMemo(() => order.map((id) => nodes[id]).filter(Boolean), [nodes, order]);
@@ -129,7 +125,6 @@ export function MapPage() {
     [appSettingsQuery.data],
   );
   const mapDefaultRadius = appSettingsQuery.data?.defaultRadiusM ?? 200;
-
 
   const alertIndicatorMap = useMemo(() => {
     const severityRank: Record<IndicatorSeverity, number> = {
@@ -190,10 +185,7 @@ export function MapPage() {
       return;
     }
     if (pendingTarget.bounds) {
-      const bounds = latLngBounds([
-        pendingTarget.bounds.southWest,
-        pendingTarget.bounds.northEast,
-      ]);
+      const bounds = latLngBounds([pendingTarget.bounds.southWest, pendingTarget.bounds.northEast]);
       mapRef.current.fitBounds(bounds.pad(0.2), { animate: true });
     } else {
       const zoom = pendingTarget.zoom ?? Math.max(mapRef.current.getZoom(), 15);
@@ -365,14 +357,23 @@ export function MapPage() {
         />
       </div>
       <footer className="map-footer">
-        <button type="button" className="submit-button" onClick={startGeofenceDrawing} disabled={drawingGeofence}>
+        <button
+          type="button"
+          className="submit-button"
+          onClick={startGeofenceDrawing}
+          disabled={drawingGeofence}
+        >
           <MdCropFree /> Create Geofence
         </button>
         {drawingGeofence ? (
           <div className="geofence-drawing-controls">
             <span>{draftVertices.length} point(s) selected. Click map to add more.</span>
             <div className="geofence-drawing-buttons">
-              <button type="button" onClick={undoGeofencePoint} disabled={draftVertices.length === 0}>
+              <button
+                type="button"
+                onClick={undoGeofencePoint}
+                disabled={draftVertices.length === 0}
+              >
                 <MdUndo /> Undo
               </button>
               <button type="button" onClick={cancelGeofenceDrawing}>
@@ -400,7 +401,12 @@ function composeNodeKey(nodeId: string, siteId?: string | null): string {
 
 function normalizeAlarmLevel(value: string | null): AlarmLevel {
   const normalized = (value ?? '').toUpperCase();
-  if (normalized === 'CRITICAL' || normalized === 'ALERT' || normalized === 'NOTICE' || normalized === 'INFO') {
+  if (
+    normalized === 'CRITICAL' ||
+    normalized === 'ALERT' ||
+    normalized === 'NOTICE' ||
+    normalized === 'INFO'
+  ) {
     return normalized;
   }
   return 'ALERT';
@@ -421,4 +427,3 @@ function calculatePolygonCentroid(points: GeofenceVertex[]): GeofenceVertex {
     lon: sumLon / points.length,
   };
 }
-

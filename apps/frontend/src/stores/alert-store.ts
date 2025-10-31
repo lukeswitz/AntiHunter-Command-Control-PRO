@@ -1,7 +1,7 @@
 ﻿import { create } from 'zustand';
 
-import type { AlarmLevel } from '../api/types';
 import { canonicalNodeId } from './node-store';
+import type { AlarmLevel } from '../api/types';
 
 const DEFAULT_ALERT_DURATION_MS = 20_000;
 const SEVERITY_WEIGHT: Record<AlarmLevel, number> = {
@@ -112,4 +112,3 @@ export const useAlertStore = create<AlertStoreState>((set, get) => ({
     set({ alerts: next });
   },
 }));
-

@@ -1,5 +1,5 @@
-﻿import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+﻿import { useMutation } from '@tanstack/react-query';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiClient } from '../api/client';
 import { CommandRequest, CommandResponse } from '../api/types';
@@ -9,10 +9,10 @@ import {
   CommandParameter,
   MESH_COMMANDS,
 } from '../data/mesh-commands';
+import { useAuthStore } from '../stores/auth-store';
 import { NodeSummary, useNodeStore } from '../stores/node-store';
 import { useTemplateStore, CommandTemplate } from '../stores/template-store';
 import { TerminalLevel, useTerminalStore } from '../stores/terminal-store';
-import { useAuthStore } from '../stores/auth-store';
 
 type CommandFormState = {
   target: string;
@@ -46,7 +46,10 @@ function normalizeTarget(value: string | undefined): string {
   return `@${sanitized}`;
 }
 
-function createFormState(command: CommandDefinition, preset?: { target?: string; params?: string[] }): CommandFormState {
+function createFormState(
+  command: CommandDefinition,
+  preset?: { target?: string; params?: string[] },
+): CommandFormState {
   const presetParams = preset?.params ?? command.examples?.[0]?.params ?? [];
   const paramValues: Record<string, string> = {};
 
@@ -89,7 +92,9 @@ function buildCommandParams(command: CommandDefinition, form: CommandFormState):
   return parts;
 }
 
-function parseCommandText(commandText: string): { target: string; name: string; params: string[] } | null {
+function parseCommandText(
+  commandText: string,
+): { target: string; name: string; params: string[] } | null {
   const trimmed = commandText.trim();
   const firstSpace = trimmed.indexOf(' ');
   if (firstSpace <= 0) {
@@ -151,9 +156,7 @@ function deriveNodeTarget(node: NodeSummary): { value: string; label: string } {
 export function CommandConsolePage() {
   const addEntry = useTerminalStore((state) => state.addEntry);
   const availableNodes = useNodeStore((state) =>
-    state.order
-      .map((id) => state.nodes[id])
-      .filter((node): node is NodeSummary => Boolean(node)),
+    state.order.map((id) => state.nodes[id]).filter((node): node is NodeSummary => Boolean(node)),
   );
   const templates = useTemplateStore((state) => state.templates);
   const addTemplateToStore = useTemplateStore((state) => state.addTemplate);
@@ -244,25 +247,13 @@ export function CommandConsolePage() {
     return Array.from(dedup.values());
   }, [availableNodes]);
 
-  const targetValues = useMemo(() => {
-    const valueSet = new Set<string>(['@ALL']);
-    nodeCommandTargets.forEach((target) => valueSet.add(target.value));
-    if (form.target) {
-      valueSet.add(normalizeTarget(form.target));
-    }
-    return Array.from(valueSet);
-  }, [nodeCommandTargets, form.target]);
-
   const targetOptions = useMemo(() => {
     const options: Array<{ value: string; label: string }> = [
       { value: '@ALL', label: '@ALL (broadcast)' },
       ...nodeCommandTargets,
     ];
 
-    if (
-      form.target &&
-      !options.some((option) => option.value === normalizeTarget(form.target))
-    ) {
+    if (form.target && !options.some((option) => option.value === normalizeTarget(form.target))) {
       const normalized = normalizeTarget(form.target);
       options.push({ value: normalized, label: normalized.replace(/^@/, '') });
     }
@@ -270,7 +261,10 @@ export function CommandConsolePage() {
     return options;
   }, [nodeCommandTargets, form.target]);
 
-  const paramsForCommand = useMemo(() => buildCommandParams(selectedCommand, form), [selectedCommand, form]);
+  const paramsForCommand = useMemo(
+    () => buildCommandParams(selectedCommand, form),
+    [selectedCommand, form],
+  );
 
   const commandPayload = useMemo(() => {
     if (paramsForCommand.length === 0) {
@@ -287,7 +281,10 @@ export function CommandConsolePage() {
     return `${target} ${commandPayload}`.trim();
   }, [form.target, commandPayload]);
 
-  const setCommand = (command: CommandDefinition, preset?: { target?: string; params?: string[] }) => {
+  const setCommand = (
+    command: CommandDefinition,
+    preset?: { target?: string; params?: string[] },
+  ) => {
     setSelectedCommandName(command.name);
     setForm(createFormState(command, preset));
     setParamErrors({});
@@ -472,8 +469,9 @@ export function CommandConsolePage() {
         <div>
           <h1 className="panel__title">Command Console</h1>
           <p className="panel__subtitle">
-            Choose a command, fill in typed parameters, and queue it to the mesh. The left rail includes curated
-            templates for quick reuse. Save your own templates when you find a useful configuration.
+            Choose a command, fill in typed parameters, and queue it to the mesh. The left rail
+            includes curated templates for quick reuse. Save your own templates when you find a
+            useful configuration.
           </p>
         </div>
       </header>
@@ -521,7 +519,7 @@ export function CommandConsolePage() {
           </div>
 
           <div className="form-row">
-            <label>Description</label>
+            <div className="form-label">Description</div>
             <p className="command-description">{selectedCommand.description}</p>
           </div>
 
@@ -548,7 +546,7 @@ export function CommandConsolePage() {
 
           {selectedCommand.parameters.length > 0 ? (
             <div className="form-row">
-              <label>Parameters</label>
+              <div className="form-label">Parameters</div>
               <div className="form-parameters">
                 {selectedCommand.parameters.map((param) => {
                   const value = form.paramValues[param.key] ?? '';
@@ -559,7 +557,10 @@ export function CommandConsolePage() {
                         {param.required ? <span className="parameter-required">*</span> : null}
                       </div>
                       {param.type === 'select' ? (
-                        <select value={value} onChange={(event) => handleParamInputChange(param, event.target.value)}>
+                        <select
+                          value={value}
+                          onChange={(event) => handleParamInputChange(param, event.target.value)}
+                        >
                           {param.options?.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -572,17 +573,32 @@ export function CommandConsolePage() {
                             value={value}
                             onChange={(event) => handleParamInputChange(param, event.target.value)}
                             placeholder={param.placeholder}
-                            type={param.type === 'duration' || param.type === 'number' ? 'number' : 'text'}
-                            inputMode={param.type === 'duration' || param.type === 'number' ? 'numeric' : undefined}
+                            type={
+                              param.type === 'duration' || param.type === 'number'
+                                ? 'number'
+                                : 'text'
+                            }
+                            inputMode={
+                              param.type === 'duration' || param.type === 'number'
+                                ? 'numeric'
+                                : undefined
+                            }
                             min={param.min}
                             max={param.max}
-                            step={param.step ?? (param.type === 'duration' || param.type === 'number' ? 1 : undefined)}
+                            step={
+                              param.step ??
+                              (param.type === 'duration' || param.type === 'number' ? 1 : undefined)
+                            }
                           />
-                          {param.suffix ? <span className="parameter-suffix">{param.suffix}</span> : null}
+                          {param.suffix ? (
+                            <span className="parameter-suffix">{param.suffix}</span>
+                          ) : null}
                         </div>
                       )}
                       {param.helper ? <small>{param.helper}</small> : null}
-                      {paramErrors[param.key] ? <span className="form-error">{paramErrors[param.key]}</span> : null}
+                      {paramErrors[param.key] ? (
+                        <span className="form-error">{paramErrors[param.key]}</span>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -610,11 +626,15 @@ export function CommandConsolePage() {
           ) : null}
 
           <div className="form-row">
-            <label>Preview</label>
+            <div className="form-label">Preview</div>
             <code className="preview-line">{preview || 'N/A'}</code>
           </div>
 
-          <button type="submit" className="submit-button" disabled={mutation.isPending || !canSendCommands}>
+          <button
+            type="submit"
+            className="submit-button"
+            disabled={mutation.isPending || !canSendCommands}
+          >
             {mutation.isPending ? 'Sending...' : 'Send Command'}
           </button>
 
@@ -655,7 +675,11 @@ export function CommandConsolePage() {
                   <button type="button" onClick={handleUpdateTemplate}>
                     Update
                   </button>
-                  <button type="button" className="template-cancel" onClick={handleCancelTemplateEdit}>
+                  <button
+                    type="button"
+                    className="template-cancel"
+                    onClick={handleCancelTemplateEdit}
+                  >
                     Cancel
                   </button>
                 </>
@@ -722,10 +746,3 @@ export function CommandConsolePage() {
     </section>
   );
 }
-
-
-
-
-
-
-

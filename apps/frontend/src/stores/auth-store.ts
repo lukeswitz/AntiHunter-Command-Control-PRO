@@ -2,11 +2,7 @@ import { create } from 'zustand';
 
 import { apiClient } from '../api/client';
 import type { AuthUser, LoginResponse, MeResponse } from '../api/types';
-import {
-  getAuthToken,
-  registerLogoutListener,
-  storeAuthToken,
-} from '../auth/session';
+import { getAuthToken, registerLogoutListener, storeAuthToken } from '../auth/session';
 
 const DEFAULT_DISCLAIMER = `
 By accessing and using the AntiHunter Command & Control Platform (the "Software") you acknowledge and agree to the following:

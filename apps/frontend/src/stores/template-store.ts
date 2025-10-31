@@ -78,7 +78,7 @@ type TemplateStoreState = {
 
 export const useTemplateStore = create<TemplateStoreState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       templates: DEFAULT_TEMPLATES,
       addTemplate: (template) => {
         set((state) => ({
@@ -104,5 +104,3 @@ export const useTemplateStore = create<TemplateStoreState>()(
     },
   ),
 );
-
-

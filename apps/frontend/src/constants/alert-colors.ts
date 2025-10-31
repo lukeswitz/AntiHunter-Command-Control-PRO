@@ -16,10 +16,16 @@ export const DEFAULT_ALERT_COLORS: AlertColorConfig = {
   critical: '#EF4444',
 };
 
-export function extractAlertColors(settings?: Pick<
-  AppSettings,
-  'alertColorIdle' | 'alertColorInfo' | 'alertColorNotice' | 'alertColorAlert' | 'alertColorCritical'
->): AlertColorConfig {
+export function extractAlertColors(
+  settings?: Pick<
+    AppSettings,
+    | 'alertColorIdle'
+    | 'alertColorInfo'
+    | 'alertColorNotice'
+    | 'alertColorAlert'
+    | 'alertColorCritical'
+  >,
+): AlertColorConfig {
   if (!settings) {
     return { ...DEFAULT_ALERT_COLORS };
   }

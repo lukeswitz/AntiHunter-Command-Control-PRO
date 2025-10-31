@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { apiClient } from '../api/client';
 import type {
@@ -12,8 +12,8 @@ import type {
   UserRole,
   UserSiteAccessGrant,
 } from '../api/types';
-import { useAuthStore } from '../stores/auth-store';
 import { useTheme } from '../providers/theme-provider';
+import { useAuthStore } from '../stores/auth-store';
 
 type ThemePreference = 'light' | 'dark' | 'auto';
 type DensityPreference = 'compact' | 'comfortable';
@@ -146,17 +146,7 @@ export function UserPage() {
 
   const canManageUsers = authUser?.role === 'ADMIN';
 
-  const formatTimestamp = (value: string) => {
-    try {
-      return new Date(value).toLocaleString();
-    } catch (error) {
-      return value;
-    }
-  };
-
-  const layoutClass = canManageUsers
-    ? 'account-layout account-layout--admin'
-    : 'account-layout';
+  const layoutClass = canManageUsers ? 'account-layout account-layout--admin' : 'account-layout';
 
   return (
     <div className={layoutClass}>
@@ -233,7 +223,9 @@ export function UserPage() {
                 className="control-input"
                 value={profileForm.theme}
                 onChange={(event) =>
-                  setProfileForm((prev) => prev && { ...prev, theme: event.target.value as ThemePreference })
+                  setProfileForm(
+                    (prev) => prev && { ...prev, theme: event.target.value as ThemePreference },
+                  )
                 }
               >
                 <option value="auto">Auto</option>
@@ -247,7 +239,9 @@ export function UserPage() {
                 className="control-input"
                 value={profileForm.density}
                 onChange={(event) =>
-                  setProfileForm((prev) => prev && { ...prev, density: event.target.value as DensityPreference })
+                  setProfileForm(
+                    (prev) => prev && { ...prev, density: event.target.value as DensityPreference },
+                  )
                 }
               >
                 <option value="compact">Compact</option>
@@ -276,10 +270,13 @@ export function UserPage() {
                 className="control-input"
                 value={profileForm.timeFormat}
                 onChange={(event) =>
-                  setProfileForm((prev) => prev && {
-                    ...prev,
-                    timeFormat: event.target.value as TimeFormatPreference,
-                  })
+                  setProfileForm(
+                    (prev) =>
+                      prev && {
+                        ...prev,
+                        timeFormat: event.target.value as TimeFormatPreference,
+                      },
+                  )
                 }
               >
                 <option value="24h">24-hour</option>
@@ -469,13 +466,12 @@ function AdminUserManagement() {
       setFeatureSelection(detail.permissions ?? []);
       setPermissionsMessage('Permissions updated.');
       if (authUser?.id === detail.id) {
-        const { pendingInvitations, ...rest } = detail;
+        const { pendingInvitations: _pendingInvitations, ...rest } = detail;
         setAuthUser(rest);
       }
     },
     onError: (error: unknown) => {
-      const message =
-        error instanceof Error ? error.message : 'Unable to update permissions.';
+      const message = error instanceof Error ? error.message : 'Unable to update permissions.';
       setPermissionsMessage(message);
     },
   });
@@ -494,7 +490,7 @@ function AdminUserManagement() {
       setSiteDraft(detail.siteAccess ?? []);
       setSiteMessage('Site access updated.');
       if (authUser?.id === detail.id) {
-        const { pendingInvitations, ...rest } = detail;
+        const { pendingInvitations: _pendingInvitations, ...rest } = detail;
         setAuthUser(rest);
       }
     },
@@ -680,9 +676,7 @@ function AdminUserManagement() {
             type="email"
             autoComplete="off"
             value={createForm.email}
-            onChange={(event) =>
-              setCreateForm((prev) => ({ ...prev, email: event.target.value }))
-            }
+            onChange={(event) => setCreateForm((prev) => ({ ...prev, email: event.target.value }))}
             required
           />
         </label>
@@ -751,11 +745,7 @@ function AdminUserManagement() {
           </select>
         </label>
         <div className="form-row form-row--actions">
-          <button
-            type="submit"
-            className="submit-button"
-            disabled={createMutation.isPending}
-          >
+          <button type="submit" className="submit-button" disabled={createMutation.isPending}>
             {createMutation.isPending ? 'Creating...' : 'Create User'}
           </button>
           {createMessage ? <span className="form-feedback">{createMessage}</span> : null}
@@ -953,112 +943,114 @@ function AdminUserManagement() {
                 </button>
                 <button
                   type="button"
-                className="control-chip"
+                  className="control-chip"
+                  onClick={() => {
+                    setManagedUser(null);
+                    setManageMessage(null);
+                    setPermissionsMessage(null);
+                    setSiteMessage(null);
+                    setResetMessage(null);
+                    setManageForm({
+                      firstName: '',
+                      lastName: '',
+                      phone: '',
+                      jobTitle: '',
+                      timeFormat: '24h',
+                      password: '',
+                    });
+                    setFeatureSelection([]);
+                    setSiteDraft([]);
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+              {manageMessage ? <span className="form-feedback">{manageMessage}</span> : null}
+            </div>
+          </form>
+
+          <div className="admin-section">
+            <div className="admin-section__header">
+              <h4>Feature Permissions</h4>
+              <button
+                type="button"
+                className="submit-button"
+                disabled={updatePermissionsMutation.isPending}
                 onClick={() => {
-                  setManagedUser(null);
-                  setManageMessage(null);
-                  setPermissionsMessage(null);
-                  setSiteMessage(null);
-                  setResetMessage(null);
-                  setManageForm({
-                    firstName: '',
-                    lastName: '',
-                    phone: '',
-                    jobTitle: '',
-                    timeFormat: '24h',
-                    password: '',
-                  });
-                  setFeatureSelection([]);
-                  setSiteDraft([]);
+                  if (managedUser) {
+                    setPermissionsMessage(null);
+                    updatePermissionsMutation.mutate({
+                      id: managedUser.id,
+                      features: featureSelection,
+                    });
+                  }
                 }}
               >
-                Close
+                {updatePermissionsMutation.isPending ? 'Saving…' : 'Save Permissions'}
               </button>
             </div>
-            {manageMessage ? <span className="form-feedback">{manageMessage}</span> : null}
+            {featureFlagsQuery.isLoading ? (
+              <div>Loading feature definitions…</div>
+            ) : featureFlags.length === 0 ? (
+              <div>No feature flags configured.</div>
+            ) : (
+              <div className="feature-grid">
+                {featureFlags.map((flag) => {
+                  const checkboxId = `feature-${flag.key}`;
+                  return (
+                    <div key={flag.key} className="feature-flag">
+                      <input
+                        id={checkboxId}
+                        type="checkbox"
+                        checked={featureSelection.includes(flag.key)}
+                        onChange={() => toggleFeature(flag.key)}
+                      />
+                      <label htmlFor={checkboxId}>
+                        <div className="feature-flag__label">{flag.label}</div>
+                        <div className="feature-flag__description">{flag.description}</div>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {permissionsMessage ? <div className="form-feedback">{permissionsMessage}</div> : null}
           </div>
-        </form>
 
-        <div className="admin-section">
-          <div className="admin-section__header">
-            <h4>Feature Permissions</h4>
-            <button
-              type="button"
-              className="submit-button"
-              disabled={updatePermissionsMutation.isPending}
-              onClick={() => {
-                if (managedUser) {
-                  setPermissionsMessage(null);
-                  updatePermissionsMutation.mutate({
-                    id: managedUser.id,
-                    features: featureSelection,
-                  });
-                }
-              }}
-            >
-              {updatePermissionsMutation.isPending ? 'Saving…' : 'Save Permissions'}
-            </button>
-          </div>
-          {featureFlagsQuery.isLoading ? (
-            <div>Loading feature definitions…</div>
-          ) : featureFlags.length === 0 ? (
-            <div>No feature flags configured.</div>
-          ) : (
-            <div className="feature-grid">
-              {featureFlags.map((flag) => (
-                <label key={flag.key} className="feature-flag">
-                  <input
-                    type="checkbox"
-                    checked={featureSelection.includes(flag.key)}
-                    onChange={() => toggleFeature(flag.key)}
-                  />
-                  <div>
-                    <div className="feature-flag__label">{flag.label}</div>
-                    <div className="feature-flag__description">{flag.description}</div>
-                  </div>
-                </label>
-              ))}
+          <div className="admin-section">
+            <div className="admin-section__header">
+              <h4>Site Access</h4>
+              <button
+                type="button"
+                className="submit-button"
+                disabled={updateSiteAccessMutation.isPending}
+                onClick={() => {
+                  if (managedUser) {
+                    setSiteMessage(null);
+                    updateSiteAccessMutation.mutate({ id: managedUser.id, siteAccess: siteDraft });
+                  }
+                }}
+              >
+                {updateSiteAccessMutation.isPending ? 'Saving…' : 'Save Site Access'}
+              </button>
             </div>
-          )}
-            {permissionsMessage ? (
-              <div className="form-feedback">{permissionsMessage}</div>
-            ) : null}
-        </div>
-
-        <div className="admin-section">
-          <div className="admin-section__header">
-            <h4>Site Access</h4>
-            <button
-              type="button"
-              className="submit-button"
-              disabled={updateSiteAccessMutation.isPending}
-              onClick={() => {
-                if (managedUser) {
-                  setSiteMessage(null);
-                  updateSiteAccessMutation.mutate({ id: managedUser.id, siteAccess: siteDraft });
-                }
-              }}
-            >
-              {updateSiteAccessMutation.isPending ? 'Saving…' : 'Save Site Access'}
-            </button>
-          </div>
-          {siteDraft.length === 0 ? (
-            <div>No site assignments.</div>
-          ) : (
-            <div className="table-scroll">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Site</th>
-                    <th>Level</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {siteDraft.map((assignment) => (
-                    <tr key={assignment.siteId}>
-                      <td>{assignment.siteName ?? assignment.siteId}</td>
-                      <td>
+            {siteDraft.length === 0 ? (
+              <div>No site assignments.</div>
+            ) : (
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Site</th>
+                      <th>Level</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {siteDraft.map((assignment) => (
+                      <tr key={assignment.siteId}>
+                        <td>{assignment.siteName ?? assignment.siteId}</td>
+                        <td>
                           <select
                             className="table-select"
                             value={assignment.level}
@@ -1066,119 +1058,119 @@ function AdminUserManagement() {
                               const nextLevel = event.target.value as SiteAccessLevel;
                               setSiteDraft((prev) =>
                                 prev.map((entry) =>
-                                entry.siteId === assignment.siteId
-                                  ? { ...entry, level: nextLevel }
-                                  : entry,
-                              ),
-                            );
-                          }}
-                        >
-                          <option value="VIEW">View</option>
-                          <option value="MANAGE">Manage</option>
-                        </select>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="control-chip"
-                          onClick={() => handleRemoveSite(assignment.siteId)}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <div className="site-add-row">
-            <select
-              className="control-input"
-              value={siteToAdd}
-              onChange={(event) => setSiteToAdd(event.target.value)}
-            >
-              <option value="" disabled>
-                Select site
-              </option>
-              {availableSites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name}
+                                  entry.siteId === assignment.siteId
+                                    ? { ...entry, level: nextLevel }
+                                    : entry,
+                                ),
+                              );
+                            }}
+                          >
+                            <option value="VIEW">View</option>
+                            <option value="MANAGE">Manage</option>
+                          </select>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="control-chip"
+                            onClick={() => handleRemoveSite(assignment.siteId)}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="site-add-row">
+              <select
+                className="control-input"
+                value={siteToAdd}
+                onChange={(event) => setSiteToAdd(event.target.value)}
+              >
+                <option value="" disabled>
+                  Select site
                 </option>
-              ))}
-            </select>
-            <select
-              className="control-input"
-              value={siteLevelToAdd}
-              onChange={(event) => setSiteLevelToAdd(event.target.value as SiteAccessLevel)}
-            >
-              <option value="VIEW">View</option>
-              <option value="MANAGE">Manage</option>
-            </select>
-            <button type="button" className="control-chip" onClick={handleAddSite}>
-              Add
-            </button>
+                {availableSites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="control-input"
+                value={siteLevelToAdd}
+                onChange={(event) => setSiteLevelToAdd(event.target.value as SiteAccessLevel)}
+              >
+                <option value="VIEW">View</option>
+                <option value="MANAGE">Manage</option>
+              </select>
+              <button type="button" className="control-chip" onClick={handleAddSite}>
+                Add
+              </button>
+            </div>
+            {siteMessage ? <div className="form-feedback">{siteMessage}</div> : null}
           </div>
-          {siteMessage ? <div className="form-feedback">{siteMessage}</div> : null}
-        </div>
 
-        <div className="admin-section">
-          <div className="admin-section__header">
-            <h4>Security Actions</h4>
-            <button
-              type="button"
-              className="control-chip"
-              onClick={() => {
-                if (managedUser) {
-                  setResetMessage(null);
-                  sendResetMutation.mutate(managedUser.id);
-                }
-              }}
-              disabled={sendResetMutation.isPending}
-            >
-              {sendResetMutation.isPending ? 'Sending…' : 'Send Password Reset'}
-            </button>
-          </div>
+          <div className="admin-section">
+            <div className="admin-section__header">
+              <h4>Security Actions</h4>
+              <button
+                type="button"
+                className="control-chip"
+                onClick={() => {
+                  if (managedUser) {
+                    setResetMessage(null);
+                    sendResetMutation.mutate(managedUser.id);
+                  }
+                }}
+                disabled={sendResetMutation.isPending}
+              >
+                {sendResetMutation.isPending ? 'Sending…' : 'Send Password Reset'}
+              </button>
+            </div>
             {resetMessage ? <div className="form-feedback">{resetMessage}</div> : null}
-        </div>
+          </div>
 
-        <div className="admin-section">
-          <h4>Pending Invitations</h4>
-          {detail && detail.pendingInvitations.length > 0 ? (
-            <ul className="invitation-list">
-              {detail.pendingInvitations.map((invite) => (
-                <li key={invite.id}>
-                  <span>{invite.email}</span>
-                  <span>Expires: {formatDateTime(invite.expiresAt)}</span>
-                  <span className="token-preview">Token: {invite.token}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div>No pending invitations for this address.</div>
-          )}
-        </div>
+          <div className="admin-section">
+            <h4>Pending Invitations</h4>
+            {detail && detail.pendingInvitations.length > 0 ? (
+              <ul className="invitation-list">
+                {detail.pendingInvitations.map((invite) => (
+                  <li key={invite.id}>
+                    <span>{invite.email}</span>
+                    <span>Expires: {formatDateTime(invite.expiresAt)}</span>
+                    <span className="token-preview">Token: {invite.token}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div>No pending invitations for this address.</div>
+            )}
+          </div>
 
-        <div className="admin-section">
-          <h4>Recent Audit</h4>
-          {auditQuery.isLoading ? (
-            <div>Loading audit history…</div>
-          ) : auditEntries.length === 0 ? (
-            <div>No recent audit entries.</div>
-          ) : (
-            <ul className="audit-list">
-              {auditEntries.map((entry) => (
-                <li key={entry.id}>
-                  <span className="audit-timestamp">{formatDateTime(entry.createdAt)}</span>
-                  <span className="audit-action">{entry.action}</span>
-                  <span className="audit-entity">{entry.entity}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="admin-section">
+            <h4>Recent Audit</h4>
+            {auditQuery.isLoading ? (
+              <div>Loading audit history…</div>
+            ) : auditEntries.length === 0 ? (
+              <div>No recent audit entries.</div>
+            ) : (
+              <ul className="audit-list">
+                {auditEntries.map((entry) => (
+                  <li key={entry.id}>
+                    <span className="audit-timestamp">{formatDateTime(entry.createdAt)}</span>
+                    <span className="audit-action">{entry.action}</span>
+                    <span className="audit-entity">{entry.entity}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
-    ) : null}
+      ) : null}
 
       <div className="admin-section">
         <h3 className="section-heading">Send Invitation</h3>
@@ -1202,7 +1194,9 @@ function AdminUserManagement() {
               className="control-input"
               type="email"
               value={inviteForm.email}
-              onChange={(event) => setInviteForm((prev) => ({ ...prev, email: event.target.value }))}
+              onChange={(event) =>
+                setInviteForm((prev) => ({ ...prev, email: event.target.value }))
+              }
               required
             />
           </label>
@@ -1246,7 +1240,9 @@ function AdminUserManagement() {
               className="control-input"
               value={inviteForm.siteIds}
               onChange={(event) => {
-                const values = Array.from(event.target.selectedOptions).map((option) => option.value);
+                const values = Array.from(event.target.selectedOptions).map(
+                  (option) => option.value,
+                );
                 setInviteForm((prev) => ({ ...prev, siteIds: values }));
               }}
             >
@@ -1258,26 +1254,30 @@ function AdminUserManagement() {
             </select>
           </label>
           <div className="feature-grid">
-            {featureFlags.map((flag) => (
-              <label key={flag.key} className="feature-flag">
-                <input
-                  type="checkbox"
-                  checked={inviteForm.features.includes(flag.key)}
-                  onChange={() =>
-                    setInviteForm((prev) => ({
-                      ...prev,
-                      features: prev.features.includes(flag.key)
-                        ? prev.features.filter((value) => value !== flag.key)
-                        : [...prev.features, flag.key],
-                    }))
-                  }
-                />
-                <div>
-                  <div className="feature-flag__label">{flag.label}</div>
-                  <div className="feature-flag__description">{flag.description}</div>
+            {featureFlags.map((flag) => {
+              const inviteCheckboxId = `invite-feature-${flag.key}`;
+              return (
+                <div key={flag.key} className="feature-flag">
+                  <input
+                    id={inviteCheckboxId}
+                    type="checkbox"
+                    checked={inviteForm.features.includes(flag.key)}
+                    onChange={() =>
+                      setInviteForm((prev) => ({
+                        ...prev,
+                        features: prev.features.includes(flag.key)
+                          ? prev.features.filter((value) => value !== flag.key)
+                          : [...prev.features, flag.key],
+                      }))
+                    }
+                  />
+                  <label htmlFor={inviteCheckboxId}>
+                    <div className="feature-flag__label">{flag.label}</div>
+                    <div className="feature-flag__description">{flag.description}</div>
+                  </label>
                 </div>
-              </label>
-            ))}
+              );
+            })}
           </div>
           <div className="form-row form-row--actions">
             <button

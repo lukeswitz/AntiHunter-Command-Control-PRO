@@ -1,12 +1,12 @@
-import { Link } from 'react-router-dom';
-import { MdBrightness4, MdBrightness7, MdLogout, MdSignalWifiStatusbar4Bar } from 'react-icons/md';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { MdBrightness4, MdBrightness7, MdLogout, MdSignalWifiStatusbar4Bar } from 'react-icons/md';
+import { Link } from 'react-router-dom';
 
+import { apiClient } from '../api/client';
+import type { AuthUser } from '../api/types';
 import { useSocketConnected } from '../providers/socket-provider';
 import { useTheme } from '../providers/theme-provider';
 import { useAuthStore } from '../stores/auth-store';
-import { apiClient } from '../api/client';
-import type { AuthUser } from '../api/types';
 
 export function AppHeader() {
   const isConnected = useSocketConnected();
@@ -62,7 +62,11 @@ export function AppHeader() {
     <header className="app-header">
       <div className="app-header__brand">
         <span className="app-header__brand-icon" aria-hidden="true">
-          <img className="app-header__brand-mark" src="/header_logo.png" alt="AntiHunter Shield Logo" />
+          <img
+            className="app-header__brand-mark"
+            src="/header_logo.png"
+            alt="AntiHunter Shield Logo"
+          />
         </span>
         <div>
           <span className="brand-title">AntiHunter Command &amp; Control Pro</span>

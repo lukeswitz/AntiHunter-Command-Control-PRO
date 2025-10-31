@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { apiClient } from '../api/client';
 import { InventoryDevice } from '../api/types';
@@ -35,8 +35,8 @@ export function InventoryPage() {
         error instanceof Error
           ? error.message
           : typeof error === 'object' && error && 'message' in error
-          ? String((error as { message?: unknown }).message)
-          : 'Unable to promote device to target';
+            ? String((error as { message?: unknown }).message)
+            : 'Unable to promote device to target';
       window.alert(message);
     },
   });
@@ -52,8 +52,8 @@ export function InventoryPage() {
         error instanceof Error
           ? error.message
           : typeof error === 'object' && error && 'message' in error
-          ? String((error as { message?: unknown }).message)
-          : 'Unable to clear inventory';
+            ? String((error as { message?: unknown }).message)
+            : 'Unable to clear inventory';
       window.alert(message);
     },
   });
@@ -91,7 +91,9 @@ export function InventoryPage() {
                 window.alert('You need ADMIN privileges to clear the inventory.');
                 return;
               }
-              const confirmed = window.confirm('Clear all inventory records? This cannot be undone.');
+              const confirmed = window.confirm(
+                'Clear all inventory records? This cannot be undone.',
+              );
               if (!confirmed) {
                 return;
               }
@@ -168,7 +170,9 @@ export function InventoryPage() {
                         className="control-chip"
                         onClick={() => {
                           if (!canPromote) {
-                            window.alert('You need OPERATOR or ADMIN privileges to promote devices.');
+                            window.alert(
+                              'You need OPERATOR or ADMIN privileges to promote devices.',
+                            );
                             return;
                           }
                           promoteMutation.mutate(device);

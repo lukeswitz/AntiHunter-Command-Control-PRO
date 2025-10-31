@@ -38,7 +38,7 @@ const MAX_LOG_ENTRIES = 300;
 
 export const useSchedulerStore = create<SchedulerState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       active: false,
       events: [],
       logs: [],
@@ -49,9 +49,7 @@ export const useSchedulerStore = create<SchedulerState>()(
       },
       updateEvent: (id, update) => {
         set((state) => ({
-          events: state.events.map((event) =>
-            event.id === id ? { ...event, ...update } : event,
-          ),
+          events: state.events.map((event) => (event.id === id ? { ...event, ...update } : event)),
         }));
       },
       deleteEvent: (id) => {
@@ -124,4 +122,3 @@ export const useSchedulerStore = create<SchedulerState>()(
     },
   ),
 );
-

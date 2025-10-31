@@ -1,10 +1,10 @@
-﻿import { ChangeEvent, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+﻿import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChangeEvent, useMemo, useState } from 'react';
 
 import { apiClient } from '../api/client';
 import type { CommandRequest, InventoryDevice, Target } from '../api/types';
-import { useTargetStore } from '../stores/target-store';
 import { useAuthStore } from '../stores/auth-store';
+import { useTargetStore } from '../stores/target-store';
 
 interface TriangulatePayload {
   target: Target;
@@ -76,7 +76,10 @@ export function TargetsPage() {
   }, [inventoryQuery.data]);
 
   const triangulateMutation = useMutation({
-    mutationFn: async ({ target, duration = DEFAULT_TRIANGULATION_DURATION }: TriangulatePayload) => {
+    mutationFn: async ({
+      target,
+      duration = DEFAULT_TRIANGULATION_DURATION,
+    }: TriangulatePayload) => {
       if (!target.mac) {
         throw new Error('Target MAC unknown');
       }
@@ -134,8 +137,8 @@ export function TargetsPage() {
         error instanceof Error
           ? error.message
           : typeof error === 'object' && error && 'message' in error
-          ? String((error as { message?: unknown }).message)
-          : 'Unable to clear targets';
+            ? String((error as { message?: unknown }).message)
+            : 'Unable to clear targets';
       window.alert(message);
     },
   });
@@ -185,7 +188,9 @@ export function TargetsPage() {
                 window.alert('You need ADMIN privileges to clear all targets.');
                 return;
               }
-              const confirmed = window.confirm('Clear all targets? This removes all promoted devices.');
+              const confirmed = window.confirm(
+                'Clear all targets? This removes all promoted devices.',
+              );
               if (!confirmed) {
                 return;
               }
@@ -208,9 +213,7 @@ export function TargetsPage() {
         </div>
       ) : filteredTargets.length === 0 ? (
         <div className="empty-state">
-          <div>
-            No promoted targets yet. Promote a device from the inventory to manage it here.
-          </div>
+          <div>No promoted targets yet. Promote a device from the inventory to manage it here.</div>
         </div>
       ) : (
         <div className="targets-table">
@@ -238,7 +241,8 @@ export function TargetsPage() {
                 const tracking = trackingEntry?.active ?? false;
                 const comment = commentMap[target.id] ?? '';
                 const location = `${target.lat.toFixed(5)}, ${target.lon.toFixed(5)}`;
-                const firstNode = normalizeNodeTarget(target.firstNodeId)?.replace(/^@/, '') ?? 'Unknown';
+                const firstNode =
+                  normalizeNodeTarget(target.firstNodeId)?.replace(/^@/, '') ?? 'Unknown';
                 const ssid = vendorEntry?.ssid ?? null;
                 const statusLabel = target.status
                   .split('_')
@@ -273,7 +277,9 @@ export function TargetsPage() {
                         className="control-chip"
                         onClick={() => {
                           if (!canSendCommands) {
-                            window.alert('You need OPERATOR or ADMIN privileges to start triangulation.');
+                            window.alert(
+                              'You need OPERATOR or ADMIN privileges to start triangulation.',
+                            );
                             return;
                           }
                           triangulateMutation.mutate({ target });
@@ -294,7 +300,9 @@ export function TargetsPage() {
                         className={`control-chip ${tracking ? 'is-active' : ''}`}
                         onClick={() => {
                           if (!canSendCommands) {
-                            window.alert('You need OPERATOR or ADMIN privileges to control tracking.');
+                            window.alert(
+                              'You need OPERATOR or ADMIN privileges to control tracking.',
+                            );
                             return;
                           }
                           if (tracking) {
@@ -323,4 +331,3 @@ export function TargetsPage() {
     </section>
   );
 }
-

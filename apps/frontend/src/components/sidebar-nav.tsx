@@ -1,5 +1,4 @@
 ﻿import type { ComponentType } from 'react';
-import { NavLink } from 'react-router-dom';
 import {
   MdMap,
   MdSensors,
@@ -12,6 +11,7 @@ import {
   MdOutlineAreaChart,
   MdPerson,
 } from 'react-icons/md';
+import { NavLink } from 'react-router-dom';
 
 interface NavItem {
   to: string;
@@ -48,6 +48,3 @@ export function SidebarNav() {
     </aside>
   );
 }
-
-
-

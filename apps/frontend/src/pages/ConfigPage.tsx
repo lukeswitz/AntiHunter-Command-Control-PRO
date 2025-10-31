@@ -1,5 +1,5 @@
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 
 import { apiClient } from '../api/client';
 import type {
@@ -11,10 +11,9 @@ import type {
   SiteSummary,
   MqttSiteConfig,
 } from '../api/types';
-import { useAlarm } from '../providers/alarm-provider';
-import { useTheme } from '../providers/theme-provider';
-import { useNodeStore } from '../stores/node-store';
 import { DEFAULT_ALERT_COLORS, extractAlertColors } from '../constants/alert-colors';
+import { useAlarm } from '../providers/alarm-provider';
+import { useNodeStore } from '../stores/node-store';
 
 type AppSettingsUpdate = Partial<AppSettings> & { mailPassword?: string };
 
@@ -106,11 +105,9 @@ const DEFAULT_ALARM_CONFIG: AlarmConfig = {
   backgroundAllowed: false,
 };
 
-const DEFAULT_SITE_ID = 'default';
-
 export function ConfigPage() {
   const queryClient = useQueryClient();
-  const { theme, toggleTheme, setTheme } = useTheme();
+
   const updateNodeSiteMeta = useNodeStore((state) => state.updateSiteMeta);
   const {
     settings: alarmSettings,
@@ -142,28 +139,31 @@ export function ConfigPage() {
 
   const ouiStatsQuery = useQuery({
     queryKey: ['ouiStats'],
-    queryFn: () =>
-      apiClient.get<{ total: number; lastUpdated?: string | null }>('/oui/stats'),
+    queryFn: () => apiClient.get<{ total: number; lastUpdated?: string | null }>('/oui/stats'),
   });
 
   const [ouiMode, setOuiMode] = useState<'replace' | 'merge'>('replace');
   const [ouiError, setOuiError] = useState<string | null>(null);
 
   const [localAlarm, setLocalAlarm] = useState<AlarmConfig>(DEFAULT_ALARM_CONFIG);
-const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-const [serialConfig, setSerialConfig] = useState<SerialConfig | null>(null);
-const [siteSettings, setSiteSettings] = useState<SiteSummary[]>([]);
-const [mqttConfigs, setMqttConfigs] = useState<MqttSiteConfig[]>([]);
-const [mqttPasswords, setMqttPasswords] = useState<Record<string, string>>({});
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [serialConfig, setSerialConfig] = useState<SerialConfig | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSummary[]>([]);
+  const [mqttConfigs, setMqttConfigs] = useState<MqttSiteConfig[]>([]);
+  const [mqttPasswords, setMqttPasswords] = useState<Record<string, string>>({});
   const [mailPasswordInput, setMailPasswordInput] = useState('');
-  const [mailPasswordMessage, setMailPasswordMessage] = useState<
-    { type: 'success' | 'error'; text: string } | null
-  >(null);
-const [serialTestStatus, setSerialTestStatus] = useState<{
-  status: 'idle' | 'running' | 'success' | 'error';
-  message?: string;
-}>({ status: 'idle' });
-  const [configNotice, setConfigNotice] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [mailPasswordMessage, setMailPasswordMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+  const [serialTestStatus, setSerialTestStatus] = useState<{
+    status: 'idle' | 'running' | 'success' | 'error';
+    message?: string;
+  }>({ status: 'idle' });
+  const [configNotice, setConfigNotice] = useState<{
+    type: 'success' | 'error' | 'info';
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     if (alarmSettings?.config) {
@@ -260,8 +260,13 @@ const [serialTestStatus, setSerialTestStatus] = useState<{
     },
   });
   const updateMqttConfigMutation = useMutation({
-    mutationFn: ({ siteId, body }: { siteId: string; body: Partial<MqttSiteConfig> & { password?: string | null } }) =>
-      apiClient.put<MqttSiteConfig>(`/mqtt/sites/${siteId}`, body),
+    mutationFn: ({
+      siteId,
+      body,
+    }: {
+      siteId: string;
+      body: Partial<MqttSiteConfig> & { password?: string | null };
+    }) => apiClient.put<MqttSiteConfig>(`/mqtt/sites/${siteId}`, body),
     onSuccess: (data) => {
       queryClient.setQueryData(['mqttSites'], (existing: MqttSiteConfig[] | undefined) =>
         existing
@@ -310,15 +315,18 @@ const [serialTestStatus, setSerialTestStatus] = useState<{
       });
       setAppSettings(result);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to update mail password.';
+      const message = error instanceof Error ? error.message : 'Unable to update mail password.';
       setMailPasswordMessage({ type: 'error', text: message });
     }
   };
 
   const serialTestMutation = useMutation({
-    mutationFn: (payload: { path?: string; baudRate?: number; delimiter?: string; protocol?: string }) =>
-      apiClient.post<SerialState>('/serial/connect', payload),
+    mutationFn: (payload: {
+      path?: string;
+      baudRate?: number;
+      delimiter?: string;
+      protocol?: string;
+    }) => apiClient.post<SerialState>('/serial/connect', payload),
     onMutate: () => {
       setSerialTestStatus({ status: 'running', message: 'Attempting to connect...' });
     },
@@ -326,7 +334,8 @@ const [serialTestStatus, setSerialTestStatus] = useState<{
       if (state.connected) {
         setSerialTestStatus({
           status: 'success',
-          message: `Connected to ${state.path ?? 'device'} ${state.baudRate ? `@ ${state.baudRate} baud` : ''}`.trim(),
+          message:
+            `Connected to ${state.path ?? 'device'} ${state.baudRate ? `@ ${state.baudRate} baud` : ''}`.trim(),
         });
         void serialConfigQuery.refetch();
       } else {
@@ -362,7 +371,7 @@ const [serialTestStatus, setSerialTestStatus] = useState<{
     },
   });
 
-const updateAppSetting = (patch: Partial<AppSettings>) => {
+  const updateAppSetting = (patch: Partial<AppSettings>) => {
     if (!appSettings) return;
     const next = { ...appSettings, ...patch };
     setAppSettings(next);
@@ -487,13 +496,14 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
     updateAlarmConfig(next);
   };
 
-  const handleDndChange = (key: 'dndStart' | 'dndEnd') => (event: ChangeEvent<HTMLInputElement>) => {
-    if (!localAlarm) return;
-    const value = event.target.value || null;
-    const next = { ...localAlarm, [key]: value };
-    setLocalAlarm(next);
-    updateAlarmConfig(next);
-  };
+  const handleDndChange =
+    (key: 'dndStart' | 'dndEnd') => (event: ChangeEvent<HTMLInputElement>) => {
+      if (!localAlarm) return;
+      const value = event.target.value || null;
+      const next = { ...localAlarm, [key]: value };
+      setLocalAlarm(next);
+      updateAlarmConfig(next);
+    };
 
   const handleBackgroundToggle = (event: ChangeEvent<HTMLInputElement>) => {
     if (!localAlarm) return;
@@ -529,7 +539,8 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
   const mailInputsDisabled = !appSettings.mailEnabled;
   const trimmedMailPassword = mailPasswordInput.trim();
   const mailPasswordReady =
-    trimmedMailPassword.length > 0 || (appSettings.mailPasswordSet && mailPasswordInput.length === 0);
+    trimmedMailPassword.length > 0 ||
+    (appSettings.mailPasswordSet && mailPasswordInput.length === 0);
 
   return (
     <section className="panel">
@@ -537,7 +548,8 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
         <div>
           <h1 className="panel__title">Configuration</h1>
           <p className="panel__subtitle">
-            Manage appearance, alarms, serial transport, detection defaults, federation, and retention.
+            Manage appearance, alarms, serial transport, detection defaults, federation, and
+            retention.
           </p>
         </div>
         <div className="controls-row">
@@ -549,18 +561,10 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
           >
             {serialTestMutation.isPending ? 'Testing...' : 'Test Serial'}
           </button>
-          <button
-            type="button"
-            className="control-chip"
-            onClick={handleJsonFeatureNotice}
-          >
+          <button type="button" className="control-chip" onClick={handleJsonFeatureNotice}>
             Import JSON
           </button>
-          <button
-            type="button"
-            className="control-chip"
-            onClick={handleJsonFeatureNotice}
-          >
+          <button type="button" className="control-chip" onClick={handleJsonFeatureNotice}>
             Export JSON
           </button>
         </div>
@@ -570,8 +574,8 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               configNotice.type === 'error'
                 ? 'form-error'
                 : configNotice.type === 'success'
-                ? 'form-success'
-                : 'form-hint'
+                  ? 'form-success'
+                  : 'form-hint'
             }
             role={configNotice.type === 'error' ? 'alert' : 'status'}
           >
@@ -584,8 +588,8 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               serialTestStatus.status === 'error'
                 ? 'form-error'
                 : serialTestStatus.status === 'success'
-                ? 'form-success'
-                : 'form-hint'
+                  ? 'form-success'
+                  : 'form-hint'
             }
           >
             {serialTestStatus.message}
@@ -596,40 +600,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
       <div className="config-grid">
         <section className="config-card">
           <header>
-            <h2>Appearance</h2>
-            <p>Switch between light and dark themes for the operator console.</p>
-          </header>
-          <div className="config-card__body">
-            <div className="theme-toggle">
-              <button
-                type="button"
-                className={`theme-option ${theme === 'light' ? 'active' : ''}`}
-                onClick={() => setTheme('light')}
-              >
-                Light Mode
-              </button>
-              <button
-                type="button"
-                className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
-                onClick={() => setTheme('dark')}
-              >
-                Dark Mode
-              </button>
-              <button type="button" className="theme-option" onClick={toggleTheme}>
-                Toggle
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="config-card">
-          <header>
             <h2>Alarm Profiles</h2>
             <p>Adjust volume, rate limit, and audio tone for each alarm level.</p>
           </header>
           <div className="config-card__body">
             <div className="config-row">
-              <label>Sound Pack</label>
+              <span className="config-label">Sound Pack</span>
               <select value={localAlarm.audioPack} onChange={handleAudioPackChange}>
                 <option value="default">Default</option>
                 <option value="quiet">Quiet</option>
@@ -672,7 +648,11 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                         {sounds[alarmLevel] ? 'Custom sound uploaded' : 'Using default tone'}
                       </div>
                       <div className="sound-actions">
-                        <button type="button" className="control-chip" onClick={() => play(alarmLevel)}>
+                        <button
+                          type="button"
+                          className="control-chip"
+                          onClick={() => play(alarmLevel)}
+                        >
                           Preview
                         </button>
                         <label className="control-chip">
@@ -717,7 +697,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               const gapValue = (localAlarm[key] ?? 0) as number;
               return (
                 <div className="config-row" key={key}>
-                  <label>{label}</label>
+                  <span className="config-label">{label}</span>
                   <input
                     type="number"
                     min={0}
@@ -729,7 +709,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               );
             })}
             <div className="config-row">
-              <label>Do-not-disturb start</label>
+              <span className="config-label">Do-not-disturb start</span>
               <input
                 type="time"
                 value={localAlarm.dndStart ?? ''}
@@ -737,7 +717,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
             </div>
             <div className="config-row">
-              <label>Do-not-disturb end</label>
+              <span className="config-label">Do-not-disturb end</span>
               <input
                 type="time"
                 value={localAlarm.dndEnd ?? ''}
@@ -762,7 +742,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               Enable outbound email
             </label>
             <div className="config-row">
-              <label>SMTP Host</label>
+              <span className="config-label">SMTP Host</span>
               <input
                 placeholder="smtp.example.com"
                 value={appSettings.mailHost ?? ''}
@@ -772,10 +752,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                 }}
                 disabled={mailInputsDisabled}
               />
-              <span className="config-hint">Fully qualified domain or IP that the backend can reach, e.g. smtp.yourdomain.com.</span>
+              <span className="config-hint">
+                Fully qualified domain or IP that the backend can reach, e.g. smtp.yourdomain.com.
+              </span>
             </div>
             <div className="config-row">
-              <label>SMTP Port</label>
+              <span className="config-label">SMTP Port</span>
               <input
                 type="number"
                 min={1}
@@ -795,7 +777,9 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                 }}
                 disabled={mailInputsDisabled}
               />
-              <span className="config-hint">Common ports: 587 for STARTTLS, 465 for SMTPS, 25 for unencrypted relays.</span>
+              <span className="config-hint">
+                Common ports: 587 for STARTTLS, 465 for SMTPS, 25 for unencrypted relays.
+              </span>
             </div>
             <label className="checkbox-label">
               <input
@@ -806,9 +790,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
               Use TLS (secure connection)
             </label>
-            <span className="config-hint">Enable for STARTTLS/SMTPS. Disable only if your relay explicitly requires plain-text connections.</span>
+            <span className="config-hint">
+              Enable for STARTTLS/SMTPS. Disable only if your relay explicitly requires plain-text
+              connections.
+            </span>
             <div className="config-row">
-              <label>Username</label>
+              <span className="config-label">Username</span>
               <input
                 value={appSettings.mailUser ?? ''}
                 onChange={(event) => {
@@ -817,10 +804,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                 }}
                 disabled={mailInputsDisabled}
               />
-              <span className="config-hint">Optional login for authenticated SMTP. Leave blank for IP/hostname based relays.</span>
+              <span className="config-hint">
+                Optional login for authenticated SMTP. Leave blank for IP/hostname based relays.
+              </span>
             </div>
             <div className="config-row">
-              <label>From Address</label>
+              <span className="config-label">From Address</span>
               <input
                 value={appSettings.mailFrom}
                 onChange={(event) => updateAppSetting({ mailFrom: event.target.value })}
@@ -837,9 +826,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
               Capture mail in local preview instead of sending
             </label>
-            <span className="config-hint">When enabled, emails are written to disk for inspection and never delivered to external servers.</span>
+            <span className="config-hint">
+              When enabled, emails are written to disk for inspection and never delivered to
+              external servers.
+            </span>
             <div className="config-row">
-              <label>Password</label>
+              <span className="config-label">Password</span>
               <div className="mail-password-row">
                 <input
                   type="password"
@@ -852,7 +844,9 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   type="button"
                   className="control-chip"
                   onClick={handleMailPasswordSave}
-                  disabled={mailInputsDisabled || !mailPasswordReady || updateAppSettingsMutation.isPending}
+                  disabled={
+                    mailInputsDisabled || !mailPasswordReady || updateAppSettingsMutation.isPending
+                  }
                 >
                   Save Password
                 </button>
@@ -881,7 +875,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
           </header>
           <div className="config-card__body">
             <div className="config-row">
-              <label>Application URL</label>
+              <span className="config-label">Application URL</span>
               <input
                 type="url"
                 placeholder="https://command-center.example.com"
@@ -891,7 +885,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               <span className="field-hint">Used in email templates and deep links.</span>
             </div>
             <div className="config-row">
-              <label>Invitation expiry (hours)</label>
+              <span className="config-label">Invitation expiry (hours)</span>
               <input
                 type="number"
                 min={1}
@@ -904,7 +898,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
             </div>
             <div className="config-row">
-              <label>Password reset expiry (hours)</label>
+              <span className="config-label">Password reset expiry (hours)</span>
               <input
                 type="number"
                 min={1}
@@ -941,7 +935,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                       />
                     </div>
                     <div className="alert-color-details">
-                      <label>{field.label}</label>
+                      <span className="config-label">{field.label}</span>
                       <div className="alert-color-code">{previewColor}</div>
                       <p className="field-hint">{field.description}</p>
                       <div className="alert-color-actions">
@@ -980,11 +974,11 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               siteSettings.map((site) => (
                 <div key={site.id} className="config-subcard">
                   <div className="config-row">
-                    <label>Site ID</label>
+                    <span className="config-label">Site ID</span>
                     <span className="muted">{site.id}</span>
                   </div>
                   <div className="config-row">
-                    <label>Name</label>
+                    <span className="config-label">Name</span>
                     <input
                       value={site.name}
                       onChange={(event) => updateSiteSetting(site.id, { name: event.target.value })}
@@ -996,7 +990,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     />
                   </div>
                   <div className="config-row">
-                    <label>Display Color</label>
+                    <span className="config-label">Display Color</span>
                     <div className="site-color-row">
                       <input
                         type="color"
@@ -1014,20 +1008,20 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                         onChange={(event) =>
                           updateSiteSetting(site.id, { color: event.target.value })
                         }
-                      onBlur={(event) => {
-                        const raw = event.target.value.trim();
-                        if (!raw) {
-                          return;
-                        }
-                        const sanitized = raw.startsWith('#') ? raw : `#${raw}`;
-                        updateSiteSetting(site.id, { color: sanitized });
-                        commitSiteSetting(site.id, { color: sanitized });
-                      }}
+                        onBlur={(event) => {
+                          const raw = event.target.value.trim();
+                          if (!raw) {
+                            return;
+                          }
+                          const sanitized = raw.startsWith('#') ? raw : `#${raw}`;
+                          updateSiteSetting(site.id, { color: sanitized });
+                          commitSiteSetting(site.id, { color: sanitized });
+                        }}
                       />
                     </div>
                   </div>
                   <div className="config-row">
-                    <label>Region</label>
+                    <span className="config-label">Region</span>
                     <input
                       value={site.region ?? ''}
                       placeholder="Optional"
@@ -1063,9 +1057,11 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
               Enable serial auto-connect
             </label>
-            <span className="config-hint">When enabled, the ingest service reconnects automatically using the settings below.</span>
+            <span className="config-hint">
+              When enabled, the ingest service reconnects automatically using the settings below.
+            </span>
             <div className="config-row">
-              <label>Device Path</label>
+              <span className="config-label">Device Path</span>
               <input
                 placeholder="/dev/ttyUSB0"
                 value={serialConfig.devicePath ?? ''}
@@ -1073,10 +1069,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ devicePath: event.target.value || null })
                 }
               />
-              <span className="config-hint">Path to the radio / serial bridge. On Windows use COM ports, on Linux use /dev/tty*.</span>
+              <span className="config-hint">
+                Path to the radio / serial bridge. On Windows use COM ports, on Linux use /dev/tty*.
+              </span>
             </div>
             <div className="config-row">
-              <label>Baud Rate</label>
+              <span className="config-label">Baud Rate</span>
               <input
                 type="number"
                 placeholder="115200"
@@ -1092,10 +1090,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ baud: value });
                 }}
               />
-              <span className="config-hint">Must match the firmware setting on the connected device (115200 for Meshtastic).</span>
+              <span className="config-hint">
+                Must match the firmware setting on the connected device (115200 for Meshtastic).
+              </span>
             </div>
             <div className="config-row">
-              <label>Protocol</label>
+              <span className="config-label">Protocol</span>
               <select
                 value={appSettings.protocol}
                 onChange={(event) => updateAppSetting({ protocol: event.target.value })}
@@ -1106,10 +1106,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   </option>
                 ))}
               </select>
-              <span className="config-hint">Select the parser that matches the incoming frame format on the wire.</span>
+              <span className="config-hint">
+                Select the parser that matches the incoming frame format on the wire.
+              </span>
             </div>
             <div className="config-row">
-              <label>Data Bits</label>
+              <span className="config-label">Data Bits</span>
               <input
                 type="number"
                 min={5}
@@ -1126,10 +1128,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ dataBits: value });
                 }}
               />
-              <span className="config-hint">Most serial radios use 8 data bits. Adjust only for specialized hardware.</span>
+              <span className="config-hint">
+                Most serial radios use 8 data bits. Adjust only for specialized hardware.
+              </span>
             </div>
             <div className="config-row">
-              <label>Parity</label>
+              <span className="config-label">Parity</span>
               <select
                 value={serialConfig.parity ?? 'none'}
                 onChange={(event) => updateSerialSetting({ parity: event.target.value })}
@@ -1140,15 +1144,15 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   </option>
                 ))}
               </select>
-              <span className="config-hint">Leave as “None” unless the device requires parity bits for error checking.</span>
+              <span className="config-hint">
+                Leave as None unless the device requires parity bits for error checking.
+              </span>
             </div>
             <div className="config-row">
-              <label>Stop Bits</label>
+              <span className="config-label">Stop Bits</span>
               <select
                 value={serialConfig.stopBits ?? 1}
-                onChange={(event) =>
-                  updateSerialSetting({ stopBits: Number(event.target.value) })
-                }
+                onChange={(event) => updateSerialSetting({ stopBits: Number(event.target.value) })}
               >
                 {STOP_BITS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1156,22 +1160,24 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   </option>
                 ))}
               </select>
-              <span className="config-hint">Typically 1; some equipment expects 2 stop bits on slower links.</span>
+              <span className="config-hint">
+                Typically 1; some equipment expects 2 stop bits on slower links.
+              </span>
             </div>
             <div className="config-row">
-              <label>Delimiter</label>
+              <span className="config-label">Delimiter</span>
               <input
                 placeholder="auto (default)"
                 value={serialConfig.delimiter ?? ''}
-                onChange={(event) =>
-                  updateSerialSetting({ delimiter: event.target.value || null })
-                }
+                onChange={(event) => updateSerialSetting({ delimiter: event.target.value || null })}
                 title="Use 'auto' to try CRLF and LF automatically. Common values: \n, \r\n."
               />
-              <span className="config-hint">Line ending used to split incoming frames. Leave blank for automatic detection.</span>
+              <span className="config-hint">
+                Line ending used to split incoming frames. Leave blank for automatic detection.
+              </span>
             </div>
             <div className="config-row">
-              <label>Reconnect Base (ms)</label>
+              <span className="config-label">Reconnect Base (ms)</span>
               <input
                 type="number"
                 value={serialConfig.reconnectBaseMs ?? ''}
@@ -1186,10 +1192,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ reconnectBaseMs: value });
                 }}
               />
-              <span className="config-hint">Initial backoff delay before retrying a disconnected serial link.</span>
+              <span className="config-hint">
+                Initial backoff delay before retrying a disconnected serial link.
+              </span>
             </div>
             <div className="config-row">
-              <label>Reconnect Max (ms)</label>
+              <span className="config-label">Reconnect Max (ms)</span>
               <input
                 type="number"
                 value={serialConfig.reconnectMaxMs ?? ''}
@@ -1204,10 +1212,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ reconnectMaxMs: value });
                 }}
               />
-              <span className="config-hint">Upper bound for exponential backoff between reconnection attempts.</span>
+              <span className="config-hint">
+                Upper bound for exponential backoff between reconnection attempts.
+              </span>
             </div>
             <div className="config-row">
-              <label>Reconnect Jitter</label>
+              <span className="config-label">Reconnect Jitter</span>
               <input
                 type="number"
                 min={0}
@@ -1227,7 +1237,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
             </div>
             <div className="config-row">
-              <label>Reconnect Attempts</label>
+              <span className="config-label">Reconnect Attempts</span>
               <input
                 type="number"
                 min={0}
@@ -1256,7 +1266,9 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
             {mqttSitesQuery.isLoading ? (
               <div>Loading MQTT configuration...</div>
             ) : mqttSitesQuery.isError ? (
-              <div className="form-error">Unable to load MQTT configuration. Check backend logs.</div>
+              <div className="form-error">
+                Unable to load MQTT configuration. Check backend logs.
+              </div>
             ) : mqttConfigs.length === 0 ? (
               <div className="empty-state">
                 <div>No MQTT sites configured yet. Add a site to enable federation.</div>
@@ -1265,7 +1277,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               mqttConfigs.map((cfg) => (
                 <div key={cfg.siteId} className="config-subcard">
                   <div className="config-row">
-                    <label>Site</label>
+                    <span className="config-label">Site</span>
                     <div className="config-value">
                       <strong>{cfg.site?.name ?? cfg.siteId}</strong>
                       <span className="muted">{cfg.siteId}</span>
@@ -1284,7 +1296,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     Enable site replication
                   </label>
                   <div className="config-row">
-                    <label>Broker URL</label>
+                    <span className="config-label">Broker URL</span>
                     <input
                       value={cfg.brokerUrl}
                       onChange={(event) =>
@@ -1296,7 +1308,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     />
                   </div>
                   <div className="config-row">
-                    <label>Client ID</label>
+                    <span className="config-label">Client ID</span>
                     <input
                       value={cfg.clientId}
                       onChange={(event) =>
@@ -1308,7 +1320,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     />
                   </div>
                   <div className="config-row">
-                    <label>Username</label>
+                    <span className="config-label">Username</span>
                     <input
                       value={cfg.username ?? ''}
                       onChange={(event) =>
@@ -1322,7 +1334,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     />
                   </div>
                   <div className="config-row">
-                    <label>Password</label>
+                    <span className="config-label">Password</span>
                     <div className="mqtt-password-row">
                       <input
                         type="password"
@@ -1358,7 +1370,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     TLS enabled
                   </label>
                   <div className="config-row">
-                    <label>QoS (events)</label>
+                    <span className="config-label">QoS (events)</span>
                     <select
                       value={cfg.qosEvents}
                       onChange={(event) => {
@@ -1375,7 +1387,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     </select>
                   </div>
                   <div className="config-row">
-                    <label>QoS (commands)</label>
+                    <span className="config-label">QoS (commands)</span>
                     <select
                       value={cfg.qosCommands}
                       onChange={(event) => {
@@ -1392,7 +1404,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     </select>
                   </div>
                   <div className="config-row">
-                    <label>CA PEM</label>
+                    <span className="config-label">CA PEM</span>
                     <textarea
                       rows={3}
                       value={cfg.caPem ?? ''}
@@ -1405,7 +1417,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     />
                   </div>
                   <div className="config-row">
-                    <label>Client Cert PEM</label>
+                    <span className="config-label">Client Cert PEM</span>
                     <textarea
                       rows={3}
                       value={cfg.certPem ?? ''}
@@ -1418,7 +1430,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                     />
                   </div>
                   <div className="config-row">
-                    <label>Client Key PEM</label>
+                    <span className="config-label">Client Key PEM</span>
                     <textarea
                       rows={3}
                       value={cfg.keyPem ?? ''}
@@ -1443,7 +1455,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
           </header>
           <div className="config-card__body">
             <div className="config-row">
-              <label>Mode</label>
+              <span className="config-label">Mode</span>
               <select
                 value={appSettings.detectMode}
                 onChange={(event) => updateAppSetting({ detectMode: Number(event.target.value) })}
@@ -1454,19 +1466,24 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   </option>
                 ))}
               </select>
-              <span className="config-hint">Default interface mix used when operators start a new scan (WiFi, BLE, or both).</span>
+              <span className="config-hint">
+                Default interface mix used when operators start a new scan (WiFi, BLE, or both).
+              </span>
             </div>
             <div className="config-row">
-              <label>Channels</label>
+              <span className="config-label">Channels</span>
               <input
                 placeholder="1..14"
                 value={appSettings.detectChannels}
                 onChange={(event) => updateAppSetting({ detectChannels: event.target.value })}
               />
-              <span className="config-hint">Accepts comma-separated channels or ranges (e.g. 1,6,11 or 1..14). Applied to quick-start presets.</span>
+              <span className="config-hint">
+                Accepts comma-separated channels or ranges (e.g. 1,6,11 or 1..14). Applied to
+                quick-start presets.
+              </span>
             </div>
             <div className="config-row">
-              <label>Scan Duration (s)</label>
+              <span className="config-label">Scan Duration (s)</span>
               <input
                 type="number"
                 value={appSettings.detectScanSecs}
@@ -1476,10 +1493,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ detectScanSecs: value });
                 }}
               />
-              <span className="config-hint">Baseline length for general scans before results are returned.</span>
+              <span className="config-hint">
+                Baseline length for general scans before results are returned.
+              </span>
             </div>
             <div className="config-row">
-              <label>Device Scan Duration (s)</label>
+              <span className="config-label">Device Scan Duration (s)</span>
               <input
                 type="number"
                 value={appSettings.deviceScanSecs}
@@ -1489,10 +1508,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ deviceScanSecs: value });
                 }}
               />
-              <span className="config-hint">Used when operators launch inventory-focused sweeps.</span>
+              <span className="config-hint">
+                Used when operators launch inventory-focused sweeps.
+              </span>
             </div>
             <div className="config-row">
-              <label>Baseline Duration (s)</label>
+              <span className="config-label">Baseline Duration (s)</span>
               <input
                 type="number"
                 value={appSettings.baselineSecs}
@@ -1502,10 +1523,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ baselineSecs: value });
                 }}
               />
-              <span className="config-hint">Time allowed for sites to capture a “quiet” profile before anomaly detection starts.</span>
+              <span className="config-hint">
+                Time allowed for sites to capture a quiet profile before anomaly detection starts.
+              </span>
             </div>
             <div className="config-row">
-              <label>Randomization Duration (s)</label>
+              <span className="config-label">Randomization Duration (s)</span>
               <input
                 type="number"
                 value={appSettings.randomizeSecs}
@@ -1515,10 +1538,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ randomizeSecs: value });
                 }}
               />
-              <span className="config-hint">Duration for MAC randomization sweeps triggered from the console.</span>
+              <span className="config-hint">
+                Duration for MAC randomization sweeps triggered from the console.
+              </span>
             </div>
             <div className="config-row">
-              <label>Drone Duration (s)</label>
+              <span className="config-label">Drone Duration (s)</span>
               <input
                 type="number"
                 value={appSettings.droneSecs}
@@ -1528,10 +1553,12 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ droneSecs: value });
                 }}
               />
-              <span className="config-hint">How long RID monitoring runs before automatically stopping.</span>
+              <span className="config-hint">
+                How long RID monitoring runs before automatically stopping.
+              </span>
             </div>
             <div className="config-row">
-              <label>Deauth Duration (s)</label>
+              <span className="config-label">Deauth Duration (s)</span>
               <input
                 type="number"
                 value={appSettings.deauthSecs}
@@ -1541,7 +1568,9 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ deauthSecs: value });
                 }}
               />
-              <span className="config-hint">Time limit for deauthentication campaigns to avoid accidental long runs.</span>
+              <span className="config-hint">
+                Time limit for deauthentication campaigns to avoid accidental long runs.
+              </span>
             </div>
             <label className="checkbox-label">
               <input
@@ -1551,7 +1580,9 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
               Allow FOREVER commands
             </label>
-            <span className="config-hint">Permit operators to schedule indefinite tasks (requires explicit STOP to end).</span>
+            <span className="config-hint">
+              Permit operators to schedule indefinite tasks (requires explicit STOP to end).
+            </span>
           </div>
         </section>
 
@@ -1562,7 +1593,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
           </header>
           <div className="config-card__body">
             <div className="config-row">
-              <label>Map Tile URL</label>
+              <span className="config-label">Map Tile URL</span>
               <input
                 placeholder="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 value={appSettings.mapTileUrl}
@@ -1570,14 +1601,14 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
             </div>
             <div className="config-row">
-              <label>Attribution</label>
+              <span className="config-label">Attribution</span>
               <input
                 value={appSettings.mapAttribution}
                 onChange={(event) => updateAppSetting({ mapAttribution: event.target.value })}
               />
             </div>
             <div className="config-row">
-              <label>Default Radius (m)</label>
+              <span className="config-label">Default Radius (m)</span>
               <input
                 type="number"
                 value={appSettings.defaultRadiusM}
@@ -1589,7 +1620,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
             </div>
             <div className="config-row">
-              <label>Min Zoom</label>
+              <span className="config-label">Min Zoom</span>
               <input
                 type="number"
                 value={appSettings.minZoom}
@@ -1601,7 +1632,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
             </div>
             <div className="config-row">
-              <label>Max Zoom</label>
+              <span className="config-label">Max Zoom</span>
               <input
                 type="number"
                 value={appSettings.maxZoom}
@@ -1622,16 +1653,16 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
           </header>
           <div className="config-card__body">
             <div className="config-row">
-              <label>Total entries</label>
+              <span className="config-label">Total entries</span>
               <span>{ouiStats ? ouiStats.total.toLocaleString() : 'N/A'}</span>
             </div>
             <div className="config-row">
-              <label>Last updated</label>
+              <span className="config-label">Last updated</span>
               <span>{formatDateTime(ouiStats?.lastUpdated ?? null)}</span>
             </div>
             {ouiError ? <div className="form-error">{ouiError}</div> : null}
             <div className="config-row">
-              <label>Import mode</label>
+              <span className="config-label">Import mode</span>
               <select
                 value={ouiMode}
                 onChange={(event) => setOuiMode(event.target.value as 'replace' | 'merge')}
@@ -1656,11 +1687,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
             </label>
             <div className="controls-row">
-              <button
-                type="button"
-                className="control-chip"
-                onClick={() => handleOuiExport('csv')}
-              >
+              <button type="button" className="control-chip" onClick={() => handleOuiExport('csv')}>
                 Export CSV
               </button>
               <button
@@ -1690,39 +1717,3 @@ function volumeKeyForLevel(level: AlarmLevel): keyof AlarmConfig {
       return 'volumeCritical';
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

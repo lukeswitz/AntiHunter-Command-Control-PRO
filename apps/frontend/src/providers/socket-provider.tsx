@@ -1,7 +1,7 @@
-import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 
-import { useAuthStore } from "../stores/auth-store";
+import { useAuthStore } from '../stores/auth-store';
 
 interface SocketContextValue {
   socket: Socket | null;
@@ -17,35 +17,35 @@ export const SocketProvider = ({ children }: PropsWithChildren) => {
   const token = useAuthStore((state) => state.token);
 
   useEffect(() => {
-    if (status !== "authenticated" || !token) {
+    if (status !== 'authenticated' || !token) {
       setSocket(null);
       setConnected(false);
       return;
     }
 
-    const instance = io("/ws", {
-      transports: ["websocket"],
+    const instance = io('/ws', {
+      transports: ['websocket'],
       autoConnect: true,
       auth: { token },
     });
 
-    instance.on("connect", () => {
+    instance.on('connect', () => {
       setConnected(true);
     });
-    instance.on("disconnect", () => {
+    instance.on('disconnect', () => {
       setConnected(false);
     });
-    instance.on("connect_error", (error) => {
-      console.error("Socket connection error", error);
+    instance.on('connect_error', (error) => {
+      console.error('Socket connection error', error);
       setConnected(false);
     });
 
     setSocket(instance);
 
     return () => {
-      instance.off("connect");
-      instance.off("disconnect");
-      instance.off("connect_error");
+      instance.off('connect');
+      instance.off('disconnect');
+      instance.off('connect_error');
       instance.disconnect();
       setSocket(null);
       setConnected(false);

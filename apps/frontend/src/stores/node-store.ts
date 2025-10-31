@@ -1,4 +1,4 @@
-﻿import { create } from "zustand";
+﻿import { create } from 'zustand';
 
 export interface NodeSummary {
   id: string;
@@ -13,6 +13,21 @@ export interface NodeSummary {
   siteColor?: string | null;
 }
 
+export interface PartialNode {
+  id: string;
+  name?: string | null;
+  lat?: number | string | null;
+  lon?: number | string | null;
+  ts?: string | number | Date;
+  lastMessage?: string | null;
+  lastSeen?: string | number | Date | null;
+  siteId?: string | null;
+  siteName?: string | null;
+  siteColor?: string | null;
+}
+
+export type IncomingNode = NodeSummary | PartialNode;
+
 export interface NodeHistoryPoint {
   lat: number;
   lon: number;
@@ -21,16 +36,19 @@ export interface NodeHistoryPoint {
 
 export interface NodeDiffPayload {
   type: 'upsert' | 'remove';
-  node: NodeSummary;
+  node: IncomingNode;
 }
 
 interface NodeStore {
   nodes: Record<string, NodeSummary>;
   order: string[];
   histories: Record<string, NodeHistoryPoint[]>;
-  setInitialNodes: (nodes: NodeSummary[]) => void;
+  setInitialNodes: (nodes: IncomingNode[]) => void;
   applyDiff: (diff: NodeDiffPayload) => void;
-  updateSiteMeta: (siteId: string, metadata: { name?: string | null; color?: string | null }) => void;
+  updateSiteMeta: (
+    siteId: string,
+    metadata: { name?: string | null; color?: string | null },
+  ) => void;
   clearAll: () => void;
 }
 
@@ -44,7 +62,10 @@ export function canonicalNodeId(value: string | null | undefined): string {
   if (!trimmed) {
     return 'NODE_UNKNOWN';
   }
-  const segments = trimmed.split(':').map((segment) => segment.trim()).filter(Boolean);
+  const segments = trimmed
+    .split(':')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
   const token = segments.length > 0 ? segments[segments.length - 1] : trimmed;
   const upper = token.toUpperCase();
   if (upper.startsWith('NODE_')) {
@@ -74,15 +95,14 @@ export const useNodeStore = create<NodeStore>((set) => ({
       const histories: Record<string, NodeHistoryPoint[]> = {};
 
       nodes.forEach((node) => {
-        const normalized = normalizeNode(node as any);
+        const normalized = normalizeNode(node);
         map[normalized.id] = normalized;
         histories[normalized.id] = [createHistoryPoint(normalized)];
       });
 
       const order = Object.values(map)
         .sort(
-          (a, b) =>
-            new Date(b.lastSeen ?? b.ts).getTime() - new Date(a.lastSeen ?? a.ts).getTime(),
+          (a, b) => new Date(b.lastSeen ?? b.ts).getTime() - new Date(a.lastSeen ?? a.ts).getTime(),
         )
         .map((node) => node.id);
 
@@ -100,7 +120,7 @@ export const useNodeStore = create<NodeStore>((set) => ({
         delete histories[id];
         order.delete(id);
       } else {
-        const normalized = normalizeNode(diff.node as any);
+        const normalized = normalizeNode(diff.node);
         next[normalized.id] = normalized;
         order.add(normalized.id);
 
@@ -135,8 +155,10 @@ export const useNodeStore = create<NodeStore>((set) => ({
         if (node.siteId === siteId) {
           const next: NodeSummary = {
             ...node,
-            siteName: metadata.name !== undefined ? metadata.name ?? null : node.siteName ?? null,
-            siteColor: metadata.color !== undefined ? metadata.color ?? null : node.siteColor ?? null,
+            siteName:
+              metadata.name !== undefined ? (metadata.name ?? null) : (node.siteName ?? null),
+            siteColor:
+              metadata.color !== undefined ? (metadata.color ?? null) : (node.siteColor ?? null),
           };
           updatedNodes[id] = next;
           touched = true;
@@ -150,8 +172,8 @@ export const useNodeStore = create<NodeStore>((set) => ({
       return {
         ...state,
         nodes: {
-        ...state.nodes,
-        ...updatedNodes,
+          ...state.nodes,
+          ...updatedNodes,
         },
       };
     }),
@@ -163,23 +185,12 @@ export const useNodeStore = create<NodeStore>((set) => ({
     })),
 }));
 
-function normalizeNode(node: {
-  id: string;
-  name?: string | null;
-  lat?: number | string | null;
-  lon?: number | string | null;
-  ts?: string | number | Date;
-  lastMessage?: string | null;
-  lastSeen?: string | number | Date | null;
-  siteId?: string | null;
-  siteName?: string | null;
-  siteColor?: string | null;
-}): NodeSummary {
+function normalizeNode(node: IncomingNode): NodeSummary {
   const ensureNumber = (value: number | string | null | undefined): number => {
-    if (typeof value === "number") {
+    if (typeof value === 'number') {
       return value;
     }
-    if (typeof value === "string") {
+    if (typeof value === 'string') {
       const parsed = Number(value);
       return Number.isFinite(parsed) ? parsed : 0;
     }
@@ -193,7 +204,7 @@ function normalizeNode(node: {
     if (value instanceof Date) {
       return value.toISOString();
     }
-    if (typeof value === "number") {
+    if (typeof value === 'number') {
       return new Date(value).toISOString();
     }
     return value;
@@ -201,7 +212,10 @@ function normalizeNode(node: {
 
   const canonicalId = canonicalNodeId(node.id);
   const rawName = node.name ?? node.id;
-  const nameSegments = rawName.split(':').map((segment) => segment.trim()).filter(Boolean);
+  const nameSegments = rawName
+    .split(':')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
   const normalizedName = nameSegments.length > 0 ? nameSegments[nameSegments.length - 1] : rawName;
   const displayName = normalizedName ? normalizedName : canonicalId;
 

@@ -1,6 +1,6 @@
-﻿import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+﻿import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useAuthStore } from "../stores/auth-store";
+import { useAuthStore } from '../stores/auth-store';
 
 export function AuthOverlay() {
   const { status, isSubmitting, error, disclaimer } = useAuthStore((state) => ({
@@ -13,15 +13,15 @@ export function AuthOverlay() {
   const acceptLegal = useAuthStore((state) => state.acceptLegal);
   const clearError = useAuthStore((state) => state.clearError);
 
-  const [email, setEmail] = useState("admin@example.com");
-  const [password, setPassword] = useState("admin");
+  const [email, setEmail] = useState('admin@example.com');
+  const [password, setPassword] = useState('admin');
   const [ackChecked, setAckChecked] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const overlayVisible = status !== "authenticated";
-  const showLegalStep = status === "legal";
+  const overlayVisible = status !== 'authenticated';
+  const showLegalStep = status === 'legal';
   useEffect(() => {
     if (showLegalStep) {
       setHasScrolled(false);
@@ -54,13 +54,17 @@ export function AuthOverlay() {
     <div className="auth-overlay" role="dialog" aria-modal="true">
       <div className="auth-overlay__panel">
         <header className="auth-overlay__header">
-          <img className="auth-overlay__logo-mark" src="/logo111.png" alt="AntiHunter Shield Logo" />
-          <h1 className="auth-overlay__brand-title"></h1>
+          <img
+            className="auth-overlay__logo-mark"
+            src="/logo111.png"
+            alt="AntiHunter Shield Logo"
+          />
+          <h1 className="auth-overlay__brand-title">AntiHunter Command & Control Pro</h1>
         </header>
 
         {error ? <div className="auth-overlay__error">{error}</div> : null}
 
-        {status === "checking" ? (
+        {status === 'checking' ? (
           <div className="auth-overlay__loading">Validating session…</div>
         ) : showLegalStep ? (
           <form onSubmit={handleAccept} className="auth-overlay__form">
@@ -85,7 +89,7 @@ export function AuthOverlay() {
               <span>I have read and accept the legal agreement above.</span>
             </label>
             <button type="submit" className="submit-button" disabled={!legalReady || isSubmitting}>
-              {isSubmitting ? "Saving…" : "Accept and Continue"}
+              {isSubmitting ? 'Saving…' : 'Accept and Continue'}
             </button>
           </form>
         ) : (
@@ -109,7 +113,7 @@ export function AuthOverlay() {
               />
             </label>
             <button type="submit" className="submit-button" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in…" : "Sign In"}
+              {isSubmitting ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
         )}

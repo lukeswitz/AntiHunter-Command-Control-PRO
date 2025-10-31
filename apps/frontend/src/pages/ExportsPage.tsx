@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 
-import { SiteSummary } from '../api/types';
 import { apiClient } from '../api/client';
+import { SiteSummary } from '../api/types';
 import { forceLogout, getAuthToken } from '../auth/session';
 
 type ExportFormat = 'csv' | 'json' | 'geojson';
@@ -106,10 +106,7 @@ export function ExportsPage() {
         ...prev[key],
         ...patch,
         status: patch.format || patch.from || patch.to || patch.siteId ? 'idle' : prev[key].status,
-        message:
-          patch.format || patch.from || patch.to || patch.siteId
-            ? null
-            : prev[key].message,
+        message: patch.format || patch.from || patch.to || patch.siteId ? null : prev[key].message,
       },
     }));
   };
@@ -161,19 +158,16 @@ export function ExportsPage() {
 
     const token = getAuthToken();
     try {
-      const response = await fetch(
-        `/api/exports/${definition.key}?${params.toString()}`,
-        {
-          method: 'GET',
-          headers: {
-            ...(token
-              ? {
-                  Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
-                }
-              : {}),
-          },
+      const response = await fetch(`/api/exports/${definition.key}?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          ...(token
+            ? {
+                Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
+              }
+            : {}),
         },
-      );
+      });
 
       if (response.status === 401) {
         forceLogout();

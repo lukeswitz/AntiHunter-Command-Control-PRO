@@ -1,4 +1,6 @@
-
+import type { LatLngExpression, LatLngTuple, Map as LeafletMap, TileLayerOptions } from 'leaflet';
+import { DivIcon, divIcon } from 'leaflet';
+import * as L from 'leaflet';
 import { Fragment, useEffect, useMemo, useRef } from 'react';
 import {
   Circle,
@@ -12,16 +14,13 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
-import type { LatLngExpression, LatLngTuple, Map as LeafletMap, TileLayerOptions } from 'leaflet';
-import { DivIcon, divIcon } from 'leaflet';
-import * as L from 'leaflet';
 import 'leaflet.heat';
 
+import type { AlertColorConfig } from '../../constants/alert-colors';
+import type { Geofence, GeofenceVertex } from '../../stores/geofence-store';
 import type { NodeHistoryPoint, NodeSummary } from '../../stores/node-store';
 import { canonicalNodeId } from '../../stores/node-store';
 import type { TargetMarker } from '../../stores/target-store';
-import type { Geofence, GeofenceVertex } from '../../stores/geofence-store';
-import type { AlertColorConfig } from '../../constants/alert-colors';
 
 const FALLBACK_CENTER: LatLngExpression = [0, 0];
 const DEFAULT_RADIUS_FALLBACK = 200;
@@ -65,7 +64,7 @@ const BASE_LAYERS: BaseLayerDefinition[] = [
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     tileOptions: { maxZoom: 19 },
   },
-] ;
+];
 
 export type IndicatorSeverity = 'idle' | 'info' | 'notice' | 'alert' | 'critical';
 
@@ -79,14 +78,14 @@ function createNodeIcon(
   const label = formatNodeLabel(node);
   const severityColor =
     severity === 'idle'
-      ? node.siteColor ?? colors.idle
+      ? (node.siteColor ?? colors.idle)
       : severity === 'info'
-      ? colors.info
-      : severity === 'notice'
-      ? colors.notice
-      : severity === 'alert'
-      ? colors.alert
-      : colors.critical;
+        ? colors.info
+        : severity === 'notice'
+          ? colors.notice
+          : severity === 'alert'
+            ? colors.alert
+            : colors.critical;
   const styleAttr = `style="background:${severityColor};--marker-glow-color:${severityColor};"`;
   return divIcon({
     html: `<div class="${markerClasses.join(' ')}" ${styleAttr}>${label}</div>`,
@@ -110,7 +109,10 @@ function createTargetIcon(target: TargetMarker): DivIcon {
 function formatNodeLabel(node: NodeSummary): string {
   const siteCode = deriveSiteCode(node.siteName, node.siteId);
   const rawBase = node.name ?? node.id;
-  const segments = rawBase.split(':').map((segment) => segment.trim()).filter(Boolean);
+  const segments = rawBase
+    .split(':')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
   const token = segments.length > 0 ? segments[segments.length - 1] : rawBase;
   const base = token.replace(/^NODE[_-]?/i, '').toUpperCase();
   return siteCode ? `${siteCode}:${base}` : base;
@@ -183,7 +185,13 @@ function withAlpha(color: string, alpha: number): string {
   }
   if (color.startsWith('#')) {
     const hex = color.slice(1);
-    const normalized = hex.length === 3 ? hex.split('').map((ch) => ch + ch).join('') : hex;
+    const normalized =
+      hex.length === 3
+        ? hex
+            .split('')
+            .map((ch) => ch + ch)
+            .join('')
+        : hex;
     const numeric = Number.parseInt(normalized, 16);
     if (Number.isNaN(numeric)) {
       return color;
@@ -256,12 +264,11 @@ export function CommandCenterMap({
   followEnabled,
   showCoverage,
   geofences,
-  geofenceHighlights,
+  geofenceHighlights: _geofenceHighlights,
   drawing,
   onReady,
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
-  const now = Date.now();
   const effectiveRadius = useMemo(
     () => Math.max(25, Number.isFinite(defaultRadius) ? defaultRadius : DEFAULT_RADIUS_FALLBACK),
     [defaultRadius],
@@ -317,7 +324,11 @@ export function CommandCenterMap({
       <LayersControl position="topright">
         {BASE_LAYERS.map((layer, index) => (
           <LayersControl.BaseLayer key={layer.key} checked={index === 0} name={layer.name}>
-            <TileLayer attribution={layer.attribution} url={layer.url} {...(layer.tileOptions ?? {})} />
+            <TileLayer
+              attribution={layer.attribution}
+              url={layer.url}
+              {...(layer.tileOptions ?? {})}
+            />
           </LayersControl.BaseLayer>
         ))}
       </LayersControl>
@@ -328,7 +339,10 @@ export function CommandCenterMap({
         if (geofence.polygon.length < 3) {
           return null;
         }
-        const positions = geofence.polygon.map((vertex) => [vertex.lat, vertex.lon]) as LatLngTuple[];
+        const positions = geofence.polygon.map((vertex) => [
+          vertex.lat,
+          vertex.lon,
+        ]) as LatLngTuple[];
         return (
           <Polygon
             key={geofence.id}
@@ -355,7 +369,10 @@ export function CommandCenterMap({
 
       {drawing?.enabled && draftPositions.length > 0 ? (
         <>
-          <Polyline positions={draftPositions} pathOptions={{ color: '#f97316', dashArray: '6 4', weight: 2 }} />
+          <Polyline
+            positions={draftPositions}
+            pathOptions={{ color: '#f97316', dashArray: '6 4', weight: 2 }}
+          />
           {draftPositions.length >= 3 ? (
             <Polygon
               positions={draftPositions as LatLngTuple[]}
@@ -388,18 +405,16 @@ export function CommandCenterMap({
         const position: LatLngExpression = [node.lat, node.lon];
         const radiusStyle = resolveRadiusStyle(indicator, alertColors);
         return (
-          <Marker
-            key={key}
-            position={position}
-            icon={createNodeIcon(node, indicator, alertColors)}
-          >
+          <Marker key={key} position={position} icon={createNodeIcon(node, indicator, alertColors)}>
             <Tooltip direction="top" offset={[0, -12]} opacity={0.9}>
               <div className="node-tooltip">
                 <strong>{formatNodeLabel(node)}</strong>
                 {node.siteName || node.siteId ? (
                   <div className="muted">{node.siteName ?? node.siteId}</div>
                 ) : null}
-                <div>Last seen: {node.lastSeen ? new Date(node.lastSeen).toLocaleString() : 'N/A'}</div>
+                <div>
+                  Last seen: {node.lastSeen ? new Date(node.lastSeen).toLocaleString() : 'N/A'}
+                </div>
                 {node.lastMessage && <div>Last message: {node.lastMessage}</div>}
               </div>
             </Tooltip>
@@ -450,8 +465,12 @@ export function CommandCenterMap({
                     <div>
                       Location: {target.lat.toFixed(5)}, {target.lon.toFixed(5)}
                     </div>
-                    {target.tracking ? <div className="tracking-label">Tracking in progress</div> : null}
-                    {target.comment ? <div className="target-comment">Comment: {target.comment}</div> : null}
+                    {target.tracking ? (
+                      <div className="tracking-label">Tracking in progress</div>
+                    ) : null}
+                    {target.comment ? (
+                      <div className="target-comment">Comment: {target.comment}</div>
+                    ) : null}
                   </div>
                 </Tooltip>
               </Marker>
@@ -519,7 +538,10 @@ function CoverageHeatLayer({
 }) {
   const map = useMap();
   const layerRef = useRef<L.Layer | null>(null);
-  const points = useMemo(() => (enabled ? buildCoveragePoints(nodes, baseRadius) : []), [enabled, nodes, baseRadius]);
+  const points = useMemo(
+    () => (enabled ? buildCoveragePoints(nodes, baseRadius) : []),
+    [enabled, nodes, baseRadius],
+  );
 
   useEffect(() => {
     if (!enabled) {
@@ -543,7 +565,11 @@ function CoverageHeatLayer({
       layerRef.current = null;
     }
 
-    const heatFactory = (L as unknown as typeof L & { heatLayer?: (latlngs: HeatPoint[], options?: any) => L.Layer }).heatLayer;
+    const heatFactory = (
+      L as unknown as typeof L & {
+        heatLayer?: (latlngs: HeatPoint[], options?: L.HeatMapOptions) => L.HeatLayer;
+      }
+    ).heatLayer;
     if (typeof heatFactory !== 'function') {
       return;
     }
@@ -619,17 +645,3 @@ function buildCoveragePoints(nodes: NodeSummary[], baseRadius: number): HeatPoin
   });
   return samples;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -37,4 +37,3 @@ export const useMapCommandStore = create<MapCommandState>((set) => ({
     }),
   consume: () => set({ target: null }),
 }));
-

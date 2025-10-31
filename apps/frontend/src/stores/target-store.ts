@@ -39,7 +39,7 @@ interface TargetStoreState {
 
 export const useTargetStore = create<TargetStoreState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       commentMap: {},
       trackingMap: {},
       setComment: (targetId, comment) =>
