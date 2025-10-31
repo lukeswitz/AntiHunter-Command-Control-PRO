@@ -6,24 +6,24 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, Role, SiteAccessLevel } from '@prisma/client';
-import { randomBytes } from 'crypto';
 import * as argon2 from 'argon2';
+import { randomBytes } from 'crypto';
 
-import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
-import { UpdateCurrentUserDto } from './dto/update-current-user.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { ListUsersDto } from './dto/list-users.dto';
+import { UpdateCurrentUserDto } from './dto/update-current-user.dto';
+import { UpdateUserPermissionsDto } from './dto/update-user-permissions.dto';
+import { UpdateUserSiteAccessDto } from './dto/update-user-site-access.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import {
   DEFAULT_FEATURES_BY_ROLE,
   FEATURE_FLAGS,
   FeatureFlagDefinition,
   isValidFeatureKey,
 } from './user-permissions.constants';
-import { UpdateUserPermissionsDto } from './dto/update-user-permissions.dto';
-import { UpdateUserSiteAccessDto } from './dto/update-user-site-access.dto';
-import { CreateInvitationDto } from './dto/create-invitation.dto';
 
 interface PreferenceDto {
   theme: string;
@@ -475,7 +475,9 @@ export class UsersService {
       },
     });
 
-    const baseUrl = (this.configService.get<string>('security.appUrl') ?? 'http://localhost:5173').replace(/\/$/, '');
+    const baseUrl = (
+      this.configService.get<string>('security.appUrl') ?? 'http://localhost:5173'
+    ).replace(/\/$/, '');
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
     await this.mailService.sendMail({
@@ -504,7 +506,7 @@ export class UsersService {
 
     const featureSet = dto.permissions?.length
       ? this.normalizeFeatureSet(dto.permissions)
-      : DEFAULT_FEATURES_BY_ROLE[dto.role] ?? [];
+      : (DEFAULT_FEATURES_BY_ROLE[dto.role] ?? []);
 
     const invitation = await this.prisma.userInvitation.create({
       data: {
@@ -519,7 +521,9 @@ export class UsersService {
       },
     });
 
-    const baseUrl = (this.configService.get<string>('security.appUrl') ?? 'http://localhost:5173').replace(/\/$/, '');
+    const baseUrl = (
+      this.configService.get<string>('security.appUrl') ?? 'http://localhost:5173'
+    ).replace(/\/$/, '');
     const acceptUrl = `${baseUrl}/accept-invite?token=${token}`;
 
     const bodyLines: string[] = [
@@ -712,9 +716,7 @@ export class UsersService {
     });
   }
 
-  private toJsonValue(
-    value: unknown,
-  ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+  private toJsonValue(value: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
     if (value === null || value === undefined) {
       return Prisma.JsonNull;
     }

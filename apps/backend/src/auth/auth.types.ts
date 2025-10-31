@@ -11,12 +11,10 @@ export interface AuthTokenPayload {
   features?: string[];
 }
 
-declare global {
-  namespace Express {
-    interface Request {
-      auth?: AuthTokenPayload;
-      authToken?: string;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    auth?: AuthTokenPayload;
+    authToken?: string;
   }
 }
 

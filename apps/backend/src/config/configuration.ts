@@ -42,10 +42,10 @@ export default () => ({
     port: process.env.MAIL_PORT
       ? Number(process.env.MAIL_PORT)
       : process.env.MAIL_HOST
-      ? process.env.MAIL_SECURE === 'true'
-        ? 465
-        : 587
-      : undefined,
+        ? process.env.MAIL_SECURE === 'true'
+          ? 465
+          : 587
+        : undefined,
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
     secure: process.env.MAIL_SECURE === 'true',

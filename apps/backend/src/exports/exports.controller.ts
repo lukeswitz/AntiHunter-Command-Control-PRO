@@ -24,4 +24,3 @@ export class ExportsController {
     res.send(result.data);
   }
 }
-

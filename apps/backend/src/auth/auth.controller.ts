@@ -1,10 +1,10 @@
 import { BadRequestException, Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 
-import { AuthService } from './auth.service';
 import { AllowLegalPending, Public } from './auth.decorators';
-import { LoginDto } from './dto/login.dto';
+import { AuthService } from './auth.service';
 import { LegalAckDto } from './dto/legal-ack.dto';
+import { LoginDto } from './dto/login.dto';
 import { LEGAL_DISCLAIMER } from './legal-disclaimer';
 
 @Controller('auth')

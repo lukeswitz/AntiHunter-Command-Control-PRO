@@ -1,14 +1,13 @@
-
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CommandLog, CommandStatus } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { Observable, Subject } from 'rxjs';
 
-import { PrismaService } from '../prisma/prisma.service';
-import { SerialCommandAck, SerialCommandResult } from '../serial/serial.types';
-import { SerialService } from '../serial/serial.service';
-import { SendCommandDto } from './dto/send-command.dto';
 import { buildCommandPayload } from './command-builder';
+import { PrismaService } from '../prisma/prisma.service';
+import { SerialService } from '../serial/serial.service';
+import { SerialCommandAck, SerialCommandResult } from '../serial/serial.types';
+import { SendCommandDto } from './dto/send-command.dto';
 
 const ACK_TO_COMMAND: Record<string, string> = {
   SCAN_ACK: 'SCAN_START',
@@ -132,7 +131,7 @@ export class CommandsService {
 
     const status = this.deriveStatusFromAck(ack.status, command.status);
     const finishedAt =
-      status === 'OK' || status === 'ERROR' ? new Date() : command.finishedAt ?? undefined;
+      status === 'OK' || status === 'ERROR' ? new Date() : (command.finishedAt ?? undefined);
 
     const updated = await this.prisma.commandLog.update({
       where: { id: command.id },
@@ -194,19 +193,17 @@ export class CommandsService {
     return ACK_TO_COMMAND[ackType];
   }
 
-  private async findLatestMatchingCommand(name: string, nodeId?: string): Promise<CommandLog | null> {
+  private async findLatestMatchingCommand(
+    name: string,
+    nodeId?: string,
+  ): Promise<CommandLog | null> {
     const directTarget = nodeId ? `@${nodeId}` : undefined;
 
     return this.prisma.commandLog.findFirst({
       where: {
         name,
         status: { in: ['PENDING', 'SENT'] },
-        OR: nodeId
-          ? [
-              { target: directTarget },
-              { target: '@ALL' },
-            ]
-          : undefined,
+        OR: nodeId ? [{ target: directTarget }, { target: '@ALL' }] : undefined,
       },
       orderBy: {
         createdAt: 'desc',

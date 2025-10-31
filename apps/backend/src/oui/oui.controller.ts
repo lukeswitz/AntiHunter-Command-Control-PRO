@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  Body,
   Controller,
   Get,
   Param,
@@ -63,7 +62,10 @@ export class OuiController {
       return;
     }
 
-    const lines = ['OUI,Vendor', ...entries.map((entry) => `${entry.oui},${escapeCsv(entry.vendor)}`)];
+    const lines = [
+      'OUI,Vendor',
+      ...entries.map((entry) => `${entry.oui},${escapeCsv(entry.vendor)}`),
+    ];
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="oui-cache.csv"');
     res.send(lines.join('\n'));

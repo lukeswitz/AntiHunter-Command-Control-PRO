@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-import { PrismaService } from '../prisma/prisma.service';
 import { OuiService } from '../oui/oui.service';
-import { normalizeMac } from '../utils/mac';
+import { PrismaService } from '../prisma/prisma.service';
 import { SerialTargetDetected } from '../serial/serial.types';
+import { normalizeMac } from '../utils/mac';
 
 interface ListOptions {
   search?: string;
@@ -45,8 +45,7 @@ export class InventoryService {
     const existingRecord = await this.prisma.inventoryDevice.findUnique({
       where: { mac: normalizedMac },
     });
-    const existing =
-      existingRecord as (typeof existingRecord & { ssid?: string | null }) | null;
+    const existing = existingRecord as (typeof existingRecord & { ssid?: string | null }) | null;
 
     const hits = (existing?.hits ?? 0) + 1;
     const rssi = typeof event.rssi === 'number' ? event.rssi : undefined;
@@ -70,15 +69,13 @@ export class InventoryService {
 
     let maxRSSI = existing?.maxRSSI ?? rssi ?? null;
     let minRSSI = existing?.minRSSI ?? rssi ?? null;
-    let avgRSSI = existing?.avgRSSI ?? (rssi ?? null);
+    let avgRSSI = existing?.avgRSSI ?? rssi ?? null;
 
     if (typeof rssi === 'number') {
       maxRSSI = maxRSSI !== null ? Math.max(maxRSSI, rssi) : rssi;
       minRSSI = minRSSI !== null ? Math.min(minRSSI, rssi) : rssi;
       if (existing?.avgRSSI != null) {
-        avgRSSI = Number(
-          ((existing.avgRSSI * (existing.hits ?? 0) + rssi) / hits).toFixed(2),
-        );
+        avgRSSI = Number(((existing.avgRSSI * (existing.hits ?? 0) + rssi) / hits).toFixed(2));
       } else {
         avgRSSI = rssi;
       }
@@ -144,10 +141,7 @@ export class InventoryService {
 
     return this.prisma.inventoryDevice.findMany({
       where,
-      orderBy: [
-        { hits: 'desc' },
-        { lastSeen: 'desc' },
-      ],
+      orderBy: [{ hits: 'desc' }, { lastSeen: 'desc' }],
       take: options.limit ?? 200,
     });
   }
@@ -175,7 +169,7 @@ export class InventoryService {
     const coordinatesMayBePlaceholder =
       lat === undefined ||
       lon === undefined ||
-      ((lat === 0 && lon === 0) && (device.lastLat == null || device.lastLon == null));
+      (lat === 0 && lon === 0 && (device.lastLat == null || device.lastLon == null));
 
     if (coordinatesMayBePlaceholder && firstNodeId) {
       const lastPosition = await this.prisma.nodePosition.findFirst({
@@ -216,7 +210,9 @@ export class InventoryService {
         },
       });
     } catch (error) {
-      this.logger.warn(`Unable to persist inventory location for ${normalizedMac}: ${String(error)}`);
+      this.logger.warn(
+        `Unable to persist inventory location for ${normalizedMac}: ${String(error)}`,
+      );
     }
 
     if (existing) {

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 
-import { MqttService } from './mqtt.service';
 import { UpdateMqttConfigDto } from './dto/update-mqtt-config.dto';
+import { MqttService } from './mqtt.service';
 
 @Controller('mqtt')
 export class MqttController {

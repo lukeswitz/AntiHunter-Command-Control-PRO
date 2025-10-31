@@ -1,3 +1,4 @@
+import { OnModuleDestroy, UnauthorizedException, UsePipes, ValidationPipe } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -9,14 +10,13 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
-import { OnModuleDestroy, UnauthorizedException, UsePipes, ValidationPipe } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
 import { Subscription } from 'rxjs';
+import { Server, Socket } from 'socket.io';
 
+import { AuthService } from '../auth/auth.service';
 import { CommandState, CommandsService } from '../commands/commands.service';
 import { SendCommandDto } from '../commands/dto/send-command.dto';
 import { NodesService } from '../nodes/nodes.service';
-import { AuthService } from '../auth/auth.service';
 
 @WebSocketGateway({
   namespace: '/ws',
@@ -102,10 +102,7 @@ export class CommandCenterGateway
 
   @SubscribeMessage('sendCommand')
   @UsePipes(new ValidationPipe({ transform: true }))
-  async handleSendCommand(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() dto: SendCommandDto,
-  ) {
+  async handleSendCommand(@ConnectedSocket() client: Socket, @MessageBody() dto: SendCommandDto) {
     try {
       const state = await this.commandsService.sendCommand(dto, client.data?.userId);
       return { event: 'command.queued', data: state };

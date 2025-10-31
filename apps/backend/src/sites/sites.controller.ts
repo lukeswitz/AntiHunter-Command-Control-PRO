@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 
-import { SitesService } from './sites.service';
 import { UpdateSiteDto } from './dto/update-site.dto';
+import { SitesService } from './sites.service';
 
 @Controller('sites')
 export class SitesController {

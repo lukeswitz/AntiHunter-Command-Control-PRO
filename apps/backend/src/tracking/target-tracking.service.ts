@@ -106,9 +106,14 @@ export class TargetTrackingService {
 
     state.siteId = input.siteId ?? state.siteId ?? null;
 
-    state.detections = state.detections.filter((entry) => now - entry.timestamp <= DETECTION_WINDOW_MS);
+    state.detections = state.detections.filter(
+      (entry) => now - entry.timestamp <= DETECTION_WINDOW_MS,
+    );
 
-    const weight = this.computeWeight(input.rssi, measurementLat !== undefined && measurementLon !== undefined);
+    const weight = this.computeWeight(
+      input.rssi,
+      measurementLat !== undefined && measurementLon !== undefined,
+    );
 
     state.detections.push({
       nodeId: input.nodeId,
@@ -196,8 +201,10 @@ export class TargetTrackingService {
       return null;
     }
 
-    const rawLat = detections.reduce((sum, entry) => sum + entry.lat * entry.weight, 0) / totalWeight;
-    const rawLon = detections.reduce((sum, entry) => sum + entry.lon * entry.weight, 0) / totalWeight;
+    const rawLat =
+      detections.reduce((sum, entry) => sum + entry.lat * entry.weight, 0) / totalWeight;
+    const rawLon =
+      detections.reduce((sum, entry) => sum + entry.lon * entry.weight, 0) / totalWeight;
 
     const clampedLat = this.clampLatitude(rawLat);
     const clampedLon = this.clampLongitude(rawLon);
@@ -227,8 +234,7 @@ export class TargetTrackingService {
       weightedDistanceSq += entry.weight * distance * distance;
     });
 
-    const spreadMeters =
-      weightedDistanceSq > 0 ? Math.sqrt(weightedDistanceSq / totalWeight) : 0;
+    const spreadMeters = weightedDistanceSq > 0 ? Math.sqrt(weightedDistanceSq / totalWeight) : 0;
 
     const nodeFactor = Math.min(1, uniqueNodes.size / 3);
     const weightFactor = Math.min(1, totalWeight / (uniqueNodes.size * 0.9 + 0.3));
@@ -268,7 +274,9 @@ export class TargetTrackingService {
 
     const lat = previous.lat + (estimate.lat - previous.lat) * smoothing;
     const lon = previous.lon + (estimate.lon - previous.lon) * smoothing;
-    const confidence = this.clamp01((previous.confidence + estimate.confidence * smoothing) / (1 + smoothing));
+    const confidence = this.clamp01(
+      (previous.confidence + estimate.confidence * smoothing) / (1 + smoothing),
+    );
 
     return {
       ...estimate,
@@ -285,29 +293,34 @@ export class TargetTrackingService {
       return { shouldPersist: estimate.confidence >= MIN_BOOTSTRAP_CONFIDENCE };
     }
 
-    const deltaMeters = this.distanceMeters(lastPersist.lat, lastPersist.lon, estimate.lat, estimate.lon);
+    const deltaMeters = this.distanceMeters(
+      lastPersist.lat,
+      lastPersist.lon,
+      estimate.lat,
+      estimate.lon,
+    );
     const elapsed = estimate.timestamp - lastPersist.timestamp;
 
     if (estimate.confidence < MIN_CONFIDENCE_FOR_PERSIST) {
-      const relaxed =
-        elapsed >= PERSIST_INTERVAL_MS * 2 && deltaMeters >= PERSIST_DISTANCE_M * 2;
+      const relaxed = elapsed >= PERSIST_INTERVAL_MS * 2 && deltaMeters >= PERSIST_DISTANCE_M * 2;
       return { shouldPersist: relaxed };
     }
 
     if (estimate.uniqueNodes <= 1 && estimate.confidence < SINGLE_NODE_CONFIDENCE_FLOOR) {
-      const relaxed =
-        elapsed >= PERSIST_INTERVAL_MS * 2 && deltaMeters >= PERSIST_DISTANCE_M * 2;
+      const relaxed = elapsed >= PERSIST_INTERVAL_MS * 2 && deltaMeters >= PERSIST_DISTANCE_M * 2;
       return { shouldPersist: relaxed };
     }
 
-    const shouldPersist =
-      deltaMeters >= PERSIST_DISTANCE_M || elapsed >= PERSIST_INTERVAL_MS;
+    const shouldPersist = deltaMeters >= PERSIST_DISTANCE_M || elapsed >= PERSIST_INTERVAL_MS;
 
     return { shouldPersist };
   }
 
   private pruneStateIfIdle(mac: string, state: TrackingState, now: number) {
-    if (!state.detections.length && (!state.lastEstimate || now - state.lastEstimate.timestamp > DETECTION_WINDOW_MS)) {
+    if (
+      !state.detections.length &&
+      (!state.lastEstimate || now - state.lastEstimate.timestamp > DETECTION_WINDOW_MS)
+    ) {
       this.states.delete(mac);
     } else {
       this.states.set(mac, state);

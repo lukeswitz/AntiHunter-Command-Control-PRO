@@ -1,14 +1,13 @@
-
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Subscription } from 'rxjs';
 
+import { SerialService } from './serial.service';
+import { SerialParseResult, SerialTargetDetected } from './serial.types';
 import { CommandsService } from '../commands/commands.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { NodesService } from '../nodes/nodes.service';
 import { TargetTrackingService } from '../tracking/target-tracking.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
-import { SerialService } from './serial.service';
-import { SerialParseResult, SerialTargetDetected } from './serial.types';
 
 @Injectable()
 export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
@@ -27,7 +26,10 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
   onModuleInit(): void {
     this.subscription = this.serialService.getParsedStream().subscribe((event) => {
       this.handleEvent(event).catch((error) => {
-        this.logger.error(`Serial ingest failure: ${error instanceof Error ? error.message : error}`, error);
+        this.logger.error(
+          `Serial ingest failure: ${error instanceof Error ? error.message : error}`,
+          error,
+        );
       });
     });
   }
@@ -62,7 +64,9 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
         break;
       case 'target-detected':
         {
-          const nodeSnapshot = event.nodeId ? this.nodesService.getSnapshotById(event.nodeId) : undefined;
+          const nodeSnapshot = event.nodeId
+            ? this.nodesService.getSnapshotById(event.nodeId)
+            : undefined;
           const detectionTime = new Date();
           const estimate = this.trackingService.ingestDetection({
             mac: event.mac,
@@ -76,10 +80,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             timestamp: detectionTime.getTime(),
           });
 
-          const latForRecord =
-            estimate?.lat ?? event.lat ?? nodeSnapshot?.lat ?? undefined;
-          const lonForRecord =
-            estimate?.lon ?? event.lon ?? nodeSnapshot?.lon ?? undefined;
+          const latForRecord = estimate?.lat ?? event.lat ?? nodeSnapshot?.lat ?? undefined;
+          const lonForRecord = estimate?.lon ?? event.lon ?? nodeSnapshot?.lon ?? undefined;
 
           const detectionForPersistence: SerialTargetDetected = {
             ...event,
@@ -128,10 +130,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
       case 'alert':
         {
           const timestamp = new Date();
-          const lat =
-            typeof event.data?.lat === 'number' ? event.data.lat : undefined;
-          const lon =
-            typeof event.data?.lon === 'number' ? event.data.lon : undefined;
+          const lat = typeof event.data?.lat === 'number' ? event.data.lat : undefined;
+          const lon = typeof event.data?.lon === 'number' ? event.data.lon : undefined;
           this.gateway.emitEvent({
             type: 'event.alert',
             timestamp: timestamp.toISOString(),

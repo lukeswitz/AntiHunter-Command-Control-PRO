@@ -1,4 +1,5 @@
-
+import { create, toBinary } from '@bufbuild/protobuf';
+import { Mesh, Portnums } from '@meshtastic/protobufs';
 import {
   BadRequestException,
   Injectable,
@@ -7,20 +8,18 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ReadlineParser } from '@serialport/parser-readline';
-import { SerialPortStream } from '@serialport/stream';
 import type { AutoDetectTypes } from '@serialport/bindings-cpp';
 import * as SerialPortBindings from '@serialport/bindings-cpp';
+import { ReadlineParser } from '@serialport/parser-readline';
+import { SerialPortStream } from '@serialport/stream';
 import PQueue from 'p-queue';
 import { Observable, Subject } from 'rxjs';
 
-import pb from '@meshtastic/protobufs';
-import { create, toBinary } from '@bufbuild/protobuf';
-import { buildCommandPayload } from '../commands/command-builder';
 import { createParser, ProtocolKey } from './protocol-registry';
 import { DEFAULT_SERIAL_SITE_ID, SerialConfigService } from './serial-config.service';
 import { SERIAL_DELIMITER_CANDIDATES } from './serial.config.defaults';
 import { SerialParseResult, SerialProtocolParser } from './serial.types';
+import { buildCommandPayload } from '../commands/command-builder';
 
 const Binding = resolveBinding();
 
@@ -54,10 +53,10 @@ async function getAvailablePorts(): Promise<SerialPortInfo[]> {
       typeof moduleRef === 'function'
         ? moduleRef
         : moduleRef && typeof (moduleRef as { default?: unknown }).default === 'function'
-        ? (moduleRef as { default: () => Promise<SerialPortInfo[]> }).default
-        : moduleRef && typeof (moduleRef as { list?: unknown }).list === 'function'
-        ? (moduleRef as { list: () => Promise<SerialPortInfo[]> }).list
-        : null;
+          ? (moduleRef as { default: () => Promise<SerialPortInfo[]> }).default
+          : moduleRef && typeof (moduleRef as { list?: unknown }).list === 'function'
+            ? (moduleRef as { list: () => Promise<SerialPortInfo[]> }).list
+            : null;
     if (candidate) {
       return candidate();
     }
@@ -171,7 +170,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       await this.connect({
         path: storedConfig.devicePath ?? this.configService.get<string>('serial.device'),
         baudRate: storedConfig.baud ?? this.configService.get<number>('serial.baudRate', 115200),
-        delimiter: storedConfig.delimiter ?? this.configService.get<string>('serial.delimiter', '\n'),
+        delimiter:
+          storedConfig.delimiter ?? this.configService.get<string>('serial.delimiter', '\n'),
         protocol: (this.configService.get<string>('serial.protocol', 'meshtastic-like') ??
           'meshtastic-like') as ProtocolKey,
       });
@@ -228,9 +228,10 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     const delimiterToken = requestedDelimiterRaw.trim();
     const autoDetect = delimiterToken.toLowerCase() === 'auto';
     const delimiter = autoDetect ? '\n' : normalizeDelimiter(delimiterToken);
-    const writeDelimiters = (autoDetect
-      ? SERIAL_DELIMITER_CANDIDATES.map((candidate) => normalizeDelimiter(candidate))
-      : [delimiter]
+    const writeDelimiters = (
+      autoDetect
+        ? SERIAL_DELIMITER_CANDIDATES.map((candidate) => normalizeDelimiter(candidate))
+        : [delimiter]
     ).filter((value, index, array) => array.indexOf(value) === index);
     const protocol = (options?.protocol ??
       this.configService.get<string>('serial.protocol', 'meshtastic-like') ??
@@ -409,9 +410,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     const channelIndex = Number.isFinite(channelConfig) ? Number(channelConfig) : 0;
 
     const payload = Buffer.from(trimmed, 'utf8');
-    const decoded = create(pb.Mesh.DataSchema, {
+    const decoded = create(Mesh.DataSchema, {
       payload,
-      portnum: pb.Portnums.PortNum.TEXT_MESSAGE_APP,
+      portnum: Portnums.PortNum.TEXT_MESSAGE_APP,
       wantResponse: false,
       dest: 0,
       source: 0,
@@ -419,12 +420,12 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       replyId: 0,
     });
 
-    const packet = create(pb.Mesh.MeshPacketSchema, {
+    const packet = create(Mesh.MeshPacketSchema, {
       id: this.nextPacketId(),
       to: this.broadcastNum,
       channel: channelIndex,
       wantAck: false,
-      priority: pb.Mesh.MeshPacket_Priority.RELIABLE,
+      priority: Mesh.MeshPacket_Priority.RELIABLE,
       payloadVariant: {
         case: 'decoded',
         value: decoded,
@@ -432,14 +433,14 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       hopLimit: 0,
     });
 
-    const toRadio = create(pb.Mesh.ToRadioSchema, {
+    const toRadio = create(Mesh.ToRadioSchema, {
       payloadVariant: {
         case: 'packet',
         value: packet,
       },
     });
 
-    const binary = toBinary(pb.Mesh.ToRadioSchema, toRadio);
+    const binary = toBinary(Mesh.ToRadioSchema, toRadio);
     const payloadBytes = Buffer.from(binary);
     const frame = Buffer.alloc(4 + payloadBytes.length);
     frame[0] = 0x94;
@@ -588,7 +589,10 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     );
 
     this.lineParser.on('data', (data: string | Buffer) => {
-      const line = data.toString().replace(/[\r\n]+$/, '').trim();
+      const line = data
+        .toString()
+        .replace(/[\r\n]+$/, '')
+        .trim();
       if (!line) {
         return;
       }

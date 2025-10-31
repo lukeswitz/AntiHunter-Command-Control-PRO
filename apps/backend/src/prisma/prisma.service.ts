@@ -15,7 +15,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     const logLevel = this.configService.get<string>('logging.level', 'info');
     if (logLevel === 'debug') {
-      (this as any).$on('query', (event: Prisma.QueryEvent) => {
+      this.$on('query', (event: Prisma.QueryEvent) => {
         // eslint-disable-next-line no-console -- Prisma query log for diagnostics
         console.debug('Prisma query:', event);
       });
@@ -27,7 +27,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async enableShutdownHooks(app: INestApplication): Promise<void> {
-    (this as any).$on('beforeExit', async () => {
+    this.$on('beforeExit', async () => {
       await app.close();
     });
   }

@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -74,8 +70,7 @@ export class ExportsService {
       throw new NotFoundException(`Export type "${type}" is not supported.`);
     }
 
-    const format =
-      (query.format as NormalizedFormat | undefined) ?? allowedFormats[0];
+    const format = (query.format as NormalizedFormat | undefined) ?? allowedFormats[0];
     if (!allowedFormats.includes(format)) {
       throw new BadRequestException(
         `Format "${query.format}" is not available for ${type} exports.`,
@@ -348,14 +343,19 @@ export class ExportsService {
       return this.jsonResult('trails', payload);
     }
 
-    const grouped = new Map<string, { siteId: string | null; coords: [number, number, string][] }>();
+    const grouped = new Map<
+      string,
+      { siteId: string | null; coords: [number, number, string][] }
+    >();
     positions.forEach((position) => {
       const entry =
         grouped.get(position.nodeId) ??
-        grouped.set(position.nodeId, {
-          siteId: position.node?.siteId ?? null,
-          coords: [],
-        }).get(position.nodeId)!;
+        grouped
+          .set(position.nodeId, {
+            siteId: position.node?.siteId ?? null,
+            coords: [],
+          })
+          .get(position.nodeId)!;
       entry.coords.push([position.lon, position.lat, position.ts.toISOString()]);
     });
 
@@ -425,9 +425,7 @@ export class ExportsService {
     }
 
     const lines = rows.map((row) =>
-      headers
-        .map((header) => this.escapeCsvValue(row[header]))
-        .join(','),
+      headers.map((header) => this.escapeCsvValue(row[header])).join(','),
     );
     return [headerLine, ...lines].join('\r\n');
   }
@@ -437,9 +435,11 @@ export class ExportsService {
       return '';
     }
     const stringValue =
-      typeof value === 'string' ? value : typeof value === 'number' || typeof value === 'boolean'
-      ? String(value)
-      : JSON.stringify(value);
+      typeof value === 'string'
+        ? value
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : JSON.stringify(value);
 
     if (/[",\r\n]/.test(stringValue)) {
       return `"${stringValue.replace(/"/g, '""')}"`;
@@ -447,7 +447,11 @@ export class ExportsService {
     return stringValue;
   }
 
-  private async recordAudit(userId: string | null | undefined, type: string, filters: ExportFilters) {
+  private async recordAudit(
+    userId: string | null | undefined,
+    type: string,
+    filters: ExportFilters,
+  ) {
     const data: Record<string, unknown> = {
       format: filters.format,
       siteId: filters.siteId ?? null,

@@ -243,4 +243,3 @@ export interface UserSummary extends AuthUser {}
 export interface UserDetail extends AuthUser {
   pendingInvitations: UserInvitationSummary[];
 }
-

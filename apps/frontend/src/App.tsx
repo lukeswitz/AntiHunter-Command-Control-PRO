@@ -1,27 +1,27 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
+import { apiClient } from './api/client';
+import type { AppSettings } from './api/types';
 import { AppHeader } from './components/app-header';
-import { SocketBridge } from './components/socket-bridge';
-import { SidebarNav } from './components/sidebar-nav';
-import { TerminalDrawer } from './components/terminal-drawer';
 import { AuthOverlay } from './components/auth-overlay';
+import { SidebarNav } from './components/sidebar-nav';
+import { SocketBridge } from './components/socket-bridge';
+import { TerminalDrawer } from './components/terminal-drawer';
+import { DEFAULT_ALERT_COLORS, extractAlertColors } from './constants/alert-colors';
 import { CommandConsolePage } from './pages/CommandConsolePage';
 import { ConfigPage } from './pages/ConfigPage';
 import { ExportsPage } from './pages/ExportsPage';
+import { GeofencePage } from './pages/GeofencePage';
 import { InventoryPage } from './pages/InventoryPage';
 import { MapPage } from './pages/MapPage';
-import { GeofencePage } from './pages/GeofencePage';
 import { NodesPage } from './pages/NodesPage';
-import { TargetsPage } from './pages/TargetsPage';
 import { SchedulerPage } from './pages/SchedulerPage';
+import { TargetsPage } from './pages/TargetsPage';
 import { UserPage } from './pages/UserPage';
-import { useAuthStore } from './stores/auth-store';
 import { useTheme } from './providers/theme-provider';
-import { useEffect } from 'react';
-import { apiClient } from './api/client';
-import type { AppSettings } from './api/types';
-import { DEFAULT_ALERT_COLORS, extractAlertColors } from './constants/alert-colors';
+import { useAuthStore } from './stores/auth-store';
 
 export default function App() {
   const status = useAuthStore((state) => state.status);

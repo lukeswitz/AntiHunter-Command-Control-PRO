@@ -13,8 +13,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
 import { extname } from 'node:path';
 
-import { UpdateAlarmConfigDto } from './dto/update-alarm-config.dto';
 import { AlarmsService } from './alarms.service';
+import { UpdateAlarmConfigDto } from './dto/update-alarm-config.dto';
 
 const ALLOWED_EXT = new Set(['.wav', '.mp3', '.ogg']);
 

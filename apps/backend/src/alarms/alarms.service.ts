@@ -43,8 +43,7 @@ export class AlarmsService {
     soundRecords.forEach((sound) => {
       const level = sound.level.toUpperCase() as AlarmLevel;
       if (ALARM_LEVELS.includes(level)) {
-        const version =
-          sound.updatedAt instanceof Date ? sound.updatedAt.getTime() : Date.now();
+        const version = sound.updatedAt instanceof Date ? sound.updatedAt.getTime() : Date.now();
         soundMap[level] = `/media/alarms/${sound.filename}?v=${version}`;
       }
     });

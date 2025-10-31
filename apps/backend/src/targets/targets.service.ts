@@ -40,10 +40,7 @@ export class TargetsService {
 
     return this.prisma.target.findMany({
       where,
-      orderBy: [
-        { status: 'asc' },
-        { updatedAt: 'desc' },
-      ],
+      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
     });
   }
 
@@ -166,7 +163,12 @@ export class TargetsService {
     });
   }
 
-  async applyTrackingEstimate(mac: string, lat: number, lon: number, siteId?: string | null): Promise<boolean> {
+  async applyTrackingEstimate(
+    mac: string,
+    lat: number,
+    lon: number,
+    siteId?: string | null,
+  ): Promise<boolean> {
     let normalizedMac: string;
     try {
       normalizedMac = normalizeMac(mac);
@@ -181,17 +183,22 @@ export class TargetsService {
       updatedAt: new Date(),
     };
 
+    const where: Prisma.TargetWhereInput = { mac: normalizedMac };
+    if (siteId !== undefined) {
+      where.siteId = siteId ?? null;
+    }
+
     try {
       const result = await this.prisma.target.updateMany({
-        where: { mac: normalizedMac },
+        where,
         data,
       });
       return result.count > 0;
     } catch (error) {
       this.logger.warn(
-        `Unable to apply tracking estimate for ${normalizedMac}: ${error instanceof Error ? error.message : String(
-          error,
-        )}`,
+        `Unable to apply tracking estimate for ${normalizedMac}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
       return false;
     }

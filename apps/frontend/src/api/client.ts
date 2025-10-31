@@ -21,9 +21,7 @@ async function request<T>(input: RequestInfo | URL, options: RequestOptions = {}
 
   const authToken = tokenOverride ?? (skipAuth ? null : getAuthToken());
   if (authToken) {
-    headers.Authorization = authToken.startsWith('Bearer ')
-      ? authToken
-      : `Bearer ${authToken}`;
+    headers.Authorization = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
   }
 
   const response = await fetch(input, {
@@ -32,8 +30,8 @@ async function request<T>(input: RequestInfo | URL, options: RequestOptions = {}
       body instanceof FormData || typeof body === 'string'
         ? body
         : body
-        ? JSON.stringify(body)
-        : undefined,
+          ? JSON.stringify(body)
+          : undefined,
     headers,
   });
 

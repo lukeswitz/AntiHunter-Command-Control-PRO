@@ -59,9 +59,7 @@ export function buildCommandPayload(input: CommandBuildInput): CommandBuildOutpu
 function normalizeTarget(target: string): string {
   const normalized = target.trim().toUpperCase();
   if (!TARGET_PATTERN.test(normalized)) {
-    throw new BadRequestException(
-      'Invalid target. Use @ALL or @NODE_<ID> (e.g., @NODE_22).',
-    );
+    throw new BadRequestException('Invalid target. Use @ALL or @NODE_<ID> (e.g., @NODE_22).');
   }
   return normalized;
 }
@@ -297,4 +295,3 @@ export function normalizeNodeId(nodeId: string): string {
   }
   return upper;
 }
-

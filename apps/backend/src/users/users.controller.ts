@@ -2,15 +2,15 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req } fr
 import { Role } from '@prisma/client';
 import { Request } from 'express';
 
-import { AllowLegalPending, Roles } from '../auth/auth.decorators';
 import { UsersService } from './users.service';
-import { UpdateCurrentUserDto } from './dto/update-current-user.dto';
+import { AllowLegalPending, Roles } from '../auth/auth.decorators';
+import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { ListUsersDto } from './dto/list-users.dto';
+import { UpdateCurrentUserDto } from './dto/update-current-user.dto';
 import { UpdateUserPermissionsDto } from './dto/update-user-permissions.dto';
 import { UpdateUserSiteAccessDto } from './dto/update-user-site-access.dto';
-import { CreateInvitationDto } from './dto/create-invitation.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('users')
 export class UsersController {

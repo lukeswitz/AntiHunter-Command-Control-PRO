@@ -1,8 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 
-import { PrismaService } from '../prisma/prisma.service';
 import { NodeDiff, NodeSnapshot } from './nodes.types';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class NodesService implements OnModuleInit {

@@ -6,15 +6,17 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-
 import { Role } from '@prisma/client';
 
-import { AuthService } from './auth.service';
 import { ALLOW_PENDING_KEY, FEATURES_KEY, IS_PUBLIC_KEY, ROLES_KEY } from './auth.decorators';
+import { AuthService } from './auth.service';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly authService: AuthService, private readonly reflector: Reflector) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [

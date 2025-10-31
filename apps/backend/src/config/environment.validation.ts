@@ -19,107 +19,51 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .positive()
-        .optional(),
-    ),
+    .pipe(z.number().int().positive().optional()),
   SERIAL_DELIMITER: z.string().optional(),
-  SERIAL_PROTOCOL: z
-    .enum(['meshtastic-like', 'raw-lines', 'nmea-like'])
-    .optional(),
+  SERIAL_PROTOCOL: z.enum(['meshtastic-like', 'raw-lines', 'nmea-like']).optional(),
   SERIAL_PER_TARGET_RATE: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .min(1)
-        .optional(),
-    ),
+    .pipe(z.number().int().min(1).optional()),
   SERIAL_GLOBAL_RATE: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .min(1)
-        .optional(),
-    ),
+    .pipe(z.number().int().min(1).optional()),
   SERIAL_RECONNECT_BASE_MS: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .min(0)
-        .optional(),
-    ),
+    .pipe(z.number().int().min(0).optional()),
   SERIAL_RECONNECT_MAX_MS: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .min(0)
-        .optional(),
-    ),
+    .pipe(z.number().int().min(0).optional()),
   SERIAL_RECONNECT_JITTER: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .min(0)
-        .max(1)
-        .optional(),
-    ),
+    .pipe(z.number().min(0).max(1).optional()),
   SERIAL_RECONNECT_MAX_ATTEMPTS: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .min(0)
-        .optional(),
-    ),
+    .pipe(z.number().int().min(0).optional()),
   WS_MAX_CLIENTS: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-      .int()
-      .positive()
-      .optional(),
-    ),
+    .pipe(z.number().int().positive().optional()),
   MAIL_ENABLED: z.string().optional(),
   MAIL_HOST: z.string().optional(),
   MAIL_PORT: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .positive()
-        .optional(),
-    ),
+    .pipe(z.number().int().positive().optional()),
   MAIL_USER: z.string().optional(),
   MAIL_PASS: z.string().optional(),
   MAIL_SECURE: z.string().optional(),
@@ -129,24 +73,12 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .positive()
-        .optional(),
-    ),
+    .pipe(z.number().int().positive().optional()),
   PASSWORD_RESET_EXPIRY_HOURS: z
     .string()
     .optional()
     .transform((val) => (val ? Number(val) : undefined))
-    .pipe(
-      z
-        .number()
-        .int()
-        .positive()
-        .optional(),
-    ),
+    .pipe(z.number().int().positive().optional()),
   APP_URL: z.string().optional(),
 });
 

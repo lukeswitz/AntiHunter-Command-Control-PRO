@@ -3,10 +3,10 @@ import { Prisma, Role, SiteAccessLevel } from '@prisma/client';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 
+import { AuthTokenPayload } from './auth.types';
+import { LEGAL_DISCLAIMER } from './legal-disclaimer';
 import { PrismaService } from '../prisma/prisma.service';
 import { DEFAULT_FEATURES_BY_ROLE } from '../users/user-permissions.constants';
-import { LEGAL_DISCLAIMER } from './legal-disclaimer';
-import { AuthTokenPayload } from './auth.types';
 
 interface PreferencesResponse {
   theme: string;
@@ -193,4 +193,3 @@ export class AuthService {
     };
   }
 }
-

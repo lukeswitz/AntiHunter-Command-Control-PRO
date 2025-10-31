@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import nodemailer from 'nodemailer';
+import { createTransport } from 'nodemailer';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -71,7 +71,7 @@ export class MailService {
     if (!config.enabled) {
       if (config.preview) {
         this.logger.log(
-          `Email preview (to=${options.to}, subject=${options.subject}):\n${options.text ?? options.html ?? ''}`
+          `Email preview (to=${options.to}, subject=${options.subject}):\n${options.text ?? options.html ?? ''}`,
         );
       } else {
         this.logger.debug('Mail delivery disabled; skipping send.');
@@ -81,7 +81,7 @@ export class MailService {
 
     if (config.preview) {
       this.logger.log(
-        `Email preview (to=${options.to}, subject=${options.subject}):\n${options.text ?? options.html ?? ''}`
+        `Email preview (to=${options.to}, subject=${options.subject}):\n${options.text ?? options.html ?? ''}`,
       );
       return;
     }
@@ -92,14 +92,12 @@ export class MailService {
     }
 
     try {
-      const transporter = nodemailer.createTransport({
+      const transporter = createTransport({
         host: config.host,
         port: config.port,
         secure: config.secure,
         auth:
-          config.user && config.password
-            ? { user: config.user, pass: config.password }
-            : undefined,
+          config.user && config.password ? { user: config.user, pass: config.password } : undefined,
       });
 
       await transporter.sendMail(payload);

@@ -2,26 +2,26 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 
+import { AlarmsModule } from './alarms/alarms.module';
+import { AppConfigModule } from './app-config/app-config.module';
+import { AuthModule } from './auth/auth.module';
+import { CommandsModule } from './commands/commands.module';
 import configuration from './config/configuration';
 import { validateEnvironment } from './config/environment.validation';
-import { AppConfigModule } from './app-config/app-config.module';
+import { ExportsModule } from './exports/exports.module';
 import { HealthModule } from './health/health.module';
+import { IngestModule } from './ingest/ingest.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { MailModule } from './mail/mail.module';
+import { MqttModule } from './mqtt/mqtt.module';
 import { NodesModule } from './nodes/nodes.module';
+import { OuiModule } from './oui/oui.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SerialModule } from './serial/serial.module';
-import { CommandsModule } from './commands/commands.module';
-import { WsModule } from './ws/ws.module';
-import { InventoryModule } from './inventory/inventory.module';
-import { IngestModule } from './ingest/ingest.module';
-import { AlarmsModule } from './alarms/alarms.module';
-import { TargetsModule } from './targets/targets.module';
-import { OuiModule } from './oui/oui.module';
 import { SitesModule } from './sites/sites.module';
-import { MqttModule } from './mqtt/mqtt.module';
-import { AuthModule } from './auth/auth.module';
+import { TargetsModule } from './targets/targets.module';
 import { UsersModule } from './users/users.module';
-import { MailModule } from './mail/mail.module';
-import { ExportsModule } from './exports/exports.module';
+import { WsModule } from './ws/ws.module';
 
 @Module({
   imports: [
@@ -69,15 +69,13 @@ import { ExportsModule } from './exports/exports.module';
     WsModule,
     IngestModule,
     AlarmsModule,
+    SitesModule,
     TargetsModule,
     OuiModule,
     MqttModule,
-    SitesModule,
     MailModule,
     UsersModule,
     ExportsModule,
   ],
 })
 export class AppModule {}
-
-

@@ -1,5 +1,5 @@
-import { SerialProtocolParser } from './serial.types';
 import { MeshtasticLikeParser } from './protocols/meshtastic-like.parser';
+import { SerialProtocolParser } from './serial.types';
 
 export type ProtocolKey = 'meshtastic-like' | 'raw-lines' | 'nmea-like';
 

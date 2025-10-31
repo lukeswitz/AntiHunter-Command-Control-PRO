@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { Role } from '@prisma/client';
 
-import { InventoryService } from './inventory.service';
 import { PromoteTargetDto } from './dto/promote-target.dto';
+import { InventoryService } from './inventory.service';
 import { Roles } from '../auth/auth.decorators';
 
 @Controller('inventory')
