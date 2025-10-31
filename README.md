@@ -256,7 +256,7 @@ All events are tagged under `<detail><ahcc*>…` blocks so TAK filters/overlays 
 
 ### Optional Addons
 
-- **FPV Decoder (experimental):** Optional NTSC/FPV ingest pipeline scaffolded as `@command-center/fpv-decoder`. Install it with `pnpm install --filter @command-center/fpv-decoder` (or create a helper script such as `pnpm addon:fpv`), then enable the backend bridge by setting `FPV_DECODER_ENABLED=true`. The Add-ons -> "FPV Decoder (Experimental)" card surfaces whether the addon loaded and how many frames have been observed. Replace the stub implementation in `addons/fpv-decoder` with a real SoapySDR/NTSC demodulator when you are ready to stream live video frames into the Command Center.
+- **FPV Decoder (experimental):** Optional NTSC/FPV ingest pipeline scaffolded as `@command-center/fpv-decoder`. Install it with `pnpm install --filter @command-center/fpv-decoder` (or create a helper script such as `pnpm addon:fpv`), then enable the backend bridge by setting `FPV_DECODER_ENABLED=true`. The AddOn page "FPV Decoder (Experimental)" card surfaces whether the addon loaded and how many frames have been observed. Replace the stub implementation in `addons/fpv-decoder` with a real SoapySDR/NTSC demodulator when you are ready to stream live video frames into the Command Center.
 
 ## Database & Migrations
 

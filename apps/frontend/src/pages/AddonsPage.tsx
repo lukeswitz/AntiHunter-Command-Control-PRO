@@ -16,9 +16,9 @@ export function AddonsPage() {
     <section className="panel">
       <header className="panel__header">
         <div>
-          <h1 className="panel__title">Add-ons</h1>
+          <h1 className="panel__title">AddOn</h1>
           <p className="panel__subtitle">
-            Optional modules that extend the Command Center. Enable or install add-ons as needed for
+            Optional modules that extend the Command Center. Enable or install addons as needed for
             your deployment.
           </p>
         </div>
