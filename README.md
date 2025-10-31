@@ -6,7 +6,7 @@ AntiHunter Perimeter Defense Systems — a full-stack command center for radio/m
 
 > **Firmware note:** The companion firmware for mesh detection nodes lives in [lukeswitz/AntiHunter](https://github.com/lukeswitz/AntiHunter). Flash those builds to your field hardware before connecting them to this Command Center.
 
-> **Early Release:** This is a beta build. Expect stability issues, breaking changes, and evolving hardware requirements/features.
+> **Early Release:** This is a beta build. Expect stability issues, breaking changes, and evolving features.
 ---
 
 ## Table of Contents
