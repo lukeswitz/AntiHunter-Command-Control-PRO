@@ -2,7 +2,6 @@
 
 AntiHunter Perimeter Defense Systems — a full-stack command center for radio/mesh deployments built entirely with Node.js and TypeScript. The platform ingests live telemetry, renders nodes and geofences on a real-time map, orchestrates detection/command workflows, and provides rich operator tooling (alarms, inventory, exports, and audit trails).
 
-> **No Python anywhere.** Serial ingest, protocol parsing, storage, and UI are all TypeScript-based for a single-language operational model.
 
 ---
 
