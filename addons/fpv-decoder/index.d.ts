@@ -1,20 +1,25 @@
+export type FpvFrameFormat = 'svg' | 'gray8';
+
 export interface FpvFrame {
+  width: number;
+  height: number;
   /**
-   * Raw luminance samples (stub metadata only).
+   * Payload format. `svg` indicates inline SVG markup (UTF-8 buffer).
+   * `gray8` would represent raw luminance bytes (future implementation).
    */
-  data?: Uint8Array;
+  format: FpvFrameFormat;
   /**
-   * Frame width in pixels.
+   * Optional MIME type hint for the consumer (e.g., image/svg+xml).
    */
-  width?: number;
+  mimeType?: string;
   /**
-    * Frame height in pixels.
-    */
-  height?: number;
-  /**
-   * Frames per second estimate.
+   * Raw frame data buffer.
    */
-  fps?: number;
+  data: Buffer;
+  /**
+   * Timestamp in milliseconds since epoch.
+   */
+  timestamp: number;
 }
 
 export interface FpvDecoder {

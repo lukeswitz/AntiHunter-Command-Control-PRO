@@ -150,6 +150,15 @@ export interface FpvStatus {
   lastFrameAt?: string | null;
 }
 
+export interface FpvFrame {
+  width: number;
+  height: number;
+  format: string;
+  mimeType?: string | null;
+  data: string;
+  timestamp: string;
+}
+
 export type TakProtocol = 'UDP' | 'TCP' | 'HTTPS';
 
 export interface TakConfig {

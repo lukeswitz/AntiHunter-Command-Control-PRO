@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client';
-import type { FpvStatus } from '../api/types';
+import type { FpvFrame, FpvStatus } from '../api/types';
 
 export function AddonsPage() {
   const fpvStatusQuery = useQuery({
@@ -11,6 +11,14 @@ export function AddonsPage() {
   });
 
   const fpvStatus = fpvStatusQuery.data;
+
+  const fpvFrameQuery = useQuery({
+    queryKey: ['fpvFrame'],
+    queryFn: () => apiClient.get<FpvFrame>('/video/fpv/frame'),
+    enabled: Boolean(fpvStatus?.available),
+    refetchInterval: fpvStatus?.available ? 2000 : false,
+    retry: false,
+  });
 
   return (
     <section className="panel">
@@ -32,7 +40,7 @@ export function AddonsPage() {
           </header>
           <div className="config-card__body">
             {fpvStatusQuery.isLoading ? (
-              <div>Checking addon status…</div>
+              <div>Checking addon status...</div>
             ) : fpvStatusQuery.isError ? (
               <div className="form-error">
                 Unable to retrieve addon status. Verify the backend is reachable.
@@ -56,7 +64,9 @@ export function AddonsPage() {
                 <div className="config-row">
                   <span className="config-label">Last Frame</span>
                   <span className="config-value">
-                    {fpvStatus.lastFrameAt ? new Date(fpvStatus.lastFrameAt).toLocaleString() : '—'}
+                    {fpvStatus.lastFrameAt
+                      ? new Date(fpvStatus.lastFrameAt).toLocaleString()
+                      : '--'}
                   </span>
                 </div>
                 {fpvStatus.message ? (
@@ -70,6 +80,26 @@ export function AddonsPage() {
                     }
                   >
                     {fpvStatus.message}
+                  </div>
+                ) : null}
+
+                {fpvStatus.available ? (
+                  <div className="fpv-preview">
+                    {fpvFrameQuery.isLoading ? (
+                      <div>Loading preview...</div>
+                    ) : fpvFrameQuery.isError ? (
+                      <div className="form-hint">Waiting for the first frame...</div>
+                    ) : fpvFrameQuery.data ? (
+                      <img
+                        src={`data:${fpvFrameQuery.data.mimeType ?? 'image/svg+xml'};base64,${
+                          fpvFrameQuery.data.data
+                        }`}
+                        alt="FPV preview"
+                        width={fpvFrameQuery.data.width}
+                        height={fpvFrameQuery.data.height}
+                        style={{ maxWidth: '100%', borderRadius: 4, border: '1px solid #1f2937' }}
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </>

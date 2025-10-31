@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, NotFoundException } from '@nestjs/common';
 
 import { VideoAddonService } from './video-addon.service';
 
@@ -9,5 +9,14 @@ export class VideoController {
   @Get('fpv/status')
   getStatus() {
     return this.videoAddonService.getStatus();
+  }
+
+  @Get('fpv/frame')
+  getFrame() {
+    const frame = this.videoAddonService.getLastFrame();
+    if (!frame) {
+      throw new NotFoundException('No FPV frame captured yet');
+    }
+    return frame;
   }
 }
