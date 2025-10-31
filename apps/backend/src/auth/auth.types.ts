@@ -11,10 +11,13 @@ export interface AuthTokenPayload {
   features?: string[];
 }
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    auth?: AuthTokenPayload;
-    authToken?: string;
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      auth?: AuthTokenPayload;
+      authToken?: string;
+    }
   }
 }
 
