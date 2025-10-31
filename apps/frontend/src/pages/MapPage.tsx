@@ -134,9 +134,10 @@ export function MapPage() {
   const alertIndicatorMap = useMemo(() => {
     const severityRank: Record<IndicatorSeverity, number> = {
       idle: 0,
-      notice: 1,
-      alert: 2,
-      critical: 3,
+      info: 1,
+      notice: 2,
+      alert: 3,
+      critical: 4,
     };
     const map = new Map<string, IndicatorSeverity>();
     Object.values(alerts).forEach((alert) => {
@@ -145,13 +146,13 @@ export function MapPage() {
       let indicator: IndicatorSeverity;
       switch (level) {
         case 'INFO':
-          indicator = 'idle';
+          indicator = 'info';
           break;
         case 'NOTICE':
           indicator = 'notice';
           break;
         case 'ALERT':
-          indicator = 'alert';
+          indicator = 'critical';
           break;
         case 'CRITICAL':
           indicator = 'critical';

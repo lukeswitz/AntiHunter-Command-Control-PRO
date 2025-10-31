@@ -3,7 +3,7 @@
 import type { AlarmLevel } from '../api/types';
 import { canonicalNodeId } from './node-store';
 
-const DEFAULT_ALERT_DURATION_MS = 10_000;
+const DEFAULT_ALERT_DURATION_MS = 20_000;
 const SEVERITY_WEIGHT: Record<AlarmLevel, number> = {
   INFO: 0,
   NOTICE: 1,

@@ -67,14 +67,27 @@ const BASE_LAYERS: BaseLayerDefinition[] = [
   },
 ] ;
 
-export type IndicatorSeverity = 'idle' | 'notice' | 'alert' | 'critical';
+export type IndicatorSeverity = 'idle' | 'info' | 'notice' | 'alert' | 'critical';
 
-function createNodeIcon(node: NodeSummary, severity: IndicatorSeverity): DivIcon {
+function createNodeIcon(
+  node: NodeSummary,
+  severity: IndicatorSeverity,
+  colors: AlertColorConfig,
+): DivIcon {
   const wrapperClasses = ['node-marker-wrapper', `node-marker-wrapper--${severity}`];
   const markerClasses = ['node-marker', `node-marker--${severity}`];
   const label = formatNodeLabel(node);
-  const background = severity === 'idle' && node.siteColor ? `background:${node.siteColor};` : '';
-  const styleAttr = background ? `style="${background}"` : '';
+  const severityColor =
+    severity === 'idle'
+      ? node.siteColor ?? colors.idle
+      : severity === 'info'
+      ? colors.info
+      : severity === 'notice'
+      ? colors.notice
+      : severity === 'alert'
+      ? colors.alert
+      : colors.critical;
+  const styleAttr = `style="background:${severityColor};--marker-glow-color:${severityColor};"`;
   return divIcon({
     html: `<div class="${markerClasses.join(' ')}" ${styleAttr}>${label}</div>`,
     className: wrapperClasses.join(' '),
@@ -145,10 +158,11 @@ const SEVERITY_PRESET: Record<
   IndicatorSeverity,
   { colorKey: keyof AlertColorConfig; fillOpacity: number; weight: number }
 > = {
-  idle: { colorKey: 'idle', fillOpacity: 0.12, weight: 2 },
-  notice: { colorKey: 'notice', fillOpacity: 0.2, weight: 2 },
-  alert: { colorKey: 'alert', fillOpacity: 0.24, weight: 2 },
-  critical: { colorKey: 'critical', fillOpacity: 0.28, weight: 3 },
+  idle: { colorKey: 'idle', fillOpacity: 0.25, weight: 2 },
+  info: { colorKey: 'info', fillOpacity: 0.3, weight: 2 },
+  notice: { colorKey: 'notice', fillOpacity: 0.35, weight: 2 },
+  alert: { colorKey: 'alert', fillOpacity: 0.4, weight: 2 },
+  critical: { colorKey: 'critical', fillOpacity: 0.45, weight: 3 },
 };
 
 function resolveRadiusStyle(severity: IndicatorSeverity, colors: AlertColorConfig): CircleVisual {
@@ -374,7 +388,11 @@ export function CommandCenterMap({
         const position: LatLngExpression = [node.lat, node.lon];
         const radiusStyle = resolveRadiusStyle(indicator, alertColors);
         return (
-          <Marker key={key} position={position} icon={createNodeIcon(node, indicator)}>
+          <Marker
+            key={key}
+            position={position}
+            icon={createNodeIcon(node, indicator, alertColors)}
+          >
             <Tooltip direction="top" offset={[0, -12]} opacity={0.9}>
               <div className="node-tooltip">
                 <strong>{formatNodeLabel(node)}</strong>

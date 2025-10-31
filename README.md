@@ -225,14 +225,16 @@ Seed inserts singleton config rows (AppConfig, AlarmConfig, VisualConfig, Covera
 Open two terminals:
 
 ```bash
-# Terminal 1 – backend API + WebSocket + serial worker
+# Terminal 1 — backend API + WebSocket + serial worker
 cd apps/backend
 pnpm dev     # http://localhost:3000
 
-# Terminal 2 – frontend SPA
+# Terminal 2 — frontend SPA
 cd apps/frontend
 pnpm dev     # http://localhost:5173
 ```
+
+Prefer a single command? From the repo root run `pnpm AHCC` to start both workspaces in parallel.
 
 The Vite dev server proxies `/api/*`, `/healthz`, `/readyz`, `/metrics`, `/socket.io` back to the NestJS service so CORS is not a concern in development.
 
@@ -394,5 +396,6 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 | **Docker push fails due to upstream changes** | Run `git pull --rebase origin main` locally, resolve conflicts, then `git push`. This keeps your fork in sync before building new images. |
 
 ---
+
 
 

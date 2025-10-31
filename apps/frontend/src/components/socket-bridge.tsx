@@ -76,7 +76,8 @@ export function SocketBridge() {
       addEntry(entry);
       const alarmLevel = extractAlarmLevel(payload);
       if (alarmLevel) {
-        play(alarmLevel);
+        const playbackLevel: AlarmLevel = alarmLevel === 'CRITICAL' ? 'ALERT' : alarmLevel;
+        play(playbackLevel);
       }
 
       const targetDetails = extractTargetDetails(payload);
