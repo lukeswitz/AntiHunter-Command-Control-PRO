@@ -3,6 +3,8 @@
 AntiHunter Perimeter Defense Systems — a full-stack command center for radio/mesh deployments built entirely with Node.js and TypeScript. The platform ingests live telemetry, renders nodes and geofences on a real-time map, orchestrates detection/command workflows, and provides rich operator tooling (alarms, inventory, exports, and audit trails).
 
 
+
+> **Firmware note:** The companion firmware for mesh detection nodes lives in [lukeswitz/AntiHunter](https://github.com/lukeswitz/AntiHunter). Flash those builds to your field hardware before connecting them to this Command Center.
 ---
 
 ## Table of Contents
