@@ -1,18 +1,22 @@
 import { ChangeEvent, useMemo } from 'react';
 import { MdDelete, MdMyLocation, MdWarningAmber } from 'react-icons/md';
+import { useNavigate } from 'react-router-dom';
 
 import type { AlarmLevel } from '../api/types';
 import { useGeofenceStore } from '../stores/geofence-store';
 import { useMapCommandStore } from '../stores/map-command-store';
 
 const ALARM_LEVELS: AlarmLevel[] = ['INFO', 'NOTICE', 'ALERT', 'CRITICAL'];
+const HIGHLIGHT_DURATION_MS = 10_000;
 
 export function GeofencePage() {
+  const navigate = useNavigate();
   const geofences = useGeofenceStore((state) => state.geofences);
   const updateGeofence = useGeofenceStore((state) => state.updateGeofence);
   const deleteGeofence = useGeofenceStore((state) => state.deleteGeofence);
   const setAlarmEnabled = useGeofenceStore((state) => state.setAlarmEnabled);
   const resetStates = useGeofenceStore((state) => state.resetStates);
+  const setHighlighted = useGeofenceStore((state) => state.setHighlighted);
   const goto = useMapCommandStore((state) => state.goto);
 
   const totalArea = useMemo(() => geofences.length, [geofences]);
@@ -23,11 +27,16 @@ export function GeofencePage() {
       return;
     }
     const centroid = calculatePolygonCentroid(geofence.polygon);
+    const bounds = calculatePolygonBounds(geofence.polygon);
     goto({
       lat: centroid.lat,
       lon: centroid.lon,
       zoom: 16,
+      geofenceId: geofence.id,
+      bounds,
     });
+    setHighlighted(geofence.id, HIGHLIGHT_DURATION_MS);
+    navigate('/map');
   };
 
   const handleDelete = (id: string) => {
@@ -89,7 +98,7 @@ export function GeofencePage() {
       {geofences.length === 0 ? (
         <div className="empty-state">
           <MdWarningAmber size={48} />
-          <p>No geofences yet. Use the “Create Geofence” button on the map to draw one.</p>
+          <p>No geofences yet. Use the "Create Geofence" button on the map to draw one.</p>
         </div>
       ) : (
         <div className="geofence-list">
@@ -186,5 +195,30 @@ function calculatePolygonCentroid(points: { lat: number; lon: number }[]) {
   return {
     lat: sumLat / points.length,
     lon: sumLon / points.length,
+  };
+}
+
+function calculatePolygonBounds(points: { lat: number; lon: number }[]) {
+  if (!points.length) {
+    return {
+      southWest: [0, 0] as [number, number],
+      northEast: [0, 0] as [number, number],
+    };
+  }
+  let minLat = Number.POSITIVE_INFINITY;
+  let maxLat = Number.NEGATIVE_INFINITY;
+  let minLon = Number.POSITIVE_INFINITY;
+  let maxLon = Number.NEGATIVE_INFINITY;
+
+  points.forEach((point) => {
+    minLat = Math.min(minLat, point.lat);
+    maxLat = Math.max(maxLat, point.lat);
+    minLon = Math.min(minLon, point.lon);
+    maxLon = Math.max(maxLon, point.lon);
+  });
+
+  return {
+    southWest: [minLat, minLon] as [number, number],
+    northEast: [maxLat, maxLon] as [number, number],
   };
 }

@@ -17,7 +17,27 @@ const AlarmContext = createContext<AlarmContextValue | undefined>(undefined);
 
 const LEVELS: AlarmLevel[] = ['INFO', 'NOTICE', 'ALERT', 'CRITICAL'];
 
-function createFallbackTone(level: AlarmLevel) {
+const MEDIA_PROTOCOL_REGEX = /^https?:\/\//i;
+const BLOB_PROTOCOL_REGEX = /^blob:/i;
+function resolveMediaUrl(path: string | null): string | null {
+  if (!path) {
+    return null;
+  }
+  if (MEDIA_PROTOCOL_REGEX.test(path)) {
+    return path;
+  }
+  if (BLOB_PROTOCOL_REGEX.test(path)) {
+    return path;
+  }
+  if (typeof window === 'undefined') {
+    return path;
+  }
+  const base = window.location.origin.replace(/\/$/, '');
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${normalized}`;
+}
+
+function createFallbackTone(level: AlarmLevel, volumePercent: number) {
   const ctx = new AudioContext();
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -29,7 +49,8 @@ function createFallbackTone(level: AlarmLevel) {
     CRITICAL: 1040,
   };
   oscillator.frequency.value = frequencies[level];
-  gain.gain.value = 0.2;
+  const normalized = Math.max(0, Math.min(1, volumePercent / 100));
+  gain.gain.value = Math.max(0.02, normalized * 0.4);
   oscillator.connect(gain);
   gain.connect(ctx.destination);
   oscillator.start();
@@ -45,12 +66,28 @@ export function AlarmProvider({ children }: PropsWithChildren) {
     ALERT: null,
     CRITICAL: null,
   });
+  const objectUrlsRef = useRef<Record<AlarmLevel, string | undefined>>({
+    INFO: undefined,
+    NOTICE: undefined,
+    ALERT: undefined,
+    CRITICAL: undefined,
+  });
+  const configRef = useRef<AlarmConfig | undefined>(undefined);
   const lastPlayedRef = useRef<Record<AlarmLevel, number>>({
     INFO: 0,
     NOTICE: 0,
     ALERT: 0,
     CRITICAL: 0,
   });
+
+  const applyAudioVolumes = (config: AlarmConfig | undefined) => {
+    LEVELS.forEach((level) => {
+      const audio = audioRefs.current[level];
+      if (audio) {
+        audio.volume = (configToVolume(config, level) ?? 60) / 100;
+      }
+    });
+  };
 
   const settingsQuery = useQuery({
     queryKey: ['alarms'],
@@ -63,13 +100,14 @@ export function AlarmProvider({ children }: PropsWithChildren) {
     }
 
     const { config, sounds } = settingsQuery.data;
+    configRef.current = config;
     LEVELS.forEach((level) => {
       const existing = audioRefs.current[level];
       if (existing) {
         existing.pause();
         existing.currentTime = 0;
       }
-      const src = sounds[level];
+      const src = resolveMediaUrl(sounds[level]);
       if (!src) {
         audioRefs.current[level] = null;
         return;
@@ -77,24 +115,99 @@ export function AlarmProvider({ children }: PropsWithChildren) {
       const audio = new Audio(src);
       audio.preload = 'auto';
       audio.volume = (configToVolume(config, level) ?? 60) / 100;
+      audio.crossOrigin = 'anonymous';
+      audio.load();
       audioRefs.current[level] = audio;
     });
   }, [settingsQuery.data]);
 
   const updateConfigMutation = useMutation({
     mutationFn: (body: AlarmConfig) => apiClient.put<AlarmSettingsResponse>('/alarms', body),
+    onMutate: async (body: AlarmConfig) => {
+      const previous = queryClient.getQueryData<AlarmSettingsResponse>(['alarms']);
+      if (previous) {
+        const mergedConfig = { ...previous.config, ...body };
+        queryClient.setQueryData<AlarmSettingsResponse>(['alarms'], {
+          config: mergedConfig,
+          sounds: previous.sounds,
+        });
+        configRef.current = mergedConfig;
+        applyAudioVolumes(mergedConfig);
+      } else {
+        configRef.current = { ...(configRef.current ?? body), ...body };
+        applyAudioVolumes(configRef.current);
+      }
+      return { previous };
+    },
+    onError: (_error, _body, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['alarms'], context.previous);
+        configRef.current = context.previous.config;
+        applyAudioVolumes(context.previous.config);
+      }
+    },
     onSuccess: (data) => {
       queryClient.setQueryData(['alarms'], data);
+      configRef.current = data.config;
+      applyAudioVolumes(data.config);
     },
   });
 
-  const uploadSoundMutation = useMutation({
+  const uploadSoundMutation = useMutation<AlarmSettingsResponse, Error, { level: AlarmLevel; file: File }, { previous?: AlarmSettingsResponse; level: AlarmLevel }>({
     mutationFn: ({ level, file }: { level: AlarmLevel; file: File }) => {
       const formData = new FormData();
       formData.append('file', file);
       return apiClient.upload<AlarmSettingsResponse>(`/alarms/sounds/${level}`, formData);
     },
-    onSuccess: (data) => queryClient.setQueryData(['alarms'], data),
+    onMutate: async ({ level, file }) => {
+      const previous = queryClient.getQueryData<AlarmSettingsResponse>(['alarms']);
+      const objectUrl = URL.createObjectURL(file);
+      const existingUrl = objectUrlsRef.current[level];
+      if (existingUrl) {
+        URL.revokeObjectURL(existingUrl);
+      }
+      objectUrlsRef.current[level] = objectUrl;
+
+      const tempAudio = new Audio(objectUrl);
+      tempAudio.preload = 'auto';
+      tempAudio.volume =
+        ((previous ? configToVolume(previous.config, level) : undefined) ?? 60) / 100;
+      tempAudio.load();
+      audioRefs.current[level]?.pause();
+      audioRefs.current[level] = tempAudio;
+
+      if (previous) {
+        queryClient.setQueryData<AlarmSettingsResponse>(['alarms'], {
+          config: previous.config,
+          sounds: {
+            ...previous.sounds,
+            [level]: objectUrl,
+          },
+        });
+      }
+
+      return { previous, level };
+    },
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(['alarms'], data);
+      const url = objectUrlsRef.current[variables.level];
+      if (url) {
+        URL.revokeObjectURL(url);
+        objectUrlsRef.current[variables.level] = undefined;
+      }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['alarms'], context.previous);
+      }
+      if (context) {
+        const url = objectUrlsRef.current[context.level];
+        if (url) {
+          URL.revokeObjectURL(url);
+          objectUrlsRef.current[context.level] = undefined;
+        }
+      }
+    },
   });
 
   const removeSoundMutation = useMutation({
@@ -103,7 +216,7 @@ export function AlarmProvider({ children }: PropsWithChildren) {
   });
 
   const play = (level: AlarmLevel) => {
-    const config = settingsQuery.data?.config;
+    const config = configRef.current ?? settingsQuery.data?.config;
     const now = Date.now();
 
     if (config) {
@@ -126,13 +239,17 @@ export function AlarmProvider({ children }: PropsWithChildren) {
     if (audio) {
       audio.volume = volume / 100;
       audio.currentTime = 0;
-      void audio.play().catch(() => {
-        createFallbackTone(level);
+      void audio.play().catch((error) => {
+        if (typeof window !== 'undefined') {
+          // eslint-disable-next-line no-console -- surface playback issues for operators
+          console.warn(`Failed to play alarm ${level}:`, error);
+        }
+        createFallbackTone(level, volume);
       });
       lastPlayedRef.current[level] = now;
       return;
     }
-    createFallbackTone(level);
+    createFallbackTone(level, volume);
     lastPlayedRef.current[level] = now;
   };
 

@@ -1,4 +1,38 @@
-﻿:root {
+
+
+.geofence-shape {
+  transition: stroke 0.3s ease, fill 0.3s ease, stroke-width 0.3s ease;
+  stroke-linejoin: round;
+}
+
+.geofence-shape--highlighted {
+  stroke: #facc15 !important;
+  fill: rgba(250, 204, 21, 0.22) !important;
+  stroke-width: 4px !important;
+  filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.4));
+  animation: geofenceGlow 1.4s ease-in-out infinite;
+}
+
+@keyframes geofenceGlow {
+  0% {
+    filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(250, 204, 21, 0.65));
+  }
+  100% {
+    filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.3));
+  }
+}
+
+.config-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+
+:root {
   color-scheme: light;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
@@ -303,7 +337,7 @@ a {
 
   align-items: center;
 
-  gap: 0.4rem;
+  gap: 0.45rem;
 
   padding: 0.35rem 0.75rem;
 
@@ -546,7 +580,7 @@ body.theme-dark .control-chip[disabled] {
 
   padding: 0.4rem 0.65rem;
 
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 
 }
 
@@ -568,7 +602,7 @@ body.theme-dark .control-chip[disabled] {
   border: 1px solid var(--color-input-border);
   border-radius: 0.6rem;
   padding: 0.35rem 0.65rem;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: var(--color-text);
   min-width: 6.5rem;
 }
@@ -603,7 +637,7 @@ body.theme-dark .control-chip[disabled] {
 
   color: var(--color-text-muted);
 
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 
 }
 
@@ -784,13 +818,11 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .geofence-list {
-
   display: grid;
-
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-
-  gap: 1.25rem;
-
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
 .geofence-card {
@@ -829,7 +861,7 @@ body.theme-dark .control-chip[disabled] {
 
   flex-direction: column;
 
-  gap: 0.4rem;
+  gap: 0.45rem;
 
 }
 
@@ -939,7 +971,7 @@ body.theme-dark .control-chip[disabled] {
 
   gap: 0.35rem;
 
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 
 }
 
@@ -985,7 +1017,7 @@ body.theme-dark .control-chip[disabled] {
 
   gap: 0.35rem;
 
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 
 }
 
@@ -1266,7 +1298,7 @@ body.theme-dark .control-chip[disabled] {
 
   padding: 0.75rem;
 
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 
   border-top: 1px solid var(--color-panel-border);
 
@@ -1315,7 +1347,7 @@ body.theme-dark .control-chip[disabled] {
 
 .nodes-table td {
   padding: 0.75rem;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   border-top: 1px solid var(--color-panel-border);
   vertical-align: top;
 }
@@ -1375,7 +1407,8 @@ body.theme-dark .control-chip[disabled] {
 
 .targets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  max-width: 980px;
   gap: 1rem;
   margin-top: 1rem;
 }
@@ -1439,7 +1472,7 @@ body.theme-dark .control-chip[disabled] {
 .target-card__body {
   display: grid;
   gap: 0.5rem;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
 
 .coordinate-row {
@@ -1589,7 +1622,7 @@ body.theme-dark .control-chip[disabled] {
 
 .template-card__header strong {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
 
 .template-card__header span {
@@ -1671,7 +1704,7 @@ body.theme-dark .control-chip[disabled] {
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .form-row label {
@@ -1717,9 +1750,9 @@ body.theme-dark .control-chip[disabled] {
   background: var(--color-input-bg);
   border: 1px solid var(--color-input-border);
   border-radius: 0.6rem;
-  padding: 0.45rem 0.65rem;
+  padding: 0.6rem 0.75rem;
   color: var(--color-text);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
 
 .console-form input:focus,
@@ -1817,7 +1850,7 @@ body.theme-dark .control-chip[disabled] {
 
 .command-menu__item-name {
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
 
 .command-menu__item-desc {
@@ -1857,7 +1890,7 @@ body.theme-dark .control-chip[disabled] {
 
 .export-card__header p {
   margin: 0.35rem 0 0;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   line-height: 1.45;
   color: var(--color-text-muted);
 }
@@ -1872,7 +1905,7 @@ body.theme-dark .control-chip[disabled] {
 .export-card__body .form-control {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .export-card__body .form-control span {
@@ -1936,7 +1969,7 @@ body.theme-dark .control-chip[disabled] {
 .parameter-label {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   font-size: 0.8rem;
   color: var(--color-text-muted);
   font-weight: 600;
@@ -2007,7 +2040,7 @@ body.theme-dark .control-chip[disabled] {
   border-radius: 0.6rem;
   padding: 0.6rem 0.75rem;
   color: var(--color-text);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   resize: vertical;
   min-height: 96px;
 }
@@ -2061,7 +2094,7 @@ body.theme-dark .control-chip[disabled] {
 .example-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .example-chips button {
@@ -2095,7 +2128,7 @@ body.theme-dark .control-chip[disabled] {
 
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 
 }
 
@@ -2365,13 +2398,10 @@ body.theme-dark .control-chip[disabled] {
 
 
 .config-grid {
-
   display: grid;
-
-  gap: 1rem;
-
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  align-items: start;
 }
 
 
@@ -2414,7 +2444,7 @@ body.theme-dark .control-chip[disabled] {
 
   color: var(--color-text-muted);
 
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 
 }
 
@@ -2427,7 +2457,7 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .config-row span {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: var(--color-text);
   font-weight: 600;
 }
@@ -2452,7 +2482,7 @@ body.theme-dark .control-chip[disabled] {
 
   flex-direction: column;
 
-  gap: 0.4rem;
+  gap: 0.45rem;
 
 }
 
@@ -2486,9 +2516,9 @@ body.theme-dark .control-chip[disabled] {
 
   border-radius: 0.6rem;
 
-  padding: 0.45rem 0.65rem;
+  padding: 0.6rem 0.75rem;
 
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 
 }
 
@@ -2563,7 +2593,8 @@ body.theme-dark .control-chip[disabled] {
 .alarm-grid {
   display: grid;
   gap: 0.9rem;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  max-width: 980px;
 }
 
 .alarm-level-card {
@@ -2651,8 +2682,8 @@ body.theme-dark .control-chip[disabled] {
   border: 1px solid var(--color-input-border);
   color: var(--color-text);
   border-radius: 0.6rem;
-  padding: 0.45rem 0.65rem;
-  font-size: 0.85rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.88rem;
   resize: vertical;
 }
 
@@ -2760,7 +2791,7 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .scheduler-week-range {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: var(--color-text-muted);
   margin-left: 0.75rem;
 }
@@ -2802,7 +2833,7 @@ body.theme-dark .control-chip[disabled] {
 .scheduler-day__actions {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .scheduler-day__actions button {
@@ -2950,7 +2981,7 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .scheduler-log {
-  padding: 0.45rem 0.65rem;
+  padding: 0.6rem 0.75rem;
   border-radius: 0.55rem;
   background: rgba(148, 163, 184, 0.12);
   font-size: 0.78rem;
@@ -3247,7 +3278,7 @@ body.theme-dark .control-chip[disabled] {
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(148, 163, 184, 0.35);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
 
 .user-pill__label {
@@ -3299,13 +3330,13 @@ body.theme-dark .control-chip[disabled] {
 .form-grid label {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .form-grid label span {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  color: rgba(15, 23, 42, 0.7);
+  color: color-mix(in srgb, var(--color-text) 94%, transparent);
 }
 
 .form-grid .control-input {
@@ -3400,7 +3431,7 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .data-table th {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: rgba(15, 23, 42, 0.65);
@@ -3461,7 +3492,7 @@ body.theme-dark .control-chip[disabled] {
 
 .field-hint {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   opacity: 0.75;
   margin-top: 0.3rem;
 }
@@ -3469,7 +3500,8 @@ body.theme-dark .control-chip[disabled] {
 .alert-color-grid {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  max-width: 980px;
 }
 
 .alert-color-item {
@@ -3509,7 +3541,7 @@ body.theme-dark .alert-color-item {
 
 .alert-color-code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   letter-spacing: 0.02em;
 }
 
@@ -3543,7 +3575,7 @@ body.theme-dark .alert-color-item {
 }
 
 .feature-flag__description {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   opacity: 0.75;
 }
 
@@ -3558,7 +3590,7 @@ body.theme-dark .alert-color-item {
 }
 
 .audit-timestamp {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   opacity: 0.7;
   margin-right: 0.5rem;
 }
@@ -3569,14 +3601,14 @@ body.theme-dark .alert-color-item {
 }
 
 .audit-entity {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   opacity: 0.8;
 }
 
 .token-preview {
   font-family: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   opacity: 0.75;
 }
 

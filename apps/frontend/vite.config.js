@@ -9,6 +9,7 @@ export default defineConfig({
             '/healthz': 'http://localhost:3000',
             '/readyz': 'http://localhost:3000',
             '/metrics': 'http://localhost:3000',
+            '/media': 'http://localhost:3000',
             '/socket.io': {
                 target: 'http://localhost:3000',
                 ws: true,

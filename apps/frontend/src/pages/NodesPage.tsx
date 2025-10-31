@@ -2,6 +2,7 @@
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { apiClient } from '../api/client';
 import { useNodeStore } from '../stores/node-store';
 import { useMapCommandStore } from '../stores/map-command-store';
 
@@ -37,9 +38,16 @@ export function NodesPage() {
     [gotoOnMap, navigate],
   );
 
-  const handleClearNodes = useCallback(() => {
-    if (window.confirm('Clear all nodes from the local view? They will repopulate as new telemetry arrives.')) {
+  const handleClearNodes = useCallback(async () => {
+    if (!window.confirm('Clear all nodes from the system? Historical telemetry will be removed.')) {
+      return;
+    }
+    try {
+      await apiClient.delete('/nodes');
       clearNodes();
+    } catch (error) {
+      console.error('Failed to clear nodes', error);
+      window.alert('Unable to clear nodes. Check backend logs and try again.');
     }
   }, [clearNodes]);
 

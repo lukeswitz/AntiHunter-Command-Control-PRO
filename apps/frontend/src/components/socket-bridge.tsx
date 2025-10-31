@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useAlarm } from '../providers/alarm-provider';
 import { useSocket } from '../providers/socket-provider';
@@ -7,7 +8,7 @@ import { canonicalNodeId, NodeDiffPayload, NodeSummary, useNodeStore } from '../
 import { TerminalEntry, TerminalLevel, useTerminalStore } from '../stores/terminal-store';
 import { useGeofenceStore } from '../stores/geofence-store';
 import type { GeofenceEvent } from '../stores/geofence-store';
-import type { AlarmLevel } from '../api/types';
+import type { AlarmLevel, Target } from '../api/types';
 
 const NOTIFICATION_CATEGORIES = new Set(['gps', 'status', 'console']);
 
@@ -15,6 +16,7 @@ type TerminalEntryInput = Omit<TerminalEntry, 'id' | 'timestamp'> & { timestamp?
 
 export function SocketBridge() {
   const socket = useSocket();
+  const queryClient = useQueryClient();
   const { play } = useAlarm();
   const setInitialNodes = useNodeStore((state) => state.setInitialNodes);
   const applyDiff = useNodeStore((state) => state.applyDiff);
@@ -79,6 +81,55 @@ export function SocketBridge() {
 
       const targetDetails = extractTargetDetails(payload);
       if (targetDetails) {
+        if (
+          targetDetails.mac &&
+          typeof targetDetails.lat === 'number' &&
+          typeof targetDetails.lon === 'number' &&
+          Number.isFinite(targetDetails.lat) &&
+          Number.isFinite(targetDetails.lon)
+        ) {
+          const normalizedMac = normalizeMacKey(targetDetails.mac);
+          queryClient.setQueryData(['targets'], (previous: Target[] | undefined) => {
+            if (!previous) {
+              return previous;
+            }
+            let changed = false;
+            const next = previous.map((target) => {
+              if (!target.mac) {
+                return target;
+              }
+              const macKey = normalizeMacKey(target.mac);
+              if (macKey !== normalizedMac) {
+                return target;
+              }
+              const lat = targetDetails.lat ?? target.lat;
+              const lon = targetDetails.lon ?? target.lon;
+              const confidence =
+                typeof targetDetails.confidence === 'number'
+                  ? targetDetails.confidence
+                  : target.trackingConfidence ?? null;
+              const updatedAt = targetDetails.detectedAt ?? target.updatedAt;
+              if (
+                Math.abs(target.lat - lat) > 1e-6 ||
+                Math.abs(target.lon - lon) > 1e-6 ||
+                (confidence ?? null) !== (target.trackingConfidence ?? null) ||
+                updatedAt !== target.updatedAt
+              ) {
+                changed = true;
+                return {
+                  ...target,
+                  lat,
+                  lon,
+                  updatedAt,
+                  trackingConfidence: confidence,
+                };
+              }
+              return target;
+            });
+            return changed ? next : previous;
+          });
+        }
+
         const nodeState = useNodeStore.getState();
         const node = targetDetails.nodeId
           ? nodeState.nodes[canonicalNodeId(targetDetails.nodeId)]
@@ -152,7 +203,7 @@ export function SocketBridge() {
       socket.off('event', handleEvent);
       socket.off('command.update', handleCommandUpdate);
     };
-  }, [socket, setInitialNodes, applyDiff, addEntry, play, triggerAlert]);
+  }, [socket, setInitialNodes, applyDiff, addEntry, play, triggerAlert, queryClient]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -334,6 +385,7 @@ interface TargetEventDetails {
   lat?: number;
   lon?: number;
   detectedAt?: string;
+  confidence?: number;
 }
 
 function extractTargetDetails(payload: unknown): TargetEventDetails | null {
@@ -351,11 +403,20 @@ function extractTargetDetails(payload: unknown): TargetEventDetails | null {
     lon?: number | string;
     timestamp?: string;
     ts?: string;
+    confidence?: number;
+    tracking?: { confidence?: number };
   };
 
   if (base.type !== 'event.target') {
     return null;
   }
+
+  const trackingConfidence =
+    typeof base.confidence === 'number'
+      ? base.confidence
+      : typeof base.tracking?.confidence === 'number'
+      ? base.tracking.confidence
+      : undefined;
 
   return {
     mac: base.mac,
@@ -365,6 +426,7 @@ function extractTargetDetails(payload: unknown): TargetEventDetails | null {
     lat: toNumber(base.lat),
     lon: toNumber(base.lon),
     detectedAt: typeof base.timestamp === 'string' ? base.timestamp : typeof base.ts === 'string' ? base.ts : undefined,
+    confidence: typeof trackingConfidence === 'number' ? trackingConfidence : undefined,
   };
 }
 
@@ -424,6 +486,10 @@ function toNumber(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   return undefined;
+}
+
+function normalizeMacKey(value: string): string {
+  return value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 }
 
 function alarmLevelToTerminal(level: AlarmLevel | undefined): TerminalLevel {

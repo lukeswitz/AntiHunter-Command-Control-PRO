@@ -5,9 +5,10 @@ import { Subscription } from 'rxjs';
 import { CommandsService } from '../commands/commands.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { NodesService } from '../nodes/nodes.service';
+import { TargetTrackingService } from '../tracking/target-tracking.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 import { SerialService } from './serial.service';
-import { SerialParseResult } from './serial.types';
+import { SerialParseResult, SerialTargetDetected } from './serial.types';
 
 @Injectable()
 export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
@@ -19,6 +20,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
     private readonly nodesService: NodesService,
     private readonly inventoryService: InventoryService,
     private readonly commandsService: CommandsService,
+    private readonly trackingService: TargetTrackingService,
     private readonly gateway: CommandCenterGateway,
   ) {}
 
@@ -61,21 +63,67 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
       case 'target-detected':
         {
           const nodeSnapshot = event.nodeId ? this.nodesService.getSnapshotById(event.nodeId) : undefined;
-          await this.inventoryService.recordDetection(event, siteId, nodeSnapshot?.lat, nodeSnapshot?.lon);
+          const detectionTime = new Date();
+          const estimate = this.trackingService.ingestDetection({
+            mac: event.mac,
+            nodeId: event.nodeId,
+            nodeLat: nodeSnapshot?.lat,
+            nodeLon: nodeSnapshot?.lon,
+            targetLat: event.lat,
+            targetLon: event.lon,
+            rssi: event.rssi,
+            siteId,
+            timestamp: detectionTime.getTime(),
+          });
+
+          const latForRecord =
+            estimate?.lat ?? event.lat ?? nodeSnapshot?.lat ?? undefined;
+          const lonForRecord =
+            estimate?.lon ?? event.lon ?? nodeSnapshot?.lon ?? undefined;
+
+          const detectionForPersistence: SerialTargetDetected = {
+            ...event,
+            lat: latForRecord,
+            lon: lonForRecord,
+          };
+
+          await this.inventoryService.recordDetection(
+            detectionForPersistence,
+            siteId,
+            nodeSnapshot?.lat,
+            nodeSnapshot?.lon,
+          );
+
+          if (estimate?.shouldPersist) {
+            await this.trackingService.persistEstimate(estimate.mac, estimate);
+          }
+
+          const trackingPayload = estimate
+            ? {
+                confidence: Number(estimate.confidence.toFixed(3)),
+                spreadMeters: Number(estimate.spreadMeters.toFixed(2)),
+                contributors: estimate.contributors.slice(0, 5),
+                uniqueNodes: estimate.uniqueNodes,
+                samples: estimate.samples,
+              }
+            : undefined;
+
+          this.gateway.emitEvent({
+            type: 'event.target',
+            timestamp: detectionTime.toISOString(),
+            nodeId: event.nodeId,
+            mac: event.mac,
+            rssi: event.rssi,
+            deviceType: event.type,
+            lat: latForRecord ?? nodeSnapshot?.lat ?? null,
+            lon: lonForRecord ?? nodeSnapshot?.lon ?? null,
+            confidence: trackingPayload?.confidence,
+            tracking: trackingPayload,
+            message: `Device ${event.mac} discovered (RSSI ${event.rssi ?? 'n/a'})`,
+            raw: event.raw,
+            siteId,
+          });
         }
-        this.gateway.emitEvent({
-          type: 'event.target',
-          timestamp: new Date().toISOString(),
-          nodeId: event.nodeId,
-          mac: event.mac,
-          rssi: event.rssi,
-          deviceType: event.type,
-          lat: event.lat,
-          lon: event.lon,
-          message: `Device ${event.mac} discovered (RSSI ${event.rssi ?? 'n/a'})`,
-          raw: event.raw,
-          siteId,
-        });
         break;
       case 'alert':
         {

@@ -1,4 +1,4 @@
-import { ChangeEvent, useMemo, useState } from 'react';
+﻿import { ChangeEvent, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client';
@@ -149,7 +149,7 @@ export function TargetsPage() {
     return targets.filter((target) => {
       const mac = target.mac?.toUpperCase();
       const vendorEntry = mac ? vendorMap.get(mac) : undefined;
-      return [target.name, mac, target.deviceType, vendorEntry?.vendor]
+      return [target.name, mac, target.deviceType, vendorEntry?.vendor, vendorEntry?.ssid]
         .filter(Boolean)
         .some((value) => String(value).toUpperCase().includes(term));
     });
@@ -221,6 +221,7 @@ export function TargetsPage() {
                 <th>MAC</th>
                 <th>Vendor</th>
                 <th>Type</th>
+                <th>SSID</th>
                 <th>Status</th>
                 <th>First Node</th>
                 <th>Location</th>
@@ -238,6 +239,11 @@ export function TargetsPage() {
                 const comment = commentMap[target.id] ?? '';
                 const location = `${target.lat.toFixed(5)}, ${target.lon.toFixed(5)}`;
                 const firstNode = normalizeNodeTarget(target.firstNodeId)?.replace(/^@/, '') ?? 'Unknown';
+                const ssid = vendorEntry?.ssid ?? null;
+                const statusLabel = target.status
+                  .split('_')
+                  .map((segment) => segment.charAt(0) + segment.slice(1).toLowerCase())
+                  .join(' ');
 
                 return (
                   <tr key={target.id} className={tracking ? 'tracking-row' : undefined}>
@@ -245,7 +251,8 @@ export function TargetsPage() {
                     <td>{mac || 'N/A'}</td>
                     <td>{vendorEntry?.vendor ?? 'Unknown'}</td>
                     <td>{target.deviceType ?? vendorEntry?.type ?? 'N/A'}</td>
-                    <td>{target.status}</td>
+                    <td>{ssid && ssid.trim() ? ssid : 'N/A'}</td>
+                    <td>{statusLabel}</td>
                     <td>{firstNode}</td>
                     <td>{location}</td>
                     <td>{new Date(target.updatedAt).toLocaleString()}</td>
@@ -316,3 +323,4 @@ export function TargetsPage() {
     </section>
   );
 }
+

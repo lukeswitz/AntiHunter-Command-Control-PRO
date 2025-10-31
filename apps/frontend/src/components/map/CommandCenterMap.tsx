@@ -1,4 +1,4 @@
-﻿
+
 import { Fragment, useEffect, useMemo, useRef } from 'react';
 import {
   Circle,
@@ -67,19 +67,13 @@ const BASE_LAYERS: BaseLayerDefinition[] = [
   },
 ] ;
 
-type IndicatorState = 'info' | 'notice' | 'alert' | 'critical' | undefined;
+export type IndicatorSeverity = 'idle' | 'notice' | 'alert' | 'critical';
 
-function createNodeIcon(node: NodeSummary, state: IndicatorState): DivIcon {
-  const wrapperClasses = ['node-marker-wrapper'];
-  if (state) {
-    wrapperClasses.push(`node-marker-wrapper--${state}`);
-  }
-  const markerClasses = ['node-marker'];
-  if (state) {
-    markerClasses.push(`node-marker--${state}`);
-  }
+function createNodeIcon(node: NodeSummary, severity: IndicatorSeverity): DivIcon {
+  const wrapperClasses = ['node-marker-wrapper', `node-marker-wrapper--${severity}`];
+  const markerClasses = ['node-marker', `node-marker--${severity}`];
   const label = formatNodeLabel(node);
-  const background = !state && node.siteColor ? `background:${node.siteColor};` : '';
+  const background = severity === 'idle' && node.siteColor ? `background:${node.siteColor};` : '';
   const styleAttr = background ? `style="${background}"` : '';
   return divIcon({
     html: `<div class="${markerClasses.join(' ')}" ${styleAttr}>${label}</div>`,
@@ -139,59 +133,34 @@ function nodeKey(nodeId: string, siteId?: string | null): string {
   return `${siteId ?? 'default'}::${canonicalNodeId(nodeId)}`;
 }
 
-type RadiusStyle = {
+type CircleVisual = {
   className: string;
-  color: string;
-  fillColor: string;
+  stroke: string;
+  fill: string;
   fillOpacity: number;
   weight: number;
 };
 
-function resolveRadiusStyle(state: IndicatorState, colors: AlertColorConfig): RadiusStyle {
-  const key = state ?? 'idle';
-  switch (key) {
-    case 'critical':
-      return {
-        className: 'node-radius node-radius--critical',
-        color: colors.critical,
-        fillColor: withAlpha(colors.critical, 0.28),
-        fillOpacity: 0.28,
-        weight: 3,
-      };
-    case 'alert':
-      return {
-        className: 'node-radius node-radius--alert',
-        color: colors.alert,
-        fillColor: colors.alert,
-        fillOpacity: 0.24,
-        weight: 2,
-      };
-    case 'notice':
-      return {
-        className: 'node-radius node-radius--notice',
-        color: colors.notice,
-        fillColor: colors.notice,
-        fillOpacity: 0.2,
-        weight: 2,
-      };
-    case 'info':
-      return {
-        className: 'node-radius node-radius--info',
-        color: colors.info,
-        fillColor: colors.info,
-        fillOpacity: 0.18,
-        weight: 2,
-      };
-    case 'idle':
-    default:
-      return {
-        className: 'node-radius node-radius--idle',
-        color: colors.idle,
-        fillColor: withAlpha(colors.idle, 0.12),
-        fillOpacity: 0.12,
-        weight: 2,
-      };
-  }
+const SEVERITY_PRESET: Record<
+  IndicatorSeverity,
+  { colorKey: keyof AlertColorConfig; fillOpacity: number; weight: number }
+> = {
+  idle: { colorKey: 'idle', fillOpacity: 0.12, weight: 2 },
+  notice: { colorKey: 'notice', fillOpacity: 0.2, weight: 2 },
+  alert: { colorKey: 'alert', fillOpacity: 0.24, weight: 2 },
+  critical: { colorKey: 'critical', fillOpacity: 0.28, weight: 3 },
+};
+
+function resolveRadiusStyle(severity: IndicatorSeverity, colors: AlertColorConfig): CircleVisual {
+  const preset = SEVERITY_PRESET[severity] ?? SEVERITY_PRESET.idle;
+  const stroke = colors[preset.colorKey];
+  return {
+    className: `node-radius node-radius--${severity}`,
+    stroke,
+    fill: withAlpha(stroke, preset.fillOpacity),
+    fillOpacity: preset.fillOpacity,
+    weight: preset.weight,
+  };
 }
 
 function withAlpha(color: string, alpha: number): string {
@@ -211,7 +180,26 @@ function withAlpha(color: string, alpha: number): string {
     const clamped = Math.max(0, Math.min(1, alpha));
     return `rgba(${r}, ${g}, ${b}, ${clamped.toFixed(2)})`;
   }
-  if (color.startsWith('rgb')) {
+  if (color.startsWith('rgba')) {
+    const match = /^rgba\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3}),\s*(\d*(?:\.\d+)?)\)$/.exec(color);
+    if (match) {
+      const r = Number(match[1]);
+      const g = Number(match[2]);
+      const b = Number(match[3]);
+      const clamped = Math.max(0, Math.min(1, alpha));
+      return `rgba(${r}, ${g}, ${b}, ${clamped.toFixed(2)})`;
+    }
+    return color;
+  }
+  if (color.startsWith('rgb(')) {
+    const match = /^rgb\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)$/.exec(color);
+    if (match) {
+      const r = Number(match[1]);
+      const g = Number(match[2]);
+      const b = Number(match[3]);
+      const clamped = Math.max(0, Math.min(1, alpha));
+      return `rgba(${r}, ${g}, ${b}, ${clamped.toFixed(2)})`;
+    }
     return color;
   }
   return color;
@@ -221,7 +209,7 @@ interface CommandCenterMapProps {
   nodes: NodeSummary[];
   trails: Record<string, NodeHistoryPoint[]>;
   targets: TargetMarker[];
-  alertIndicators: Map<string, IndicatorState>;
+  alertIndicators: Map<string, IndicatorSeverity>;
   alertColors: AlertColorConfig;
   defaultRadius: number;
   showRadius: boolean;
@@ -230,6 +218,7 @@ interface CommandCenterMapProps {
   followEnabled: boolean;
   showCoverage: boolean;
   geofences: Geofence[];
+  geofenceHighlights: Record<string, number>;
   drawing?: {
     enabled: boolean;
     points: GeofenceVertex[];
@@ -253,10 +242,12 @@ export function CommandCenterMap({
   followEnabled,
   showCoverage,
   geofences,
+  geofenceHighlights,
   drawing,
   onReady,
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
+  const now = Date.now();
   const effectiveRadius = useMemo(
     () => Math.max(25, Number.isFinite(defaultRadius) ? defaultRadius : DEFAULT_RADIUS_FALLBACK),
     [defaultRadius],
@@ -379,7 +370,7 @@ export function CommandCenterMap({
 
       {nodes.map((node) => {
         const key = nodeKey(node.id, node.siteId);
-        const indicator = alertIndicators.get(key);
+        const indicator = alertIndicators.get(key) ?? 'idle';
         const position: LatLngExpression = [node.lat, node.lon];
         const radiusStyle = resolveRadiusStyle(indicator, alertColors);
         return (
@@ -401,8 +392,9 @@ export function CommandCenterMap({
                 radius={effectiveRadius}
                 pathOptions={{
                   className: radiusStyle.className,
-                  color: radiusStyle.color,
-                  fillColor: radiusStyle.fillColor,
+                  color: radiusStyle.stroke,
+                  opacity: 0.9,
+                  fillColor: radiusStyle.fill,
                   fillOpacity: radiusStyle.fillOpacity,
                   weight: radiusStyle.weight,
                 }}
@@ -609,6 +601,8 @@ function buildCoveragePoints(nodes: NodeSummary[], baseRadius: number): HeatPoin
   });
   return samples;
 }
+
+
 
 
 

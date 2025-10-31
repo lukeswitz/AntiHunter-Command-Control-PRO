@@ -102,14 +102,14 @@ export const useAlertStore = create<AlertStoreState>((set, get) => ({
   purgeExpired: () => {
     const now = Date.now();
     const current = get().alerts;
-      const next: Record<string, NodeAlert> = {};
-      Object.values(current).forEach((alert) => {
-        if (alert.expiresAt > now) {
+    const next: Record<string, NodeAlert> = {};
+    Object.values(current).forEach((alert) => {
+      if (alert.expiresAt > now) {
         const key = keyForAlert(alert.nodeId, alert.siteId);
         next[key] = alert;
-        }
-      });
-      set({ alerts: next });
-    },
+      }
+    });
+    set({ alerts: next });
+  },
 }));
 

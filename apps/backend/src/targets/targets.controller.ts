@@ -48,6 +48,9 @@ export class TargetsController {
   @Delete(':id')
   @Roles(Role.ADMIN)
   delete(@Param('id') id: string) {
+    if (id === 'clear') {
+      return this.targetsService.clearAll();
+    }
     return this.targetsService.delete(id);
   }
 }

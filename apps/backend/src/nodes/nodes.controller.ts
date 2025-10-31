@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Delete, Get } from '@nestjs/common';
 
 import { NodesService } from './nodes.service';
 
@@ -9,5 +9,10 @@ export class NodesController {
   @Get()
   listNodes() {
     return this.nodesService.getSnapshot();
+  }
+
+  @Delete()
+  clearNodes() {
+    return this.nodesService.clearAll();
   }
 }

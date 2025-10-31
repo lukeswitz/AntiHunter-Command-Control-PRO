@@ -63,6 +63,7 @@ export interface Target {
   siteId?: string | null;
   createdBy?: string | null;
   deviceType?: string | null;
+  trackingConfidence?: number | null;
   firstNodeId?: string | null;
   status: TargetStatus;
   createdAt: string;

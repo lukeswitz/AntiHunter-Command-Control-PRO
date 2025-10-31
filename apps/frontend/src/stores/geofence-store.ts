@@ -50,6 +50,7 @@ type GeofenceUpdate = Partial<Omit<Geofence, 'id' | 'alarm' | 'polygon'>> & {
 interface GeofenceStoreState {
   geofences: Geofence[];
   states: GeofenceStateMap;
+  highlighted: Record<string, number>;
   addGeofence: (
     geofence: {
       id?: string;
@@ -72,6 +73,8 @@ interface GeofenceStoreState {
     lon: number;
   }) => GeofenceEvent[];
   resetStates: (geofenceId: string) => void;
+  setHighlighted: (id: string, durationMs: number) => void;
+  pruneHighlights: (now?: number) => void;
 }
 
 const randomColor = () => {
@@ -86,9 +89,10 @@ const generateId = () => {
   return `gfn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
-const initialState: Pick<GeofenceStoreState, 'geofences' | 'states'> = {
+const initialState: Pick<GeofenceStoreState, 'geofences' | 'states' | 'highlighted'> = {
   geofences: [],
   states: {},
+  highlighted: {},
 };
 
 export const useGeofenceStore = create<GeofenceStoreState>()(
@@ -131,7 +135,9 @@ export const useGeofenceStore = create<GeofenceStoreState>()(
           const geofences = state.geofences.filter((geofence) => geofence.id !== id);
           const nextStates = { ...state.states };
           delete nextStates[id];
-          return { geofences, states: nextStates };
+          const nextHighlighted = { ...state.highlighted };
+          delete nextHighlighted[id];
+          return { geofences, states: nextStates, highlighted: nextHighlighted };
         }),
       setAlarmEnabled: (id, enabled) =>
         set((state) => ({
@@ -287,12 +293,38 @@ export const useGeofenceStore = create<GeofenceStoreState>()(
       resetStates: (geofenceId) =>
         set((state) => {
           const next = { ...state.states };
+          const highlighted = { ...state.highlighted };
           if (geofenceId) {
             delete next[geofenceId];
-          } else {
-            return { states: {} };
+            delete highlighted[geofenceId];
+            return { states: next, highlighted };
           }
-          return { states: next };
+          return { states: {}, highlighted: {} };
+        }),
+      setHighlighted: (id, durationMs) =>
+        set((state) => {
+          if (!id) {
+            return state;
+          }
+          const next = { ...state.highlighted };
+          if (durationMs <= 0) {
+            delete next[id];
+          } else {
+            next[id] = Date.now() + durationMs;
+          }
+          return { highlighted: next };
+        }),
+      pruneHighlights: (now = Date.now()) =>
+        set((state) => {
+          const entries = Object.entries(state.highlighted).filter(([, expires]) => expires > now);
+          if (entries.length === Object.keys(state.highlighted).length) {
+            return state;
+          }
+          const next: Record<string, number> = {};
+          entries.forEach(([key, value]) => {
+            next[key] = value;
+          });
+          return { highlighted: next };
         }),
     }),
     {

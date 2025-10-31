@@ -14,7 +14,7 @@ import {
   MdSignalCellularAlt,
 } from 'react-icons/md';
 
-import { CommandCenterMap } from '../components/map/CommandCenterMap';
+import { CommandCenterMap, type IndicatorSeverity } from '../components/map/CommandCenterMap';
 import { apiClient } from '../api/client';
 import { useAlertStore } from '../stores/alert-store';
 import { useMapPreferences } from '../stores/map-store';
@@ -27,6 +27,8 @@ import type { AlarmLevel, AppSettings, Target } from '../api/types';
 import { extractAlertColors } from '../constants/alert-colors';
 import type { AlertColorConfig } from '../constants/alert-colors';
 import { useAuthStore } from '../stores/auth-store';
+
+const GEOFENCE_HIGHLIGHT_MS = 10_000;
 
 export function MapPage() {
   const { nodes, order, histories } = useNodeStore((state) => ({
@@ -62,6 +64,9 @@ export function MapPage() {
 
   const geofences = useGeofenceStore((state) => state.geofences);
   const addGeofence = useGeofenceStore((state) => state.addGeofence);
+  const geofenceHighlights = useGeofenceStore((state) => state.highlighted);
+  const pruneGeofenceHighlights = useGeofenceStore((state) => state.pruneHighlights);
+  const setGeofenceHighlighted = useGeofenceStore((state) => state.setHighlighted);
 
   const targetMarkers = useMemo<TargetMarker[]>(() => {
     if (!targetsQuery.data) {
@@ -84,6 +89,10 @@ export function MapPage() {
         comment,
         tracking: trackingEntry?.active ?? false,
         trackingSince: trackingEntry?.since ?? null,
+        trackingConfidence:
+          typeof target.trackingConfidence === 'number'
+            ? target.trackingConfidence
+            : undefined,
         history: [
           {
             lat: target.lat,
@@ -123,35 +132,40 @@ export function MapPage() {
 
 
   const alertIndicatorMap = useMemo(() => {
-    type IndicatorState = 'critical' | 'alert' | 'notice';
-    const severityRank: Record<IndicatorState, number> = {
-      notice: 0,
-      alert: 1,
-      critical: 2,
+    const severityRank: Record<IndicatorSeverity, number> = {
+      idle: 0,
+      notice: 1,
+      alert: 2,
+      critical: 3,
     };
-    const map = new Map<string, IndicatorState>();
+    const map = new Map<string, IndicatorSeverity>();
     Object.values(alerts).forEach((alert) => {
       const key = composeNodeKey(alert.nodeId, alert.siteId);
       const level = (alert.level ?? 'INFO').toUpperCase();
-      if (level === 'INFO') {
-        return;
-      }
-
-      let indicator: IndicatorState;
+      let indicator: IndicatorSeverity;
       switch (level) {
-        case 'CRITICAL':
-          indicator = 'critical';
+        case 'INFO':
+          indicator = 'idle';
+          break;
+        case 'NOTICE':
+          indicator = 'notice';
           break;
         case 'ALERT':
           indicator = 'alert';
           break;
-        case 'NOTICE':
+        case 'CRITICAL':
+          indicator = 'critical';
+          break;
         default:
-          indicator = 'notice';
+          indicator = 'idle';
           break;
       }
+      if (indicator === 'idle') {
+        return;
+      }
       const previous = map.get(key);
-      if (!previous || severityRank[indicator] >= severityRank[previous]) {
+      const previousRank = previous ? severityRank[previous] : 0;
+      if (severityRank[indicator] >= previousRank) {
         map.set(key, indicator);
       }
     });
@@ -174,12 +188,36 @@ export function MapPage() {
     if (!pendingTarget || !mapRef.current) {
       return;
     }
-    const zoom = pendingTarget.zoom ?? Math.max(mapRef.current.getZoom(), 15);
-    mapRef.current.flyTo([pendingTarget.lat, pendingTarget.lon], zoom, {
-      duration: 1.2,
-    });
+    if (pendingTarget.bounds) {
+      const bounds = latLngBounds([
+        pendingTarget.bounds.southWest,
+        pendingTarget.bounds.northEast,
+      ]);
+      mapRef.current.fitBounds(bounds.pad(0.2), { animate: true });
+    } else {
+      const zoom = pendingTarget.zoom ?? Math.max(mapRef.current.getZoom(), 15);
+      mapRef.current.flyTo([pendingTarget.lat, pendingTarget.lon], zoom, {
+        duration: 1.2,
+      });
+    }
+    if (pendingTarget.geofenceId) {
+      setGeofenceHighlighted(pendingTarget.geofenceId, GEOFENCE_HIGHLIGHT_MS);
+    }
     consumeTarget();
-  }, [pendingTarget, consumeTarget]);
+  }, [pendingTarget, consumeTarget, setGeofenceHighlighted]);
+
+  const geofenceHighlightCount = useMemo(
+    () => Object.keys(geofenceHighlights).length,
+    [geofenceHighlights],
+  );
+
+  useEffect(() => {
+    if (geofenceHighlightCount === 0) {
+      return;
+    }
+    const timer = window.setInterval(() => pruneGeofenceHighlights(), 1000);
+    return () => window.clearInterval(timer);
+  }, [geofenceHighlightCount, pruneGeofenceHighlights]);
 
   const startGeofenceDrawing = () => {
     setDrawingGeofence(true);
@@ -308,6 +346,7 @@ export function MapPage() {
           followEnabled={followEnabled}
           showCoverage={coverageEnabled}
           geofences={geofences}
+          geofenceHighlights={geofenceHighlights}
           drawing={
             drawingGeofence
               ? {

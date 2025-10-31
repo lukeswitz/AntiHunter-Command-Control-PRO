@@ -1,0 +1,12 @@
+# Ignore local artifacts that should not be baked into Docker images
+.git
+.gitignore
+node_modules
+logs
+dist
+coverage
+tmp
+.DS_Store
+Thumbs.db
+*.log
+pnpm-debug.log*

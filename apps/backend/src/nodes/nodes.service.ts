@@ -116,6 +116,27 @@ export class NodesService implements OnModuleInit {
     this.emitSnapshot();
   }
 
+  async clearAll(): Promise<{ removed: number }> {
+    const snapshots = Array.from(this.nodes.values());
+
+    const removedCount = await this.prisma.$transaction(async (tx) => {
+      await tx.triangulationResult.deleteMany();
+      await tx.nodePosition.deleteMany();
+      await tx.nodeCoverageOverride.deleteMany();
+      const deleted = await tx.node.deleteMany();
+      return deleted.count;
+    });
+
+    snapshots.forEach((snapshot) => {
+      this.diff$.next({ type: 'remove', node: snapshot });
+    });
+    this.nodes.clear();
+    this.emitSnapshot();
+
+    this.logger.log(`Cleared ${removedCount} nodes from database and cache`);
+    return { removed: removedCount };
+  }
+
   getSnapshot(): NodeSnapshot[] {
     return this.snapshot$.value;
   }

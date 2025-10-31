@@ -43,7 +43,9 @@ export class AlarmsService {
     soundRecords.forEach((sound) => {
       const level = sound.level.toUpperCase() as AlarmLevel;
       if (ALARM_LEVELS.includes(level)) {
-        soundMap[level] = `/media/alarms/${sound.filename}`;
+        const version =
+          sound.updatedAt instanceof Date ? sound.updatedAt.getTime() : Date.now();
+        soundMap[level] = `/media/alarms/${sound.filename}?v=${version}`;
       }
     });
 
@@ -66,7 +68,8 @@ export class AlarmsService {
     await this.ensureMediaDir();
 
     const extension = originalName.split('.').pop()?.toLowerCase() ?? 'wav';
-    const filename = `alarm-${level.toLowerCase()}.${extension}`;
+    const uniqueSuffix = Date.now().toString(36);
+    const filename = `alarm-${level.toLowerCase()}-${uniqueSuffix}.${extension}`;
     const filePath = join(this.mediaDir, filename);
 
     const existing = await this.prisma.alarmSound.findUnique({ where: { level } });

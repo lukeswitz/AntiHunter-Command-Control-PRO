@@ -20,6 +20,7 @@ export interface TargetMarker {
   comment?: string;
   tracking?: boolean;
   trackingSince?: string | null;
+  trackingConfidence?: number;
   history?: TargetHistoryPoint[];
 }
 

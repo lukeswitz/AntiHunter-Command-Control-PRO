@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, TargetStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,6 +9,8 @@ import { normalizeMac } from '../utils/mac';
 
 @Injectable()
 export class TargetsService {
+  private readonly logger = new Logger(TargetsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async list(dto: ListTargetsDto) {
@@ -162,6 +164,37 @@ export class TargetsService {
     await this.prisma.target.delete({
       where: { id },
     });
+  }
+
+  async applyTrackingEstimate(mac: string, lat: number, lon: number, siteId?: string | null): Promise<boolean> {
+    let normalizedMac: string;
+    try {
+      normalizedMac = normalizeMac(mac);
+    } catch {
+      this.logger.warn(`Skipping tracking estimate for invalid MAC ${mac}`);
+      return false;
+    }
+
+    const data: Prisma.TargetUpdateManyMutationInput = {
+      lat,
+      lon,
+      updatedAt: new Date(),
+    };
+
+    try {
+      const result = await this.prisma.target.updateMany({
+        where: { mac: normalizedMac },
+        data,
+      });
+      return result.count > 0;
+    } catch (error) {
+      this.logger.warn(
+        `Unable to apply tracking estimate for ${normalizedMac}: ${error instanceof Error ? error.message : String(
+          error,
+        )}`,
+      );
+      return false;
+    }
   }
 
   async clearAll(): Promise<{ deleted: number }> {

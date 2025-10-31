@@ -1,4 +1,4 @@
-﻿import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client';
@@ -526,8 +526,10 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
   }
 
   const effectiveAlertColors = extractAlertColors(appSettings!);
-  const mailInputsDisabled = !appSettings!.mailEnabled;
-  const mailPasswordReady = mailPasswordInput.trim().length > 0;
+  const mailInputsDisabled = !appSettings.mailEnabled;
+  const trimmedMailPassword = mailPasswordInput.trim();
+  const mailPasswordReady =
+    trimmedMailPassword.length > 0 || (appSettings.mailPasswordSet && mailPasswordInput.length === 0);
 
   return (
     <section className="panel">
@@ -545,7 +547,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
             onClick={handleTestSerial}
             disabled={serialTestMutation.isPending}
           >
-            {serialTestMutation.isPending ? 'Testing…' : 'Test Serial'}
+            {serialTestMutation.isPending ? 'Testing...' : 'Test Serial'}
           </button>
           <button
             type="button"
@@ -746,7 +748,6 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
         </section>
 
         <section className="config-card">
-        <section className="config-card">
           <header>
             <h2>Mail Server</h2>
             <p>Configure SMTP delivery for invitations and alert notifications.</p>
@@ -765,9 +766,13 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               <input
                 placeholder="smtp.example.com"
                 value={appSettings.mailHost ?? ''}
-                onChange={(event) => updateAppSetting({ mailHost: event.target.value })}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  updateAppSetting({ mailHost: value.trim().length > 0 ? value.trim() : null });
+                }}
                 disabled={mailInputsDisabled}
               />
+              <span className="config-hint">Fully qualified domain or IP that the backend can reach, e.g. smtp.yourdomain.com.</span>
             </div>
             <div className="config-row">
               <label>SMTP Port</label>
@@ -777,13 +782,20 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                 max={65535}
                 value={appSettings.mailPort ?? ''}
                 onChange={(event) => {
-                  if (event.target.value.trim().length === 0) return;
-                  const value = Number(event.target.value);
-                  if (!Number.isFinite(value)) return;
+                  const raw = event.target.value;
+                  if (raw.trim().length === 0) {
+                    updateAppSetting({ mailPort: null });
+                    return;
+                  }
+                  const value = Number(raw);
+                  if (!Number.isFinite(value)) {
+                    return;
+                  }
                   updateAppSetting({ mailPort: value });
                 }}
                 disabled={mailInputsDisabled}
               />
+              <span className="config-hint">Common ports: 587 for STARTTLS, 465 for SMTPS, 25 for unencrypted relays.</span>
             </div>
             <label className="checkbox-label">
               <input
@@ -794,13 +806,18 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
               Use TLS (secure connection)
             </label>
+            <span className="config-hint">Enable for STARTTLS/SMTPS. Disable only if your relay explicitly requires plain-text connections.</span>
             <div className="config-row">
               <label>Username</label>
               <input
                 value={appSettings.mailUser ?? ''}
-                onChange={(event) => updateAppSetting({ mailUser: event.target.value })}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  updateAppSetting({ mailUser: value.trim().length > 0 ? value.trim() : null });
+                }}
                 disabled={mailInputsDisabled}
               />
+              <span className="config-hint">Optional login for authenticated SMTP. Leave blank for IP/hostname based relays.</span>
             </div>
             <div className="config-row">
               <label>From Address</label>
@@ -820,13 +837,14 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
               Capture mail in local preview instead of sending
             </label>
+            <span className="config-hint">When enabled, emails are written to disk for inspection and never delivered to external servers.</span>
             <div className="config-row">
               <label>Password</label>
               <div className="mail-password-row">
                 <input
                   type="password"
                   value={mailPasswordInput}
-                  placeholder={appSettings.mailPasswordSet ? '••••••••' : 'Enter SMTP password'}
+                  placeholder={appSettings.mailPasswordSet ? '********' : 'Enter SMTP password'}
                   onChange={(event) => setMailPasswordInput(event.target.value)}
                   disabled={mailInputsDisabled}
                 />
@@ -943,13 +961,15 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
             </div>
           </div>
         </section>
+
+        <section className="config-card">
           <header>
             <h2>Site Settings</h2>
             <p>Update site names and colors for multi-site deployments.</p>
           </header>
           <div className="config-card__body">
             {sitesQuery.isLoading ? (
-              <div>Loading site metadata…</div>
+              <div>Loading site metadata...</div>
             ) : sitesQuery.isError ? (
               <div className="form-error">Unable to load site list.</div>
             ) : siteSettings.length === 0 ? (
@@ -1043,6 +1063,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
               Enable serial auto-connect
             </label>
+            <span className="config-hint">When enabled, the ingest service reconnects automatically using the settings below.</span>
             <div className="config-row">
               <label>Device Path</label>
               <input
@@ -1052,6 +1073,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ devicePath: event.target.value || null })
                 }
               />
+              <span className="config-hint">Path to the radio / serial bridge. On Windows use COM ports, on Linux use /dev/tty*.</span>
             </div>
             <div className="config-row">
               <label>Baud Rate</label>
@@ -1070,6 +1092,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ baud: value });
                 }}
               />
+              <span className="config-hint">Must match the firmware setting on the connected device (115200 for Meshtastic).</span>
             </div>
             <div className="config-row">
               <label>Protocol</label>
@@ -1083,6 +1106,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   </option>
                 ))}
               </select>
+              <span className="config-hint">Select the parser that matches the incoming frame format on the wire.</span>
             </div>
             <div className="config-row">
               <label>Data Bits</label>
@@ -1102,6 +1126,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ dataBits: value });
                 }}
               />
+              <span className="config-hint">Most serial radios use 8 data bits. Adjust only for specialized hardware.</span>
             </div>
             <div className="config-row">
               <label>Parity</label>
@@ -1115,6 +1140,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   </option>
                 ))}
               </select>
+              <span className="config-hint">Leave as �None� unless the device requires parity bits for error checking.</span>
             </div>
             <div className="config-row">
               <label>Stop Bits</label>
@@ -1130,6 +1156,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   </option>
                 ))}
               </select>
+              <span className="config-hint">Typically 1; some equipment expects 2 stop bits on slower links.</span>
             </div>
             <div className="config-row">
               <label>Delimiter</label>
@@ -1141,6 +1168,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                 }
                 title="Use 'auto' to try CRLF and LF automatically. Common values: \n, \r\n."
               />
+              <span className="config-hint">Line ending used to split incoming frames. Leave blank for automatic detection.</span>
             </div>
             <div className="config-row">
               <label>Reconnect Base (ms)</label>
@@ -1158,6 +1186,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ reconnectBaseMs: value });
                 }}
               />
+              <span className="config-hint">Initial backoff delay before retrying a disconnected serial link.</span>
             </div>
             <div className="config-row">
               <label>Reconnect Max (ms)</label>
@@ -1175,6 +1204,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateSerialSetting({ reconnectMaxMs: value });
                 }}
               />
+              <span className="config-hint">Upper bound for exponential backoff between reconnection attempts.</span>
             </div>
             <div className="config-row">
               <label>Reconnect Jitter</label>
@@ -1224,7 +1254,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
           </header>
           <div className="config-card__body">
             {mqttSitesQuery.isLoading ? (
-              <div>Loading MQTT configurationâ€¦</div>
+              <div>Loading MQTT configuration...</div>
             ) : mqttSitesQuery.isError ? (
               <div className="form-error">Unable to load MQTT configuration. Check backend logs.</div>
             ) : mqttConfigs.length === 0 ? (
@@ -1424,6 +1454,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   </option>
                 ))}
               </select>
+              <span className="config-hint">Default interface mix used when operators start a new scan (WiFi, BLE, or both).</span>
             </div>
             <div className="config-row">
               <label>Channels</label>
@@ -1432,6 +1463,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                 value={appSettings.detectChannels}
                 onChange={(event) => updateAppSetting({ detectChannels: event.target.value })}
               />
+              <span className="config-hint">Accepts comma-separated channels or ranges (e.g. 1,6,11 or 1..14). Applied to quick-start presets.</span>
             </div>
             <div className="config-row">
               <label>Scan Duration (s)</label>
@@ -1444,6 +1476,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ detectScanSecs: value });
                 }}
               />
+              <span className="config-hint">Baseline length for general scans before results are returned.</span>
             </div>
             <div className="config-row">
               <label>Device Scan Duration (s)</label>
@@ -1456,6 +1489,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ deviceScanSecs: value });
                 }}
               />
+              <span className="config-hint">Used when operators launch inventory-focused sweeps.</span>
             </div>
             <div className="config-row">
               <label>Baseline Duration (s)</label>
@@ -1468,6 +1502,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ baselineSecs: value });
                 }}
               />
+              <span className="config-hint">Time allowed for sites to capture a �quiet� profile before anomaly detection starts.</span>
             </div>
             <div className="config-row">
               <label>Randomization Duration (s)</label>
@@ -1480,6 +1515,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ randomizeSecs: value });
                 }}
               />
+              <span className="config-hint">Duration for MAC randomization sweeps triggered from the console.</span>
             </div>
             <div className="config-row">
               <label>Drone Duration (s)</label>
@@ -1492,6 +1528,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ droneSecs: value });
                 }}
               />
+              <span className="config-hint">How long RID monitoring runs before automatically stopping.</span>
             </div>
             <div className="config-row">
               <label>Deauth Duration (s)</label>
@@ -1504,6 +1541,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
                   updateAppSetting({ deauthSecs: value });
                 }}
               />
+              <span className="config-hint">Time limit for deauthentication campaigns to avoid accidental long runs.</span>
             </div>
             <label className="checkbox-label">
               <input
@@ -1513,6 +1551,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
               />
               Allow FOREVER commands
             </label>
+            <span className="config-hint">Permit operators to schedule indefinite tasks (requires explicit STOP to end).</span>
           </div>
         </section>
 
@@ -1584,7 +1623,7 @@ const updateAppSetting = (patch: Partial<AppSettings>) => {
           <div className="config-card__body">
             <div className="config-row">
               <label>Total entries</label>
-              <span>{ouiStats ? ouiStats.total.toLocaleString() : 'â€”'}</span>
+              <span>{ouiStats ? ouiStats.total.toLocaleString() : 'N/A'}</span>
             </div>
             <div className="config-row">
               <label>Last updated</label>
@@ -1651,6 +1690,16 @@ function volumeKeyForLevel(level: AlarmLevel): keyof AlarmConfig {
       return 'volumeCritical';
   }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,19 +1,62 @@
-import { Link } from "react-router-dom";
-import { MdBrightness4, MdBrightness7, MdLogout, MdSignalWifiStatusbar4Bar } from "react-icons/md";
+import { Link } from 'react-router-dom';
+import { MdBrightness4, MdBrightness7, MdLogout, MdSignalWifiStatusbar4Bar } from 'react-icons/md';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { useSocketConnected } from "../providers/socket-provider";
-import { useTheme } from "../providers/theme-provider";
-import { useAuthStore } from "../stores/auth-store";
+import { useSocketConnected } from '../providers/socket-provider';
+import { useTheme } from '../providers/theme-provider';
+import { useAuthStore } from '../stores/auth-store';
+import { apiClient } from '../api/client';
+import type { AuthUser } from '../api/types';
 
 export function AppHeader() {
   const isConnected = useSocketConnected();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const user = useAuthStore((state) => state.user);
+  const setAuthUser = useAuthStore((state) => state.setUser);
   const logout = useAuthStore((state) => state.logout);
   const status = useAuthStore((state) => state.status);
+  const queryClient = useQueryClient();
 
-  const authenticated = status === "authenticated" && user;
-  const isAdmin = authenticated && user?.role === "ADMIN";
+  const updateThemeMutation = useMutation<
+    AuthUser,
+    Error,
+    'light' | 'dark',
+    { previousTheme: 'light' | 'dark' } | undefined
+  >({
+    mutationFn: (nextTheme: 'light' | 'dark') =>
+      apiClient.put<AuthUser>('/users/me', {
+        theme: nextTheme,
+      }),
+    onMutate: async (nextTheme) => {
+      const previousTheme = theme;
+      setTheme(nextTheme);
+      return { previousTheme };
+    },
+    onSuccess: (data, nextTheme) => {
+      setAuthUser(data);
+      queryClient.setQueryData(['users', 'me'], data);
+      setTheme(nextTheme);
+    },
+    onError: (_error, _nextTheme, context) => {
+      if (context && context.previousTheme) {
+        setTheme(context.previousTheme);
+      }
+    },
+  });
+
+  const handleToggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+
+    if (updateThemeMutation.isPending || !user) {
+      setTheme(nextTheme);
+      return;
+    }
+
+    updateThemeMutation.mutate(nextTheme);
+  };
+
+  const authenticated = status === 'authenticated' && user;
+  const isAdmin = authenticated && user?.role === 'ADMIN';
 
   return (
     <header className="app-header">
@@ -28,9 +71,9 @@ export function AppHeader() {
       </div>
 
       <div className="app-header__actions">
-        <div className={`connection-indicator ${isConnected ? "ok" : "down"}`}>
+        <div className={`connection-indicator ${isConnected ? 'ok' : 'down'}`}>
           <MdSignalWifiStatusbar4Bar />
-          {isConnected ? "Connected" : "Disconnected"}
+          {isConnected ? 'Connected' : 'Disconnected'}
         </div>
         {isAdmin ? (
           <Link to="/account" className="control-chip">
@@ -46,8 +89,14 @@ export function AppHeader() {
             </button>
           </div>
         ) : null}
-        <button type="button" className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">
-          {theme === "light" ? <MdBrightness4 /> : <MdBrightness7 />}
+        <button
+          type="button"
+          className="icon-button"
+          onClick={handleToggleTheme}
+          aria-label="Toggle theme"
+          disabled={updateThemeMutation.isPending}
+        >
+          {theme === 'light' ? <MdBrightness4 /> : <MdBrightness7 />}
         </button>
       </div>
     </header>
