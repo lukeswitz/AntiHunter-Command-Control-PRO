@@ -36,10 +36,12 @@ COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/tsconfig.base.json ./tsconfig.base.json
 RUN mkdir -p apps/backend
+COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 COPY --from=builder /app/apps/backend/package.json ./apps/backend/package.json
 
 # Install production dependencies only for @command-center/backend
 RUN pnpm install --frozen-lockfile --prod --filter @command-center/backend...
+RUN pnpm --filter @command-center/backend prisma:generate
 
 # Provide udevadm for serialport enumeration inside the container
 RUN apt-get update  && apt-get install -y --no-install-recommends udev  && rm -rf /var/lib/apt/lists/*
