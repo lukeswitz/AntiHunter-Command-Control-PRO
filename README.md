@@ -803,7 +803,20 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 | `pnpm format`                                         | Prettier writes                  |
 | `pnpm --filter @command-center/backend prisma:studio` | Inspect DB via Prisma Studio     |
 | `pnpm --filter @command-center/backend prisma:seed`   | Reseed config rows               |
-| `pnpm seed`                                           | Shortcut to seed default admin   |
+| `pnpm seed`                                           | Shortcut to seed default admin (requires pnpm on host) |
+
+> **Docker note.** Production containers only install runtime dependencies, so the first time you seed from inside the backend container you must install the backend workspace dev deps and then run the seed:
+> ```bash
+> docker compose exec backend sh -lc "
+>   cd /app &&
+>   pnpm install --filter @command-center/backend --prod=false --ignore-scripts &&
+>   pnpm --filter @command-center/backend prisma:seed
+> "
+> ```
+> Subsequent reseeds can use the shorter command:
+> ```bash
+> docker compose exec backend sh -lc "cd /app && pnpm --filter @command-center/backend prisma:seed"
+> ```
 | `pnpm --filter @command-center/frontend preview`      | Preview SPA production build     |
 
 
