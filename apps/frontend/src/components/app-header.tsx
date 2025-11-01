@@ -68,7 +68,10 @@ export function AppHeader() {
             alt="AntiHunter Shield Logo"
           />
         </span>
-        <span className="brand-subtitle">Public 0.9.0-beta.1</span>
+        <div>
+          <span className="brand-title">AntiHunter Command &amp; Control Pro</span>
+          <span className="brand-subtitle">Public 0.9.0-beta.1</span>
+        </div>
       </div>
 
       <div className="app-header__actions">

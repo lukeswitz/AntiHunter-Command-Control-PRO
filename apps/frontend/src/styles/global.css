@@ -233,6 +233,12 @@ a {
   filter: brightness(1.08) saturate(0.95);
 }
 
+.brand-title {
+  font-size: 1.125rem;
+
+  font-weight: 600;
+}
+
 .brand-subtitle {
   display: block;
 
