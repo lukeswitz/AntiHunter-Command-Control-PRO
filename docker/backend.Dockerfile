@@ -6,6 +6,7 @@ WORKDIR /app
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
+RUN corepack prepare pnpm@8.15.4 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/backend/package.json apps/backend/
@@ -32,6 +33,7 @@ ENV NODE_ENV=production
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
+RUN corepack prepare pnpm@8.15.4 --activate
 
 # Copy workspace metadata so pnpm can resolve symlinks
 COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
