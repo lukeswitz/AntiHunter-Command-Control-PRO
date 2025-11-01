@@ -20,6 +20,11 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
     container_name: cc_backend
+    networks:
+      default:
+        aliases:
+          - backend
+          - cc_backend
     restart: unless-stopped
     environment:
       NODE_ENV: production
