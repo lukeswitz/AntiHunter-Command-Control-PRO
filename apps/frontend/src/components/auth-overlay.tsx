@@ -59,9 +59,6 @@ export function AuthOverlay() {
             src="/logo111.png"
             alt="AntiHunter Shield Logo"
           />
-          <h1 className="auth-overlay__brand-title">
-            <span className="auth-overlay__brand-name">AntiHunter</span> Command &amp; Control Pro
-          </h1>
         </header>
 
         {error ? <div className="auth-overlay__error">{error}</div> : null}

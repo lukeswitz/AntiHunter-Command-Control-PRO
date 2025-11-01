@@ -214,10 +214,8 @@ a {
 
 .app-header__brand {
   display: flex;
-
   align-items: center;
-
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .app-header__brand-icon {
@@ -225,17 +223,14 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: transparent;
 }
 
 .app-header__brand-icon img {
   height: 100%;
   width: auto;
-}
-
-.brand-title {
-  font-size: 1.125rem;
-
-  font-weight: 600;
+  display: block;
+  filter: brightness(1.08) saturate(0.95);
 }
 
 .brand-subtitle {
@@ -2791,17 +2786,6 @@ body.theme-dark .control-chip[disabled] {
   display: block;
   margin: 0 auto;
   filter: brightness(1.12) saturate(0.92);
-}
-
-.auth-overlay__brand-title {
-  font-size: 1.9rem;
-  font-weight: 600;
-  color: #0f172a;
-  letter-spacing: -0.02em;
-}
-
-.auth-overlay__brand-name {
-  font-weight: 700;
 }
 
 .auth-overlay__error {
