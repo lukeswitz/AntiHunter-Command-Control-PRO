@@ -2785,9 +2785,20 @@ body.theme-dark .control-chip[disabled] {
   text-align: center;
 }
 
+.auth-overlay__logo {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 1rem 1.5rem;
+  box-shadow:
+    0 16px 36px rgba(15, 23, 42, 0.12),
+    0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
 .auth-overlay__logo-mark {
-  width: 330px;
+  width: min(330px, 100%);
   height: auto;
+  display: block;
+  filter: brightness(1.05);
 }
 
 .auth-overlay__error {
