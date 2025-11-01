@@ -82,7 +82,7 @@ async function getAvailablePorts(): Promise<SerialPortInfo[]> {
             ? (moduleRef as { list: () => Promise<SerialPortInfo[]> }).list
             : null;
     if (candidate) {
-      const ports = await withGracefulUdevFallback(candidate);
+      const ports = await withGracefulUdevFallback(() => candidate());
       if (ports) {
         return ports;
       }
@@ -92,18 +92,16 @@ async function getAvailablePorts(): Promise<SerialPortInfo[]> {
   }
 
   if ('list' in SerialPortStream) {
-    const ports = await withGracefulUdevFallback(
-      (SerialPortStream as unknown as { list: () => Promise<SerialPortInfo[]> }).list.bind(
-        SerialPortStream,
-      ),
-    );
+    const listFn = (SerialPortStream as unknown as { list: () => Promise<SerialPortInfo[]> }).list;
+    const ports = await withGracefulUdevFallback(() => listFn());
     if (ports) {
       return ports;
     }
   }
   const bindingWithList = Binding as unknown as { list?: () => Promise<SerialPortInfo[]> };
   if (typeof bindingWithList.list === 'function') {
-    const ports = await withGracefulUdevFallback(bindingWithList.list.bind(Binding));
+    const listFn = bindingWithList.list;
+    const ports = await withGracefulUdevFallback(() => listFn());
     if (ports) {
       return ports;
     }
