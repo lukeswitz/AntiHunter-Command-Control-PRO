@@ -1249,6 +1249,27 @@ body.theme-dark .control-chip[disabled] {
   color: #facc15;
 }
 
+.status-connected {
+  background: rgba(34, 197, 94, 0.2);
+  color: #bbf7d0;
+}
+
+.status-connecting {
+  background: rgba(59, 130, 246, 0.2);
+  color: #bfdbfe;
+}
+
+.status-disabled,
+.status-not_configured {
+  background: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+}
+
+.status-error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fecaca;
+}
+
 .status-resolved {
   background: rgba(148, 163, 184, 0.25);
   color: #cbd5f5;

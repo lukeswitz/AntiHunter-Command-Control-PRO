@@ -10,6 +10,9 @@ import type {
   SerialState,
   SiteSummary,
   MqttSiteConfig,
+  MqttStatusState,
+  MqttSiteStatus,
+  MqttTestResponse,
   TakConfig,
   TakProtocol,
 } from '../api/types';
@@ -18,6 +21,7 @@ import { useAlarm } from '../providers/alarm-provider';
 import { useNodeStore } from '../stores/node-store';
 
 type AppSettingsUpdate = Partial<AppSettings> & { mailPassword?: string };
+type MqttNotice = { type: 'success' | 'error' | 'info'; text: string } | null;
 
 const LEVEL_METADATA: Record<AlarmLevel, { label: string; description: string }> = {
   INFO: { label: 'Info', description: 'Low priority notifications (status updates).' },
@@ -141,6 +145,12 @@ export function ConfigPage() {
     queryFn: () => apiClient.get<MqttSiteConfig[]>('/mqtt/sites'),
   });
 
+  const mqttStatusQuery = useQuery({
+    queryKey: ['mqttStatus'],
+    queryFn: () => apiClient.get<MqttSiteStatus[]>('/mqtt/sites-status'),
+    refetchInterval: 15_000,
+  });
+
   const takConfigQuery = useQuery({
     queryKey: ['takConfig'],
     queryFn: () => apiClient.get<TakConfig>('/tak/config'),
@@ -160,6 +170,10 @@ export function ConfigPage() {
   const [siteSettings, setSiteSettings] = useState<SiteSummary[]>([]);
   const [mqttConfigs, setMqttConfigs] = useState<MqttSiteConfig[]>([]);
   const [mqttPasswords, setMqttPasswords] = useState<Record<string, string>>({});
+  const [mqttNotices, setMqttNotices] = useState<Record<string, MqttNotice>>({});
+  const [mqttAction, setMqttAction] = useState<{ siteId: string; mode: 'test' | 'connect' } | null>(
+    null,
+  );
   const [takConfig, setTakConfig] = useState<TakConfig | null>(null);
   const [mailPasswordInput, setMailPasswordInput] = useState('');
   const [mailPasswordMessage, setMailPasswordMessage] = useState<{
@@ -209,6 +223,45 @@ export function ConfigPage() {
       setMqttConfigs(mqttSitesQuery.data);
     }
   }, [mqttSitesQuery.data]);
+
+  const mqttStatusMap = useMemo<Record<string, MqttSiteStatus>>(
+    () =>
+      (mqttStatusQuery.data ?? []).reduce(
+        (acc, entry) => {
+          acc[entry.siteId] = entry;
+          return acc;
+        },
+        {} as Record<string, MqttSiteStatus>,
+      ),
+    [mqttStatusQuery.data],
+  );
+
+  useEffect(() => {
+    const entries = Object.entries(mqttNotices).filter(
+      (entry): entry is [string, NonNullable<MqttNotice>] => entry[1] !== null,
+    );
+    if (entries.length === 0) {
+      return;
+    }
+    const timers = entries.map(([siteId, notice]) =>
+      setTimeout(() => {
+        if (notice?.type === 'error') {
+          return;
+        }
+        setMqttNotices((prev) => {
+          if (!prev[siteId] || prev[siteId]?.type === 'error') {
+            return prev;
+          }
+          const next = { ...prev };
+          next[siteId] = null;
+          return next;
+        });
+      }, 5000),
+    );
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+    };
+  }, [mqttNotices, setMqttNotices]);
 
   useEffect(() => {
     if (takConfigQuery.data) {
@@ -303,14 +356,12 @@ export function ConfigPage() {
       updateNodeSiteMeta(data.id, { name: data.name, color: data.color });
     },
   });
-  const updateMqttConfigMutation = useMutation({
-    mutationFn: ({
-      siteId,
-      body,
-    }: {
-      siteId: string;
-      body: Partial<MqttSiteConfig> & { password?: string | null };
-    }) => apiClient.put<MqttSiteConfig>(`/mqtt/sites/${siteId}`, body),
+  const updateMqttConfigMutation = useMutation<
+    MqttSiteConfig,
+    Error,
+    { siteId: string; body: Partial<MqttSiteConfig> & { password?: string | null } }
+  >({
+    mutationFn: ({ siteId, body }) => apiClient.put<MqttSiteConfig>(`/mqtt/sites/${siteId}`, body),
     onSuccess: (data) => {
       queryClient.setQueryData(['mqttSites'], (existing: MqttSiteConfig[] | undefined) =>
         existing
@@ -320,9 +371,67 @@ export function ConfigPage() {
       setMqttConfigs((prev) =>
         prev.map((cfg) => (cfg.siteId === data.siteId ? { ...cfg, ...data } : cfg)),
       );
+      setMqttNotices((prev) => ({
+        ...prev,
+        [data.siteId]: { type: 'success', text: 'Settings saved.' },
+      }));
+      queryClient.invalidateQueries({ queryKey: ['mqttStatus'] });
+    },
+    onError: (error, variables) => {
+      const message =
+        error instanceof Error ? error.message : 'Unable to update MQTT configuration.';
+      setMqttNotices((prev) => ({
+        ...prev,
+        [variables.siteId]: { type: 'error', text: message },
+      }));
     },
   });
 
+  const testMqttMutation = useMutation<MqttTestResponse, Error, string>({
+    mutationFn: (siteId) => apiClient.post<MqttTestResponse>(`/mqtt/sites/${siteId}/test`, {}),
+    onMutate: (siteId) => {
+      setMqttAction({ siteId, mode: 'test' });
+      setMqttNotices((prev) => ({ ...prev, [siteId]: null }));
+    },
+    onSuccess: (data, siteId) => {
+      setMqttNotices((prev) => ({
+        ...prev,
+        [siteId]: { type: data.ok ? 'success' : 'error', text: data.message },
+      }));
+      queryClient.invalidateQueries({ queryKey: ['mqttStatus'] });
+    },
+    onError: (error, siteId) => {
+      const message = error instanceof Error ? error.message : 'Unable to test MQTT connection.';
+      setMqttNotices((prev) => ({ ...prev, [siteId]: { type: 'error', text: message } }));
+    },
+    onSettled: () => {
+      setMqttAction(null);
+    },
+  });
+
+  const reconnectMqttMutation = useMutation<MqttSiteStatus, Error, string>({
+    mutationFn: (siteId) => apiClient.post<MqttSiteStatus>(`/mqtt/sites/${siteId}/restart`, {}),
+    onMutate: (siteId) => {
+      setMqttAction({ siteId, mode: 'connect' });
+      setMqttNotices((prev) => ({ ...prev, [siteId]: null }));
+    },
+    onSuccess: (status, siteId) => {
+      const message =
+        status.message ??
+        (status.state === 'connected' ? 'Connected to broker.' : 'Reconnect attempt finished.');
+      const type: 'success' | 'error' | 'info' =
+        status.state === 'connected' ? 'success' : status.state === 'error' ? 'error' : 'info';
+      setMqttNotices((prev) => ({ ...prev, [siteId]: { type, text: message } }));
+      queryClient.invalidateQueries({ queryKey: ['mqttStatus'] });
+    },
+    onError: (error, siteId) => {
+      const message = error instanceof Error ? error.message : 'Unable to reconnect MQTT client.';
+      setMqttNotices((prev) => ({ ...prev, [siteId]: { type: 'error', text: message } }));
+    },
+    onSettled: () => {
+      setMqttAction(null);
+    },
+  });
   const setLocalMqttConfig = (siteId: string, patch: Partial<MqttSiteConfig>) => {
     setMqttConfigs((prev) =>
       prev.map((cfg) => (cfg.siteId === siteId ? { ...cfg, ...patch } : cfg)),
@@ -334,6 +443,14 @@ export function ConfigPage() {
     patch: Partial<MqttSiteConfig> & { password?: string | null },
   ) => {
     updateMqttConfigMutation.mutate({ siteId, body: patch });
+  };
+
+  const handleMqttTest = (siteId: string) => {
+    testMqttMutation.mutate(siteId);
+  };
+
+  const handleMqttReconnect = (siteId: string) => {
+    reconnectMqttMutation.mutate(siteId);
   };
 
   const reloadTakMutation = useMutation({
@@ -1778,176 +1895,236 @@ export function ConfigPage() {
                 <div>No MQTT sites configured yet. Add a site to enable federation.</div>
               </div>
             ) : (
-              mqttConfigs.map((cfg) => (
-                <div key={cfg.siteId} className="config-subcard">
-                  <div className="config-row">
-                    <span className="config-label">Site</span>
-                    <div className="config-value">
-                      <strong>{cfg.site?.name ?? cfg.siteId}</strong>
-                      <span className="muted">{cfg.siteId}</span>
+              mqttConfigs.map((cfg) => {
+                const status = mqttStatusMap[cfg.siteId];
+                const state = status?.state ?? 'not_configured';
+                const statusClassName = `status-pill status-${state}`;
+                const statusLabel = formatMqttStatusState(state);
+                const notice = mqttNotices[cfg.siteId];
+                const isTesting =
+                  mqttAction?.mode === 'test' &&
+                  mqttAction.siteId === cfg.siteId &&
+                  testMqttMutation.isPending;
+                const isConnecting =
+                  mqttAction?.mode === 'connect' &&
+                  mqttAction.siteId === cfg.siteId &&
+                  reconnectMqttMutation.isPending;
+                const statusUpdatedAt = status?.updatedAt ? formatDateTime(status.updatedAt) : null;
+
+                return (
+                  <div key={cfg.siteId} className="config-subcard">
+                    <div className="config-row">
+                      <span className="config-label">Site</span>
+                      <div className="config-value">
+                        <strong>{cfg.site?.name ?? cfg.siteId}</strong>
+                        <span className="muted">{cfg.siteId}</span>
+                      </div>
                     </div>
-                  </div>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={cfg.enabled}
-                      onChange={(event) => {
-                        const enabled = event.target.checked;
-                        setLocalMqttConfig(cfg.siteId, { enabled });
-                        commitMqttConfig(cfg.siteId, { enabled });
-                      }}
-                    />
-                    Enable site replication
-                  </label>
-                  <div className="config-row">
-                    <span className="config-label">Broker URL</span>
-                    <input
-                      value={cfg.brokerUrl}
-                      onChange={(event) =>
-                        setLocalMqttConfig(cfg.siteId, { brokerUrl: event.target.value })
-                      }
-                      onBlur={(event) =>
-                        commitMqttConfig(cfg.siteId, { brokerUrl: event.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Client ID</span>
-                    <input
-                      value={cfg.clientId}
-                      onChange={(event) =>
-                        setLocalMqttConfig(cfg.siteId, { clientId: event.target.value })
-                      }
-                      onBlur={(event) =>
-                        commitMqttConfig(cfg.siteId, { clientId: event.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Username</span>
-                    <input
-                      value={cfg.username ?? ''}
-                      onChange={(event) =>
-                        setLocalMqttConfig(cfg.siteId, { username: event.target.value || null })
-                      }
-                      onBlur={(event) =>
-                        commitMqttConfig(cfg.siteId, {
-                          username: event.target.value || null,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Password</span>
-                    <div className="mqtt-password-row">
-                      <input
-                        type="password"
-                        value={mqttPasswords[cfg.siteId] ?? ''}
-                        placeholder={cfg.username ? 'Enter new password' : 'Optional'}
-                        onChange={(event) =>
-                          setMqttPasswords((prev) => ({
-                            ...prev,
-                            [cfg.siteId]: event.target.value,
-                          }))
-                        }
-                      />
+                    <div className="config-row">
+                      <span className="config-label">Connection</span>
+                      <div className="config-value">
+                        <span className={statusClassName}>{statusLabel}</span>
+                        {statusUpdatedAt ? (
+                          <span className="config-hint">Updated {statusUpdatedAt}</span>
+                        ) : null}
+                        {status?.message ? (
+                          <div className="config-hint">{status.message}</div>
+                        ) : null}
+                        {notice ? (
+                          <div
+                            className={
+                              notice.type === 'error'
+                                ? 'form-error'
+                                : notice.type === 'success'
+                                  ? 'form-success'
+                                  : 'form-hint'
+                            }
+                          >
+                            {notice.text}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="controls-row">
                       <button
                         type="button"
                         className="control-chip"
-                        onClick={() => handleMqttPasswordSubmit(cfg.siteId)}
-                        disabled={!mqttPasswords[cfg.siteId]}
+                        onClick={() => handleMqttReconnect(cfg.siteId)}
+                        disabled={isConnecting}
                       >
-                        Update
+                        {isConnecting ? 'Connecting…' : 'Reconnect'}
+                      </button>
+                      <button
+                        type="button"
+                        className="control-chip"
+                        onClick={() => handleMqttTest(cfg.siteId)}
+                        disabled={isTesting}
+                      >
+                        {isTesting ? 'Testing…' : 'Test connection'}
                       </button>
                     </div>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={cfg.enabled}
+                        onChange={(event) => {
+                          const enabled = event.target.checked;
+                          setLocalMqttConfig(cfg.siteId, { enabled });
+                          commitMqttConfig(cfg.siteId, { enabled });
+                        }}
+                      />
+                      Enable site replication
+                    </label>
+                    <div className="config-row">
+                      <span className="config-label">Broker URL</span>
+                      <input
+                        value={cfg.brokerUrl}
+                        onChange={(event) =>
+                          setLocalMqttConfig(cfg.siteId, { brokerUrl: event.target.value })
+                        }
+                        onBlur={(event) =>
+                          commitMqttConfig(cfg.siteId, { brokerUrl: event.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Client ID</span>
+                      <input
+                        value={cfg.clientId}
+                        onChange={(event) =>
+                          setLocalMqttConfig(cfg.siteId, { clientId: event.target.value })
+                        }
+                        onBlur={(event) =>
+                          commitMqttConfig(cfg.siteId, { clientId: event.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Username</span>
+                      <input
+                        value={cfg.username ?? ''}
+                        onChange={(event) =>
+                          setLocalMqttConfig(cfg.siteId, { username: event.target.value || null })
+                        }
+                        onBlur={(event) =>
+                          commitMqttConfig(cfg.siteId, {
+                            username: event.target.value || null,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Password</span>
+                      <div className="mqtt-password-row">
+                        <input
+                          type="password"
+                          value={mqttPasswords[cfg.siteId] ?? ''}
+                          placeholder={cfg.username ? 'Enter new password' : 'Optional'}
+                          onChange={(event) =>
+                            setMqttPasswords((prev) => ({
+                              ...prev,
+                              [cfg.siteId]: event.target.value,
+                            }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="control-chip"
+                          onClick={() => handleMqttPasswordSubmit(cfg.siteId)}
+                          disabled={!mqttPasswords[cfg.siteId]}
+                        >
+                          Update
+                        </button>
+                      </div>
+                    </div>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={cfg.tlsEnabled}
+                        onChange={(event) => {
+                          const tlsEnabled = event.target.checked;
+                          setLocalMqttConfig(cfg.siteId, { tlsEnabled });
+                          commitMqttConfig(cfg.siteId, { tlsEnabled });
+                        }}
+                      />
+                      TLS enabled
+                    </label>
+                    <div className="config-row">
+                      <span className="config-label">QoS (events)</span>
+                      <select
+                        value={cfg.qosEvents}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          setLocalMqttConfig(cfg.siteId, { qosEvents: value });
+                          commitMqttConfig(cfg.siteId, { qosEvents: value });
+                        }}
+                      >
+                        {[0, 1, 2].map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">QoS (commands)</span>
+                      <select
+                        value={cfg.qosCommands}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          setLocalMqttConfig(cfg.siteId, { qosCommands: value });
+                          commitMqttConfig(cfg.siteId, { qosCommands: value });
+                        }}
+                      >
+                        {[0, 1, 2].map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">CA PEM</span>
+                      <textarea
+                        rows={3}
+                        value={cfg.caPem ?? ''}
+                        onChange={(event) =>
+                          setLocalMqttConfig(cfg.siteId, { caPem: event.target.value || null })
+                        }
+                        onBlur={(event) =>
+                          commitMqttConfig(cfg.siteId, { caPem: event.target.value || null })
+                        }
+                      />
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Client Cert PEM</span>
+                      <textarea
+                        rows={3}
+                        value={cfg.certPem ?? ''}
+                        onChange={(event) =>
+                          setLocalMqttConfig(cfg.siteId, { certPem: event.target.value || null })
+                        }
+                        onBlur={(event) =>
+                          commitMqttConfig(cfg.siteId, { certPem: event.target.value || null })
+                        }
+                      />
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Client Key PEM</span>
+                      <textarea
+                        rows={3}
+                        value={cfg.keyPem ?? ''}
+                        onChange={(event) =>
+                          setLocalMqttConfig(cfg.siteId, { keyPem: event.target.value || null })
+                        }
+                        onBlur={(event) =>
+                          commitMqttConfig(cfg.siteId, { keyPem: event.target.value || null })
+                        }
+                      />
+                    </div>
                   </div>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={cfg.tlsEnabled}
-                      onChange={(event) => {
-                        const tlsEnabled = event.target.checked;
-                        setLocalMqttConfig(cfg.siteId, { tlsEnabled });
-                        commitMqttConfig(cfg.siteId, { tlsEnabled });
-                      }}
-                    />
-                    TLS enabled
-                  </label>
-                  <div className="config-row">
-                    <span className="config-label">QoS (events)</span>
-                    <select
-                      value={cfg.qosEvents}
-                      onChange={(event) => {
-                        const value = Number(event.target.value);
-                        setLocalMqttConfig(cfg.siteId, { qosEvents: value });
-                        commitMqttConfig(cfg.siteId, { qosEvents: value });
-                      }}
-                    >
-                      {[0, 1, 2].map((level) => (
-                        <option key={level} value={level}>
-                          {level}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">QoS (commands)</span>
-                    <select
-                      value={cfg.qosCommands}
-                      onChange={(event) => {
-                        const value = Number(event.target.value);
-                        setLocalMqttConfig(cfg.siteId, { qosCommands: value });
-                        commitMqttConfig(cfg.siteId, { qosCommands: value });
-                      }}
-                    >
-                      {[0, 1, 2].map((level) => (
-                        <option key={level} value={level}>
-                          {level}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">CA PEM</span>
-                    <textarea
-                      rows={3}
-                      value={cfg.caPem ?? ''}
-                      onChange={(event) =>
-                        setLocalMqttConfig(cfg.siteId, { caPem: event.target.value || null })
-                      }
-                      onBlur={(event) =>
-                        commitMqttConfig(cfg.siteId, { caPem: event.target.value || null })
-                      }
-                    />
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Client Cert PEM</span>
-                    <textarea
-                      rows={3}
-                      value={cfg.certPem ?? ''}
-                      onChange={(event) =>
-                        setLocalMqttConfig(cfg.siteId, { certPem: event.target.value || null })
-                      }
-                      onBlur={(event) =>
-                        commitMqttConfig(cfg.siteId, { certPem: event.target.value || null })
-                      }
-                    />
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Client Key PEM</span>
-                    <textarea
-                      rows={3}
-                      value={cfg.keyPem ?? ''}
-                      onChange={(event) =>
-                        setLocalMqttConfig(cfg.siteId, { keyPem: event.target.value || null })
-                      }
-                      onBlur={(event) =>
-                        commitMqttConfig(cfg.siteId, { keyPem: event.target.value || null })
-                      }
-                    />
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </section>
@@ -2207,6 +2384,22 @@ export function ConfigPage() {
       </div>
     </section>
   );
+}
+
+function formatMqttStatusState(state: MqttStatusState): string {
+  switch (state) {
+    case 'connected':
+      return 'Connected';
+    case 'connecting':
+      return 'Connecting';
+    case 'disabled':
+      return 'Disabled';
+    case 'error':
+      return 'Error';
+    case 'not_configured':
+    default:
+      return 'Not configured';
+  }
 }
 
 function volumeKeyForLevel(level: AlarmLevel): keyof AlarmConfig {

@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { connect, MqttClient } from 'mqtt';
 
@@ -10,10 +16,19 @@ interface SiteMqttContext {
   client: MqttClient;
 }
 
+type MqttStatusState = 'not_configured' | 'disabled' | 'connecting' | 'connected' | 'error';
+
+interface SiteStatusEntry {
+  state: MqttStatusState;
+  message?: string;
+  updatedAt: Date;
+}
+
 @Injectable()
 export class MqttService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MqttService.name);
   private readonly clients: SiteMqttContext[] = [];
+  private readonly statuses = new Map<string, SiteStatusEntry>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -26,24 +41,35 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const configs = await this.prisma.mqttConfig.findMany({
-      where: { enabled: true },
+    const configs = await this.prisma.mqttConfig.findMany();
+
+    configs.forEach((config) => {
+      if (!config.enabled) {
+        this.updateStatus(config.siteId, 'disabled', 'MQTT disabled');
+      } else {
+        this.updateStatus(config.siteId, 'connecting', 'Connecting to broker…');
+      }
     });
 
     await Promise.all(
-      configs.map(async (config) => {
-        try {
-          const client = await this.createClient(config);
-          this.clients.push({ siteId: config.siteId, client });
-          this.logger.log(`Connected MQTT client for site ${config.siteId}`);
-        } catch (error) {
-          this.logger.error(
-            `Failed to connect MQTT for site ${config.siteId}: ${
-              error instanceof Error ? error.message : error
-            }`,
-          );
-        }
-      }),
+      configs
+        .filter((config) => config.enabled)
+        .map(async (config) => {
+          try {
+            const client = await this.createClient(config);
+            this.clients.push({ siteId: config.siteId, client });
+            this.logger.log(`Connected MQTT client for site ${config.siteId}`);
+            this.updateStatus(config.siteId, 'connected', 'Connected');
+          } catch (error) {
+            this.logger.error(
+              `Failed to connect MQTT for site ${config.siteId}: ${
+                error instanceof Error ? error.message : error
+              }`,
+            );
+            const message = error instanceof Error ? error.message : String(error);
+            this.updateStatus(config.siteId, 'error', message);
+          }
+        }),
     );
   }
 
@@ -102,10 +128,74 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         qosCommands: dto.qosCommands ?? undefined,
         enabled: dto.enabled ?? undefined,
       },
+      include: {
+        site: { select: { id: true, name: true, color: true } },
+      },
     });
 
     await this.restartClient(siteId);
     return config;
+  }
+
+  async listStatuses() {
+    return Array.from(this.statuses.entries()).map(([siteId, entry]) => ({
+      siteId,
+      state: entry.state,
+      message: entry.message,
+      updatedAt: entry.updatedAt.toISOString(),
+    }));
+  }
+
+  async getSiteStatus(siteId: string) {
+    const entry = this.statuses.get(siteId);
+    if (!entry) {
+      return {
+        siteId,
+        state: 'not_configured' as const,
+        message: 'No MQTT configuration saved.',
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return {
+      siteId,
+      state: entry.state,
+      message: entry.message,
+      updatedAt: entry.updatedAt.toISOString(),
+    };
+  }
+
+  async reconnectSite(siteId: string) {
+    await this.restartClient(siteId);
+    return this.getSiteStatus(siteId);
+  }
+
+  async testSiteConnection(siteId: string) {
+    const config = await this.prisma.mqttConfig.findUnique({ where: { siteId } });
+    if (!config) {
+      throw new NotFoundException(`No MQTT configuration found for site ${siteId}`);
+    }
+
+    try {
+      const client = await this.createClient(config);
+      client.end(true);
+      const message = config.enabled
+        ? 'Connection successful.'
+        : 'Connection successful (configuration is currently disabled).';
+      this.updateStatus(siteId, 'connected', message);
+      return {
+        ok: true,
+        state: 'connected' as const,
+        message,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.updateStatus(siteId, 'error', message);
+      return {
+        ok: false,
+        state: 'error' as const,
+        message,
+      };
+    }
   }
 
   private async restartClient(siteId: string): Promise<void> {
@@ -119,19 +209,29 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
     const config = await this.prisma.mqttConfig.findUnique({ where: { siteId } });
     if (!config || !config.enabled) {
+      this.updateStatus(
+        siteId,
+        config ? 'disabled' : 'not_configured',
+        config ? 'MQTT disabled' : 'No MQTT configuration saved.',
+      );
       return;
     }
+
+    this.updateStatus(siteId, 'connecting', 'Connecting to broker…');
 
     try {
       const client = await this.createClient(config);
       this.clients.push({ siteId, client });
       this.logger.log(`Reconnected MQTT client for site ${siteId}`);
+      this.updateStatus(siteId, 'connected', 'Connected');
     } catch (error) {
       this.logger.error(
         `Failed to reconnect MQTT client for site ${siteId}: ${
           error instanceof Error ? error.message : error
         }`,
       );
+      const message = error instanceof Error ? error.message : String(error);
+      this.updateStatus(siteId, 'error', message);
     }
   }
 
@@ -185,6 +285,14 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
       client.once('error', onError);
       client.once('connect', onConnect);
+    });
+  }
+
+  private updateStatus(siteId: string, state: MqttStatusState, message?: string) {
+    this.statuses.set(siteId, {
+      state,
+      message,
+      updatedAt: new Date(),
     });
   }
 }

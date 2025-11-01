@@ -189,6 +189,21 @@ export interface MqttSiteConfig {
   };
 }
 
+export type MqttStatusState = 'not_configured' | 'disabled' | 'connecting' | 'connected' | 'error';
+
+export interface MqttSiteStatus {
+  siteId: string;
+  state: MqttStatusState;
+  message?: string;
+  updatedAt?: string;
+}
+
+export interface MqttTestResponse {
+  ok: boolean;
+  state: MqttStatusState;
+  message: string;
+}
+
 export type SiteAccessLevel = 'VIEW' | 'MANAGE';
 
 export interface FeatureFlagDefinition {
