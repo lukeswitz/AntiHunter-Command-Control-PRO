@@ -39,6 +39,11 @@ COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/tsconfig.base.json ./tsconfig.base.json
 
+# Provide udevadm for serialport enumeration inside the container
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends udev \
+ && rm -rf /var/lib/apt/lists/*
+
 # Copy production node_modules after pruning
 COPY --from=pruner /app/node_modules ./node_modules
 

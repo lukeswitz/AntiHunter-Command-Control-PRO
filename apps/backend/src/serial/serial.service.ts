@@ -45,6 +45,30 @@ type SerialPortInfo = {
   productId?: string;
 };
 
+function isUdevadmMissing(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const err = error as { code?: unknown; path?: unknown; spawnargs?: unknown[] };
+  return err.code === 'ENOENT' && (err.path === 'udevadm' || err.spawnargs?.[0] === 'udevadm');
+}
+
+async function withGracefulUdevFallback(
+  listFn: () => Promise<SerialPortInfo[]>,
+): Promise<SerialPortInfo[] | null> {
+  try {
+    return await listFn();
+  } catch (error) {
+    if (isUdevadmMissing(error)) {
+      console.warn(
+        '[serial] udevadm not available in this environment; skipping hardware enumeration',
+      );
+      return [];
+    }
+    throw error;
+  }
+}
+
 async function getAvailablePorts(): Promise<SerialPortInfo[]> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires,@typescript-eslint/no-unsafe-assignment
@@ -58,18 +82,31 @@ async function getAvailablePorts(): Promise<SerialPortInfo[]> {
             ? (moduleRef as { list: () => Promise<SerialPortInfo[]> }).list
             : null;
     if (candidate) {
-      return candidate();
+      const ports = await withGracefulUdevFallback(candidate);
+      if (ports) {
+        return ports;
+      }
     }
   } catch (error) {
     // ignore and fall back to binding-based listing
   }
 
   if ('list' in SerialPortStream) {
-    return (SerialPortStream as unknown as { list: () => Promise<SerialPortInfo[]> }).list();
+    const ports = await withGracefulUdevFallback(
+      (SerialPortStream as unknown as { list: () => Promise<SerialPortInfo[]> }).list.bind(
+        SerialPortStream,
+      ),
+    );
+    if (ports) {
+      return ports;
+    }
   }
   const bindingWithList = Binding as unknown as { list?: () => Promise<SerialPortInfo[]> };
   if (typeof bindingWithList.list === 'function') {
-    return bindingWithList.list();
+    const ports = await withGracefulUdevFallback(bindingWithList.list.bind(Binding));
+    if (ports) {
+      return ports;
+    }
   }
   throw new Error('Serial port listing is not available on this platform.');
 }
