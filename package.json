@@ -16,6 +16,7 @@
                     "build":  "pnpm -r build",
                     "lint":  "pnpm -r lint",
                     "format":  "pnpm -r format",
+                    "seed":  "pnpm --filter @command-center/backend prisma:seed",
                     "tool:sniffer":  "pnpm exec ts-node --transpile-only --project tools/tsconfig.sniffer.json tools/meshtastic-sniffer.ts"
                 },
     "dependencies":  {

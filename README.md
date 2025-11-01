@@ -803,6 +803,7 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 | `pnpm format`                                         | Prettier writes                  |
 | `pnpm --filter @command-center/backend prisma:studio` | Inspect DB via Prisma Studio     |
 | `pnpm --filter @command-center/backend prisma:seed`   | Reseed config rows               |
+| `pnpm seed`                                           | Shortcut to seed default admin   |
 | `pnpm --filter @command-center/frontend preview`      | Preview SPA production build     |
 
 
