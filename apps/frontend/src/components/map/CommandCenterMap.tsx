@@ -339,24 +339,24 @@ export function CommandCenterMap({
         onPoint={drawing?.onPoint}
         onHover={drawing?.onHover}
       />
-        <LayersControl position="topright">
-          {BASE_LAYERS.map((layer) => (
-            <LayersControl.BaseLayer
-              key={layer.key}
-              checked={layer.key === activeBaseLayerKey}
-              name={layer.name}
-            >
-              <TileLayer
-                attribution={layer.attribution}
-                url={layer.url}
-                {...(layer.tileOptions ?? {})}
-              />
-            </LayersControl.BaseLayer>
-          ))}
-        </LayersControl>
-        <BaseLayerChangeListener onChange={onMapStyleChange} />
+      <LayersControl position="topright">
+        {BASE_LAYERS.map((layer) => (
+          <LayersControl.BaseLayer
+            key={layer.key}
+            checked={layer.key === activeBaseLayerKey}
+            name={layer.name}
+          >
+            <TileLayer
+              attribution={layer.attribution}
+              url={layer.url}
+              {...(layer.tileOptions ?? {})}
+            />
+          </LayersControl.BaseLayer>
+        ))}
+      </LayersControl>
+      <BaseLayerChangeListener onChange={onMapStyleChange} />
 
-        <CoverageHeatLayer enabled={showCoverage} nodes={nodes} baseRadius={effectiveRadius} />
+      <CoverageHeatLayer enabled={showCoverage} nodes={nodes} baseRadius={effectiveRadius} />
 
       {geofences.map((geofence) => {
         if (geofence.polygon.length < 3) {
