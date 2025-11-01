@@ -347,8 +347,7 @@ export function ConfigPage() {
     },
   });
   const takSendMutation = useMutation({
-    mutationFn: (payload: string) =>
-      apiClient.post<{ status: string }>('/tak/send', { payload }),
+    mutationFn: (payload: string) => apiClient.post<{ status: string }>('/tak/send', { payload }),
     onSuccess: () => {
       setTakNotice({ type: 'success', text: 'TAK payload transmitted.' });
       setTakSendPayload('');
