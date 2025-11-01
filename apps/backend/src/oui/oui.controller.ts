@@ -38,7 +38,7 @@ export class OuiController {
     FileInterceptor('file', {
       storage: multer.memoryStorage(),
       limits: {
-        fileSize: 15 * 1024 * 1024,
+        fileSize: 50 * 1024 * 1024,
       },
     }),
   )
