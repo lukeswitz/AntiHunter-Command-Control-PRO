@@ -1,5 +1,8 @@
 export default () => ({
   env: process.env.NODE_ENV ?? 'development',
+  site: {
+    id: process.env.SITE_ID ?? 'default',
+  },
   http: {
     port: Number(process.env.PORT ?? 3000),
     prefix: process.env.HTTP_PREFIX ?? 'api',

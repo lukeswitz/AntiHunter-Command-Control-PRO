@@ -9,6 +9,7 @@ export interface NodeSnapshot {
   siteId?: string | null;
   siteName?: string | null;
   siteColor?: string | null;
+  originSiteId?: string | null;
 }
 
 export interface NodeDiff {

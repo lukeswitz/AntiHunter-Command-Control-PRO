@@ -104,6 +104,7 @@ model AppConfig {
 model Node {
   id          String          @id
   siteId      String?
+  originSiteId String?
   name        String?
   lastMessage String?
   lastSeen    DateTime?
@@ -115,6 +116,7 @@ model Node {
   triangulations TriangulationResult[]
 
   @@index([siteId])
+  @@index([originSiteId])
 }
 
 model NodePosition {

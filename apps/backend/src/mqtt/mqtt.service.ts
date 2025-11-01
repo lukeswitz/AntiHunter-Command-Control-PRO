@@ -6,12 +6,12 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { connect, MqttClient } from 'mqtt';
+import { connect, IClientPublishOptions, MqttClient } from 'mqtt';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateMqttConfigDto } from './dto/update-mqtt-config.dto';
 
-interface SiteMqttContext {
+export interface SiteMqttContext {
   siteId: string;
   client: MqttClient;
 }
@@ -27,8 +27,9 @@ interface SiteStatusEntry {
 @Injectable()
 export class MqttService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MqttService.name);
-  private readonly clients: SiteMqttContext[] = [];
+  private readonly clients = new Map<string, SiteMqttContext>();
   private readonly statuses = new Map<string, SiteStatusEntry>();
+  private readonly connectionListeners: Array<(context: SiteMqttContext) => void> = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -74,11 +75,11 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy(): void {
-    this.clients.forEach(({ client, siteId }) => {
+    this.clients.forEach((context, siteId) => {
       this.logger.log(`Disconnecting MQTT client for site ${siteId}`);
-      client.end(true);
+      context.client.end(true);
     });
-    this.clients.length = 0;
+    this.clients.clear();
   }
 
   async listSiteConfigs() {
@@ -208,12 +209,11 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async restartClient(siteId: string): Promise<void> {
-    const existingIndex = this.clients.findIndex((ctx) => ctx.siteId === siteId);
-    if (existingIndex >= 0) {
-      const existing = this.clients[existingIndex];
+    const existing = this.clients.get(siteId);
+    if (existing) {
       this.logger.log(`Restarting MQTT client for site ${siteId}`);
       existing.client.end(true);
-      this.clients.splice(existingIndex, 1);
+      this.clients.delete(siteId);
     }
 
     const config = await this.prisma.mqttConfig.findUnique({ where: { siteId } });
@@ -230,7 +230,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
     try {
       const client = await this.createClient(config);
-      this.clients.push({ siteId, client });
+      this.registerClient({ siteId, client });
       this.logger.log(`Reconnected MQTT client for site ${siteId}`);
       this.updateStatus(siteId, 'connected', 'Connected');
     } catch (error) {
@@ -242,6 +242,67 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       const message = error instanceof Error ? error.message : String(error);
       this.updateStatus(siteId, 'error', message);
     }
+  }
+
+  onClientConnected(listener: (context: SiteMqttContext) => void): void {
+    this.connectionListeners.push(listener);
+    this.clients.forEach((context) => {
+      try {
+        listener(context);
+      } catch (error) {
+        this.logger.error(
+          `MQTT connection listener error for site ${context.siteId}: ${
+            error instanceof Error ? error.message : error
+          }`,
+        );
+      }
+    });
+  }
+
+  getConnectedContexts(): SiteMqttContext[] {
+    return Array.from(this.clients.values());
+  }
+
+  async publishToAll(
+    topic: string,
+    message: string | Buffer,
+    options?: IClientPublishOptions,
+  ): Promise<void> {
+    const payload = typeof message === 'string' || Buffer.isBuffer(message) ? message : message;
+    await Promise.all(
+      Array.from(this.clients.values()).map(
+        (context) =>
+          new Promise<void>((resolve, reject) => {
+            context.client.publish(topic, payload, options, (err) => {
+              if (err) {
+                this.logger.warn(
+                  `Failed to publish MQTT message for site ${context.siteId} on topic ${topic}: ${
+                    err instanceof Error ? err.message : err
+                  }`,
+                );
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          }),
+      ),
+    );
+  }
+
+  private registerClient(context: SiteMqttContext): void {
+    this.clients.set(context.siteId, context);
+    this.connectionListeners.forEach((listener) => {
+      try {
+        listener(context);
+      } catch (error) {
+        this.logger.error(
+          `MQTT connection listener error for site ${context.siteId}: ${
+            error instanceof Error ? error.message : error
+          }`,
+        );
+      }
+    });
   }
 
   private async createClient(config: {

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 
 import { NodeDiff, NodeSnapshot } from './nodes.types';
@@ -10,8 +11,14 @@ export class NodesService implements OnModuleInit {
   private readonly nodes = new Map<string, NodeSnapshot>();
   private readonly snapshot$ = new BehaviorSubject<NodeSnapshot[]>([]);
   private readonly diff$ = new Subject<NodeDiff>();
+  private readonly localSiteId: string;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {
+    this.localSiteId = this.configService.get<string>('site.id', 'default');
+  }
 
   async onModuleInit(): Promise<void> {
     const records = await this.prisma.node.findMany({
@@ -39,6 +46,7 @@ export class NodesService implements OnModuleInit {
     const now = snapshot.ts ?? new Date();
     const lat = this.toNumber(snapshot.lat);
     const lon = this.toNumber(snapshot.lon);
+    const originSiteId = snapshot.originSiteId ?? this.localSiteId;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.node.upsert({
@@ -49,12 +57,14 @@ export class NodesService implements OnModuleInit {
           lastMessage: snapshot.lastMessage ?? undefined,
           lastSeen: snapshot.lastSeen ?? now,
           siteId: snapshot.siteId ?? undefined,
+          originSiteId,
         },
         update: {
           name: snapshot.name ?? undefined,
           lastMessage: snapshot.lastMessage ?? undefined,
           lastSeen: snapshot.lastSeen ?? now,
           siteId: snapshot.siteId ?? undefined,
+          originSiteId,
         },
       });
 
@@ -81,9 +91,11 @@ export class NodesService implements OnModuleInit {
       siteName = site?.name ?? siteName;
       siteColor = site?.color ?? siteColor;
     }
+
     const merged: NodeSnapshot = {
       ...existing,
       ...snapshot,
+      originSiteId,
       lat,
       lon,
       ts: now,
@@ -160,6 +172,7 @@ export class NodesService implements OnModuleInit {
       ...existing,
       lastMessage: message,
       lastSeen: timestamp,
+      originSiteId: existing.originSiteId ?? this.localSiteId,
     };
 
     try {
@@ -171,10 +184,12 @@ export class NodesService implements OnModuleInit {
           lastMessage: message,
           lastSeen: timestamp,
           siteId: existing.siteId ?? undefined,
+          originSiteId: existing.originSiteId ?? this.localSiteId,
         },
         update: {
           lastMessage: message,
           lastSeen: timestamp,
+          originSiteId: existing.originSiteId ?? this.localSiteId,
         },
       });
     } catch (error) {
@@ -190,6 +205,10 @@ export class NodesService implements OnModuleInit {
     return this.nodes.get(nodeId);
   }
 
+  getLocalSiteId(): string {
+    return this.localSiteId;
+  }
+
   private emitSnapshot(): void {
     this.snapshot$.next(Array.from(this.nodes.values()));
   }
@@ -200,6 +219,7 @@ export class NodesService implements OnModuleInit {
     lastMessage: string | null;
     lastSeen: Date | null;
     positions: Array<{ lat: number; lon: number; ts: Date }>;
+    originSiteId: string | null;
     site?: { id: string; name: string | null; color: string | null } | null;
   }): NodeSnapshot {
     const lastPosition = node.positions.at(0);
@@ -214,6 +234,7 @@ export class NodesService implements OnModuleInit {
       siteId: node.site?.id ?? undefined,
       siteName: node.site?.name ?? undefined,
       siteColor: node.site?.color ?? undefined,
+      originSiteId: node.originSiteId ?? node.site?.id ?? undefined,
     };
   }
 
