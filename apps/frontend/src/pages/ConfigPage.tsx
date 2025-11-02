@@ -203,7 +203,10 @@ export function ConfigPage() {
   const [takSendPayload, setTakSendPayload] = useState('');
 
   const runtimeSiteId =
-    runtimeConfigQuery.data?.siteId ?? serialConfig?.siteId ?? serialConfigQuery.data?.siteId ?? null;
+    runtimeConfigQuery.data?.siteId ??
+    serialConfig?.siteId ??
+    serialConfigQuery.data?.siteId ??
+    null;
   const runtimeSiteLabel = runtimeSiteId ?? null;
 
   useEffect(() => {
@@ -1259,7 +1262,9 @@ export function ConfigPage() {
                       <span className="config-label">Name</span>
                       <input
                         value={site.name}
-                        onChange={(event) => updateSiteSetting(site.id, { name: event.target.value })}
+                        onChange={(event) =>
+                          updateSiteSetting(site.id, { name: event.target.value })
+                        }
                         onBlur={(event) => {
                           const trimmed = event.target.value.trim();
                           updateSiteSetting(site.id, { name: trimmed });
@@ -1319,8 +1324,8 @@ export function ConfigPage() {
                 );
               })
             )}
-         </div>
-       </section>
+          </div>
+        </section>
 
         <section className="config-card">
           <header>
@@ -1962,7 +1967,10 @@ export function ConfigPage() {
                           {isLocalSite ? (
                             <>
                               {' '}
-                              <span className="status-pill status-active" title="Current backend runtime site">
+                              <span
+                                className="status-pill status-active"
+                                title="Current backend runtime site"
+                              >
                                 Active runtime
                               </span>
                             </>
