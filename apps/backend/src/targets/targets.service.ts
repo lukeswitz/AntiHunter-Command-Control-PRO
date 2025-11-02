@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, TargetStatus } from '@prisma/client';
+import { Prisma, TargetStatus, Target } from '@prisma/client';
+import { Observable, Subject } from 'rxjs';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTargetDto } from './dto/create-target.dto';
@@ -7,11 +8,36 @@ import { ListTargetsDto } from './dto/list-targets.dto';
 import { UpdateTargetDto } from './dto/update-target.dto';
 import { normalizeMac } from '../utils/mac';
 
+export interface TargetUpsertPayload {
+  id: string;
+  name?: string | null;
+  mac?: string | null;
+  lat: number;
+  lon: number;
+  url?: string | null;
+  notes?: string | null;
+  tags?: string[];
+  siteId?: string | null;
+  createdBy?: string | null;
+  deviceType?: string | null;
+  firstNodeId?: string | null;
+  status: TargetStatus;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export type TargetEvent = { type: 'upsert'; target: Target } | { type: 'delete'; target: Target };
+
 @Injectable()
 export class TargetsService {
   private readonly logger = new Logger(TargetsService.name);
+  private readonly changes$ = new Subject<TargetEvent>();
 
   constructor(private readonly prisma: PrismaService) {}
+
+  getChangesStream(): Observable<TargetEvent> {
+    return this.changes$.asObservable();
+  }
 
   async list(dto: ListTargetsDto) {
     const where: Prisma.TargetWhereInput = {};
@@ -81,9 +107,11 @@ export class TargetsService {
       createData.tags = { set: dto.tags };
     }
 
-    return this.prisma.target.create({
+    const target = await this.prisma.target.create({
       data: createData,
     });
+    this.changes$.next({ type: 'upsert', target });
+    return target;
   }
 
   async update(id: string, dto: UpdateTargetDto) {
@@ -139,28 +167,34 @@ export class TargetsService {
       data.mac = macValue ?? null;
     }
 
-    return this.prisma.target.update({
+    const target = await this.prisma.target.update({
       where: { id },
       data,
     });
+    this.changes$.next({ type: 'upsert', target });
+    return target;
   }
 
   async resolve(id: string, notes?: string) {
     await this.getById(id);
-    return this.prisma.target.update({
+    const target = await this.prisma.target.update({
       where: { id },
       data: {
         status: TargetStatus.RESOLVED,
         notes: notes ?? undefined,
       },
     });
+    this.changes$.next({ type: 'upsert', target });
+    return target;
   }
 
   async delete(id: string) {
     await this.getById(id);
-    await this.prisma.target.delete({
+    const target = await this.prisma.target.delete({
       where: { id },
     });
+    this.changes$.next({ type: 'delete', target });
+    return target;
   }
 
   async applyTrackingEstimate(
@@ -193,6 +227,10 @@ export class TargetsService {
         where,
         data,
       });
+      if (result.count > 0) {
+        const updatedTargets = await this.prisma.target.findMany({ where });
+        updatedTargets.forEach((target) => this.changes$.next({ type: 'upsert', target }));
+      }
       return result.count > 0;
     } catch (error) {
       this.logger.warn(
@@ -207,5 +245,56 @@ export class TargetsService {
   async clearAll(): Promise<{ deleted: number }> {
     const result = await this.prisma.target.deleteMany();
     return { deleted: result.count };
+  }
+
+  async syncRemoteTarget(payload: TargetUpsertPayload): Promise<Target> {
+    const tags = payload.tags ?? [];
+    const target = await this.prisma.target.upsert({
+      where: { id: payload.id },
+      create: {
+        id: payload.id,
+        name: payload.name ?? null,
+        mac: payload.mac ?? null,
+        lat: payload.lat,
+        lon: payload.lon,
+        url: payload.url ?? null,
+        notes: payload.notes ?? null,
+        tags: { set: tags },
+        siteId: payload.siteId ?? null,
+        createdBy: payload.createdBy ?? null,
+        deviceType: payload.deviceType ?? null,
+        firstNodeId: payload.firstNodeId ?? null,
+        status: payload.status,
+      } as Prisma.TargetUncheckedCreateInput,
+      update: {
+        name: payload.name ?? null,
+        mac: payload.mac ?? null,
+        lat: payload.lat,
+        lon: payload.lon,
+        url: payload.url ?? null,
+        notes: payload.notes ?? null,
+        tags: { set: tags },
+        siteId: payload.siteId ?? null,
+        createdBy: payload.createdBy ?? null,
+        deviceType: payload.deviceType ?? null,
+        firstNodeId: payload.firstNodeId ?? null,
+        status: payload.status,
+      } as Prisma.TargetUncheckedUpdateInput,
+    });
+
+    this.changes$.next({ type: 'upsert', target });
+    return target;
+  }
+
+  async syncRemoteTargetDelete(id: string): Promise<void> {
+    const existing = await this.prisma.target.findUnique({ where: { id } });
+    if (!existing) {
+      return;
+    }
+
+    const target = await this.prisma.target.delete({
+      where: { id },
+    });
+    this.changes$.next({ type: 'delete', target });
   }
 }
