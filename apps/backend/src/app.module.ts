@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CommandsModule } from './commands/commands.module';
 import configuration from './config/configuration';
 import { validateEnvironment } from './config/environment.validation';
+import { EventsModule } from './events/events.module';
 import { ExportsModule } from './exports/exports.module';
 import { HealthModule } from './health/health.module';
 import { IngestModule } from './ingest/ingest.module';
@@ -67,6 +68,7 @@ import { WsModule } from './ws/ws.module';
     NodesModule,
     InventoryModule,
     CommandsModule,
+    EventsModule,
     WsModule,
     IngestModule,
     AlarmsModule,

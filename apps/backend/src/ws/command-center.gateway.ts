@@ -1,4 +1,10 @@
-import { OnModuleDestroy, UnauthorizedException, UsePipes, ValidationPipe } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleDestroy,
+  UnauthorizedException,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -16,12 +22,14 @@ import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 import { CommandState, CommandsService } from '../commands/commands.service';
 import { SendCommandDto } from '../commands/dto/send-command.dto';
+import { EventBusService, CommandCenterEvent } from '../events/event-bus.service';
 import { NodesService } from '../nodes/nodes.service';
 
 @WebSocketGateway({
   namespace: '/ws',
   cors: { origin: true, credentials: true },
 })
+@Injectable()
 export class CommandCenterGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
@@ -35,6 +43,7 @@ export class CommandCenterGateway
     private readonly nodesService: NodesService,
     private readonly commandsService: CommandsService,
     private readonly authService: AuthService,
+    private readonly eventBus: EventBusService,
   ) {}
 
   afterInit(server: Server): void {
@@ -86,9 +95,12 @@ export class CommandCenterGateway
     this.clientDiffSubscriptions.clear();
   }
 
-  emitEvent(payload: unknown): void {
+  emitEvent(payload: CommandCenterEvent, options?: { skipBus?: boolean }): void {
     if (!this.server) {
       return;
+    }
+    if (!options?.skipBus) {
+      this.eventBus.publish(payload);
     }
     this.server.emit('event', payload);
   }

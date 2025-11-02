@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { MqttCommandsService } from './mqtt-commands.service';
+import { MqttEventsService } from './mqtt-events.service';
 import { MqttFederationService } from './mqtt-federation.service';
 import { MqttInventoryService } from './mqtt-inventory.service';
 import { MqttTargetsService } from './mqtt-targets.service';
@@ -28,6 +29,7 @@ import { TargetsModule } from '../targets/targets.module';
     MqttCommandsService,
     MqttInventoryService,
     MqttTargetsService,
+    MqttEventsService,
   ],
   controllers: [MqttController],
   exports: [MqttService],
