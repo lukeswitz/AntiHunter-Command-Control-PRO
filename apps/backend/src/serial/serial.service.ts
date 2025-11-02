@@ -188,6 +188,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly serialConfigService: SerialConfigService,
   ) {
+    this.siteId = this.configService.get<string>('site.id', DEFAULT_SERIAL_SITE_ID);
     this.globalRateLimit = this.configService.get<number>('serial.globalRate', 30);
     this.perTargetRateLimit = this.configService.get<number>('serial.perTargetRate', 8);
   }

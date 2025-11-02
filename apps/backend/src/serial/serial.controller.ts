@@ -33,12 +33,14 @@ export class SerialController {
 
   @Get('config')
   getConfig(@Query('siteId') siteId?: string) {
-    return this.serialConfigService.getConfig(siteId);
+    const targetSiteId = siteId ?? this.serialService.getSiteId();
+    return this.serialConfigService.getConfig(targetSiteId);
   }
 
   @Put('config')
   updateConfig(@Body() dto: UpdateSerialConfigDto) {
-    return this.serialConfigService.updateConfig(dto);
+    const targetSiteId = dto.siteId ?? this.serialService.getSiteId();
+    return this.serialConfigService.updateConfig({ ...dto, siteId: targetSiteId });
   }
 
   @Post('connect')
