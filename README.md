@@ -241,7 +241,37 @@ Manage your profile, theme preferences, and admin-level user management tasks.
 
 Data flows from serial workers -> Prisma (nodes/device tables) -> WS events -> Zustand stores -> React components. Commands and alarms run in the opposite direction, bubbling from the UI down to the serial layer.
 
+### MQTT Topic Topology
 
+Multi-site deployments share state through a single broker. All topics live under the `ahcc/` namespace and are segmented per site (`<siteId>` defaults to `default`). The current tree looks like this:
+
+| Topic | Direction | Payload |
+| --- | --- | --- |
+| `ahcc/<siteId>/nodes/upsert` | publish + subscribe | Node snapshots (id, coords, last message metadata) emitted on heartbeats. |
+| `ahcc/<siteId>/inventory/upsert` | publish + subscribe | Inventory device upserts (MAC, vendor, RSSI stats, last position). |
+| `ahcc/<siteId>/targets/upsert` | publish + subscribe | Target lifecycle payloads (status, notes, tags, location, device metadata). |
+| `ahcc/<siteId>/targets/delete` | publish + subscribe | `{ targetId }` payload notifying a target deletion. |
+| `ahcc/<siteId>/commands/events` | publish + subscribe | Command lifecycle messages (`command.event`) so consoles stay aligned. |
+| `ahcc/<siteId>/commands/request` | publish + subscribe | Remote command execution request for another site’s serial worker. |
+| `ahcc/<siteId>/events/<type>` | publish + subscribe | High-value broadcasts (`event.alert`, `event.target`, `command.ack`, `command.result`). `<type>` is sanitized (slashes/dots -> dashes). |
+
+All topics use QoS 1 by default (configurable per site). Publishers short-circuit when the `originSiteId` matches their own so messages are not looped. If additional replication streams are added, follow the `ahcc/<site>/<resource>/<action>` convention.
+
+#### MQTT Configuration Cheat Sheet
+
+Configure federation per site in **Config → MQTT** (or directly via the `MqttConfig` table). Key fields:
+
+| Field | Purpose | Notes |
+| --- | --- | --- |
+| `brokerUrl` | Broker endpoint (`mqtt://`, `mqtts://`, `ws://`, or `wss://`) | Example: `mqtt://broker:1883`. WebSocket brokers often use `ws://host:port/mqtt`. |
+| `clientId` | Unique MQTT client identifier | Defaults to `command-center-<siteId>`; must be unique on shared brokers. |
+| `username` / `password` | Credentials for authenticated brokers | Leave blank for anonymous brokers. Combine with TLS settings when required. |
+| `tlsEnabled`, `caPem`, `certPem`, `keyPem` | TLS configuration | Only needed for `mqtts://`/`wss://` brokers that require mutual TLS. PEM values are stored encrypted. |
+| `qosEvents` / `qosCommands` | Default QoS for publish/subscribe (`0`, `1`, or `2`) | Defaults to `1`. Adjust when the broker or network profile demands otherwise. |
+| `enabled` | Toggle federation for the site | Disable to keep a site local-only while preserving its saved connection details. |
+
+**Environment defaults:**  
+Set `SITE_ID` to the local site identifier (defaults to `default`). Optional flags like `MQTT_ENABLED`, `MQTT_COMMANDS_ENABLED`, and `MQTT_NAMESPACE` seed runtime config before any database records exist.
 
 ## Repository Layout
 
