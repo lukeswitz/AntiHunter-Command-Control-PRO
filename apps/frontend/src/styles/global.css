@@ -1275,6 +1275,11 @@ body.theme-dark .control-chip[disabled] {
   color: #cbd5f5;
 }
 
+.config-subcard--active-runtime {
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.12);
+}
+
 .target-card__body {
   display: grid;
   gap: 0.5rem;

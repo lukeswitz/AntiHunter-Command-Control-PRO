@@ -32,31 +32,35 @@ async function main() {
     create: {},
   });
 
+  const seedSiteId = process.env.SITE_ID ?? 'default';
+  const seedSiteName =
+    process.env.SITE_NAME ?? (seedSiteId === 'default' ? 'Default Site' : seedSiteId);
+
   await prisma.site.upsert({
-    where: { id: 'default' },
+    where: { id: seedSiteId },
     update: {},
     create: {
-      id: 'default',
-      name: 'Default Site',
+      id: seedSiteId,
+      name: seedSiteName,
       color: '#2E7D32',
     },
   });
 
   await prisma.serialConfig.upsert({
-    where: { siteId: 'default' },
+    where: { siteId: seedSiteId },
     update: {},
     create: {
-      siteId: 'default',
+      siteId: seedSiteId,
     },
   });
 
   await prisma.mqttConfig.upsert({
-    where: { siteId: 'default' },
+    where: { siteId: seedSiteId },
     update: {},
     create: {
       brokerUrl: 'mqtt://localhost:1883',
-      clientId: 'command-center-default',
-      siteId: 'default',
+      clientId: `command-center-${seedSiteId}`,
+      siteId: seedSiteId,
     },
   });
 
@@ -91,7 +95,7 @@ async function main() {
         siteAccess: {
           create: [
             {
-              siteId: 'default',
+              siteId: seedSiteId,
               level: SiteAccessLevel.MANAGE,
             },
           ],

@@ -15,6 +15,7 @@ import type {
   MqttTestResponse,
   TakConfig,
   TakProtocol,
+  RuntimeConfig,
 } from '../api/types';
 import { DEFAULT_ALERT_COLORS, extractAlertColors } from '../constants/alert-colors';
 import { useAlarm } from '../providers/alarm-provider';
@@ -156,6 +157,12 @@ export function ConfigPage() {
     queryFn: () => apiClient.get<TakConfig>('/tak/config'),
   });
 
+  const runtimeConfigQuery = useQuery({
+    queryKey: ['runtimeConfig'],
+    queryFn: () => apiClient.get<RuntimeConfig>('/config/runtime'),
+    staleTime: 60_000,
+  });
+
   const ouiStatsQuery = useQuery({
     queryKey: ['ouiStats'],
     queryFn: () => apiClient.get<{ total: number; lastUpdated?: string | null }>('/oui/stats'),
@@ -194,6 +201,10 @@ export function ConfigPage() {
     text: string;
   } | null>(null);
   const [takSendPayload, setTakSendPayload] = useState('');
+
+  const runtimeSiteId =
+    runtimeConfigQuery.data?.siteId ?? serialConfig?.siteId ?? serialConfigQuery.data?.siteId ?? null;
+  const runtimeSiteLabel = runtimeSiteId ?? null;
 
   useEffect(() => {
     if (alarmSettings?.config) {
@@ -1205,6 +1216,11 @@ export function ConfigPage() {
           <header>
             <h2>Site Settings</h2>
             <p>Update site names and colors for multi-site deployments.</p>
+            {runtimeSiteId ? (
+              <p className="config-hint">
+                This backend instance reports as site <strong>{runtimeSiteId}</strong>.
+              </p>
+            ) : null}
           </header>
           <div className="config-card__body">
             {sitesQuery.isLoading ? (
@@ -1216,82 +1232,105 @@ export function ConfigPage() {
                 <div>No sites found. Create a site in the database to manage settings here.</div>
               </div>
             ) : (
-              siteSettings.map((site) => (
-                <div key={site.id} className="config-subcard">
-                  <div className="config-row">
-                    <span className="config-label">Site ID</span>
-                    <span className="muted">{site.id}</span>
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Name</span>
-                    <input
-                      value={site.name}
-                      onChange={(event) => updateSiteSetting(site.id, { name: event.target.value })}
-                      onBlur={(event) => {
-                        const trimmed = event.target.value.trim();
-                        updateSiteSetting(site.id, { name: trimmed });
-                        commitSiteSetting(site.id, { name: trimmed });
-                      }}
-                    />
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Display Color</span>
-                    <div className="site-color-row">
+              siteSettings.map((site) => {
+                const cardClassName = `config-subcard${
+                  site.id === runtimeSiteId ? ' config-subcard--active-runtime' : ''
+                }`;
+                return (
+                  <div key={site.id} className={cardClassName}>
+                    <div className="config-row">
+                      <span className="config-label">Site ID</span>
+                      <span className="muted">
+                        {site.id}
+                        {site.id === runtimeSiteId ? (
+                          <>
+                            {' '}
+                            <span
+                              className="status-pill status-active"
+                              title="Current backend runtime site"
+                            >
+                              Active runtime
+                            </span>
+                          </>
+                        ) : null}
+                      </span>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Name</span>
                       <input
-                        type="color"
-                        value={site.color || '#0f62fe'}
-                        onChange={(event) => {
-                          const color = event.target.value;
-                          updateSiteSetting(site.id, { color });
-                          commitSiteSetting(site.id, { color });
-                        }}
-                        aria-label={`${site.name || site.id} color`}
-                      />
-                      <input
-                        value={site.color ?? ''}
-                        placeholder="#0f62fe"
-                        onChange={(event) =>
-                          updateSiteSetting(site.id, { color: event.target.value })
-                        }
+                        value={site.name}
+                        onChange={(event) => updateSiteSetting(site.id, { name: event.target.value })}
                         onBlur={(event) => {
-                          const raw = event.target.value.trim();
-                          if (!raw) {
-                            return;
-                          }
-                          const sanitized = raw.startsWith('#') ? raw : `#${raw}`;
-                          updateSiteSetting(site.id, { color: sanitized });
-                          commitSiteSetting(site.id, { color: sanitized });
+                          const trimmed = event.target.value.trim();
+                          updateSiteSetting(site.id, { name: trimmed });
+                          commitSiteSetting(site.id, { name: trimmed });
                         }}
                       />
                     </div>
+                    <div className="config-row">
+                      <span className="config-label">Display Color</span>
+                      <div className="site-color-row">
+                        <input
+                          type="color"
+                          value={site.color || '#0f62fe'}
+                          onChange={(event) => {
+                            const color = event.target.value;
+                            updateSiteSetting(site.id, { color });
+                            commitSiteSetting(site.id, { color });
+                          }}
+                          aria-label={`${site.name || site.id} color`}
+                        />
+                        <input
+                          value={site.color ?? ''}
+                          placeholder="#0f62fe"
+                          onChange={(event) =>
+                            updateSiteSetting(site.id, { color: event.target.value })
+                          }
+                          onBlur={(event) => {
+                            const raw = event.target.value.trim();
+                            if (!raw) {
+                              return;
+                            }
+                            const sanitized = raw.startsWith('#') ? raw : `#${raw}`;
+                            updateSiteSetting(site.id, { color: sanitized });
+                            commitSiteSetting(site.id, { color: sanitized });
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Region</span>
+                      <input
+                        value={site.region ?? ''}
+                        placeholder="Optional"
+                        onChange={(event) =>
+                          updateSiteSetting(site.id, {
+                            region: event.target.value === '' ? null : event.target.value,
+                          })
+                        }
+                        onBlur={(event) =>
+                          commitSiteSetting(site.id, {
+                            region: event.target.value === '' ? null : event.target.value.trim(),
+                          })
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="config-row">
-                    <span className="config-label">Region</span>
-                    <input
-                      value={site.region ?? ''}
-                      placeholder="Optional"
-                      onChange={(event) =>
-                        updateSiteSetting(site.id, {
-                          region: event.target.value === '' ? null : event.target.value,
-                        })
-                      }
-                      onBlur={(event) =>
-                        commitSiteSetting(site.id, {
-                          region: event.target.value === '' ? null : event.target.value.trim(),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
-          </div>
-        </section>
+         </div>
+       </section>
 
         <section className="config-card">
           <header>
             <h2>Serial Connection</h2>
             <p>Review connection defaults and rate limits.</p>
+            {runtimeSiteLabel ? (
+              <p className="config-hint">
+                Settings in this section apply to runtime site <strong>{runtimeSiteLabel}</strong>.
+              </p>
+            ) : null}
           </header>
           <div className="config-card__body">
             <label className="checkbox-label">
@@ -1900,6 +1939,7 @@ export function ConfigPage() {
                 const state = status?.state ?? 'not_configured';
                 const statusClassName = `status-pill status-${state}`;
                 const statusLabel = formatMqttStatusState(state);
+                const isLocalSite = cfg.siteId === runtimeSiteId;
                 const notice = mqttNotices[cfg.siteId];
                 const isTesting =
                   mqttAction?.mode === 'test' &&
@@ -1917,7 +1957,17 @@ export function ConfigPage() {
                       <span className="config-label">Site</span>
                       <div className="config-value">
                         <strong>{cfg.site?.name ?? cfg.siteId}</strong>
-                        <span className="muted">{cfg.siteId}</span>
+                        <span className="muted">
+                          {cfg.siteId}
+                          {isLocalSite ? (
+                            <>
+                              {' '}
+                              <span className="status-pill status-active" title="Current backend runtime site">
+                                Active runtime
+                              </span>
+                            </>
+                          ) : null}
+                        </span>
                       </div>
                     </div>
                     <div className="config-row">

@@ -126,6 +126,16 @@ export interface SerialConfig {
   updatedAt: string;
 }
 
+export interface RuntimeConfig {
+  env: string;
+  siteId: string;
+  mqtt: {
+    enabled: boolean;
+    commandsEnabled: boolean;
+    namespace: string;
+  };
+}
+
 export interface SiteSummary {
   id: string;
   name: string;
