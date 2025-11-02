@@ -1,19 +1,14 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Subscription } from 'rxjs';
 
+import { MqttService, SiteMqttContext } from './mqtt.service';
 import {
   CommandState,
   CommandsService,
   ExternalCommandEventInput,
   RemoteCommandRequest,
 } from '../commands/commands.service';
-import { MqttService, SiteMqttContext } from './mqtt.service';
 
 type CommandEventMessage = {
   type: 'command.event';
@@ -61,10 +56,7 @@ export class MqttCommandsService implements OnModuleInit, OnModuleDestroy {
   private readonly commandsEnabled: boolean;
   private outboundSubscription?: Subscription;
   private requestSubscription?: Subscription;
-  private readonly inboundHandlers = new Map<
-    string,
-    (topic: string, payload: Buffer) => void
-  >();
+  private readonly inboundHandlers = new Map<string, (topic: string, payload: Buffer) => void>();
 
   constructor(
     configService: ConfigService,
@@ -72,10 +64,7 @@ export class MqttCommandsService implements OnModuleInit, OnModuleDestroy {
     private readonly mqttService: MqttService,
   ) {
     this.localSiteId = configService.get<string>('site.id', 'default');
-    this.commandsEnabled = configService.get<boolean>(
-      'mqtt.commandsEnabled',
-      true,
-    );
+    this.commandsEnabled = configService.get<boolean>('mqtt.commandsEnabled', true);
   }
 
   onModuleInit(): void {
@@ -84,47 +73,39 @@ export class MqttCommandsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.outboundSubscription = this.commandsService
-      .getUpdatesStream()
-      .subscribe({
-        next: (command) => {
-          void this.handleCommandUpdate(command).catch((error) => {
-            this.logger.error(
-              `Failed to publish MQTT command event ${command.id}: ${
-                error instanceof Error ? error.message : error
-              }`,
-            );
-          });
-        },
-        error: (error) => {
+    this.outboundSubscription = this.commandsService.getUpdatesStream().subscribe({
+      next: (command) => {
+        void this.handleCommandUpdate(command).catch((error) => {
           this.logger.error(
-            `Command updates stream error: ${
+            `Failed to publish MQTT command event ${command.id}: ${
               error instanceof Error ? error.message : error
             }`,
           );
-        },
-      });
+        });
+      },
+      error: (error) => {
+        this.logger.error(
+          `Command updates stream error: ${error instanceof Error ? error.message : error}`,
+        );
+      },
+    });
 
-    this.requestSubscription = this.commandsService
-      .getRemoteRequestsStream()
-      .subscribe({
-        next: (request) => {
-          void this.publishCommandRequest(request).catch((error) => {
-            this.logger.error(
-              `Failed to publish MQTT command request ${request.id}: ${
-                error instanceof Error ? error.message : error
-              }`,
-            );
-          });
-        },
-        error: (error) => {
+    this.requestSubscription = this.commandsService.getRemoteRequestsStream().subscribe({
+      next: (request) => {
+        void this.publishCommandRequest(request).catch((error) => {
           this.logger.error(
-            `Command request stream error: ${
+            `Failed to publish MQTT command request ${request.id}: ${
               error instanceof Error ? error.message : error
             }`,
           );
-        },
-      });
+        });
+      },
+      error: (error) => {
+        this.logger.error(
+          `Command request stream error: ${error instanceof Error ? error.message : error}`,
+        );
+      },
+    });
 
     this.mqttService.onClientConnected((context) => {
       void this.attachInboundSubscriptions(context).catch((error) => {
@@ -141,17 +122,13 @@ export class MqttCommandsService implements OnModuleInit, OnModuleDestroy {
     this.outboundSubscription?.unsubscribe();
     this.requestSubscription?.unsubscribe();
     this.inboundHandlers.forEach((handler, siteId) => {
-      const context = this.mqttService
-        .getConnectedContexts()
-        .find((ctx) => ctx.siteId === siteId);
+      const context = this.mqttService.getConnectedContexts().find((ctx) => ctx.siteId === siteId);
       context?.client.removeListener('message', handler);
     });
     this.inboundHandlers.clear();
   }
 
-  private async attachInboundSubscriptions(
-    context: SiteMqttContext,
-  ): Promise<void> {
+  private async attachInboundSubscriptions(context: SiteMqttContext): Promise<void> {
     await Promise.all([
       new Promise<void>((resolve, reject) => {
         context.client.subscribe(
@@ -239,22 +216,13 @@ export class MqttCommandsService implements OnModuleInit, OnModuleDestroy {
         resultText: command.resultText ?? null,
         errorText: command.errorText ?? null,
         createdAt: command.createdAt.toISOString(),
-        startedAt: command.startedAt
-          ? command.startedAt.toISOString()
-          : null,
-        finishedAt: command.finishedAt
-          ? command.finishedAt.toISOString()
-          : null,
+        startedAt: command.startedAt ? command.startedAt.toISOString() : null,
+        finishedAt: command.finishedAt ? command.finishedAt.toISOString() : null,
         timestamp: new Date().toISOString(),
       },
     };
 
-    await this.mqttService.publishToAll(
-      topic,
-      JSON.stringify(message),
-      undefined,
-      'commands',
-    );
+    await this.mqttService.publishToAll(topic, JSON.stringify(message), undefined, 'commands');
   }
 
   private async publishCommandRequest(request: RemoteCommandRequest): Promise<void> {
@@ -273,18 +241,10 @@ export class MqttCommandsService implements OnModuleInit, OnModuleDestroy {
       },
     };
 
-    await this.mqttService.publishToAll(
-      topic,
-      JSON.stringify(message),
-      { qos: 1 },
-      'commands',
-    );
+    await this.mqttService.publishToAll(topic, JSON.stringify(message), { qos: 1 }, 'commands');
   }
 
-  private async handleInboundCommandEvent(
-    topic: string,
-    payload: Buffer,
-  ): Promise<void> {
+  private async handleInboundCommandEvent(topic: string, payload: Buffer): Promise<void> {
     const [, topicSiteId] = topic.split('/');
 
     let parsed: CommandEventMessage;
@@ -330,10 +290,7 @@ export class MqttCommandsService implements OnModuleInit, OnModuleDestroy {
     await this.commandsService.syncExternalCommand(event);
   }
 
-  private async handleInboundCommandRequest(
-    topic: string,
-    payload: Buffer,
-  ): Promise<void> {
+  private async handleInboundCommandRequest(topic: string, payload: Buffer): Promise<void> {
     const [, topicSiteId] = topic.split('/');
 
     let parsed: CommandRequestMessage;

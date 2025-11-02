@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { MqttFederationService } from './mqtt-federation.service';
 import { MqttCommandsService } from './mqtt-commands.service';
+import { MqttFederationService } from './mqtt-federation.service';
 import { MqttController } from './mqtt.controller';
 import { MqttService } from './mqtt.service';
 import { CommandsModule } from '../commands/commands.module';

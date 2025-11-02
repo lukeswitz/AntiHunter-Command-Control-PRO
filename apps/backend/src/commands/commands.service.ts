@@ -386,7 +386,12 @@ export class CommandsService {
 
   private normalizeStatus(status: string): CommandStatus {
     const normalized = status?.toUpperCase();
-    if (normalized === 'PENDING' || normalized === 'SENT' || normalized === 'OK' || normalized === 'ERROR') {
+    if (
+      normalized === 'PENDING' ||
+      normalized === 'SENT' ||
+      normalized === 'OK' ||
+      normalized === 'ERROR'
+    ) {
       return normalized as CommandStatus;
     }
     return 'PENDING';
