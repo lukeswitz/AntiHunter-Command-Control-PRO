@@ -1,8 +1,8 @@
-﻿import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiClient } from '../api/client';
-import { CommandRequest, CommandResponse } from '../api/types';
+import { CommandRequest, CommandResponse, SiteSummary } from '../api/types';
 import {
   COMMAND_GROUP_ORDER,
   CommandDefinition,
@@ -18,6 +18,7 @@ type CommandFormState = {
   target: string;
   paramValues: Record<string, string>;
   includeForever: boolean;
+  siteId?: string;
 };
 
 type TerminalEntryInput = {
@@ -77,6 +78,7 @@ function createFormState(
     target: normalizeTarget(targetCandidate),
     paramValues,
     includeForever,
+    siteId: undefined,
   };
 }
 
@@ -164,6 +166,11 @@ export function CommandConsolePage() {
   const deleteTemplateFromStore = useTemplateStore((state) => state.deleteTemplate);
   const role = useAuthStore((state) => state.user?.role ?? null);
 
+  const { data: sites } = useQuery({
+    queryKey: ['sites'],
+    queryFn: () => apiClient.get<SiteSummary[]>('/sites'),
+  });
+
   const canSendCommands = role === 'ADMIN' || role === 'OPERATOR';
 
   const commandMap = useMemo(() => new Map(MESH_COMMANDS.map((cmd) => [cmd.name, cmd])), []);
@@ -185,6 +192,18 @@ export function CommandConsolePage() {
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [templateError, setTemplateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!sites || sites.length === 0) {
+      return;
+    }
+    setForm((prev) => {
+      if (prev.siteId) {
+        return prev;
+      }
+      return { ...prev, siteId: sites[0]?.id };
+    });
+  }, [sites]);
 
   const menuRef = useRef<HTMLDivElement | null>(null);
   const selectorRef = useRef<HTMLButtonElement | null>(null);
@@ -286,7 +305,10 @@ export function CommandConsolePage() {
     preset?: { target?: string; params?: string[] },
   ) => {
     setSelectedCommandName(command.name);
-    setForm(createFormState(command, preset));
+    setForm((prev) => ({
+      ...createFormState(command, preset),
+      siteId: prev.siteId,
+    }));
     setParamErrors({});
     setTargetError(null);
     setMenuOpen(false);
@@ -341,6 +363,7 @@ export function CommandConsolePage() {
       target: trimmedTarget,
       name: selectedCommand.name,
       params: paramsForCommand,
+      siteId: form.siteId,
     });
   };
 
@@ -460,6 +483,7 @@ export function CommandConsolePage() {
       target: parsed.target,
       name: parsed.name,
       params: parsed.params,
+      siteId: form.siteId,
     });
   };
 
@@ -543,6 +567,27 @@ export function CommandConsolePage() {
             </select>
             {targetError ? <span className="form-error">{targetError}</span> : null}
           </div>
+
+          {sites && sites.length > 1 ? (
+            <div className="form-row">
+              <div className="form-label">Site</div>
+              <select
+                value={form.siteId ?? ''}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    siteId: event.target.value || undefined,
+                  }))
+                }
+              >
+                {sites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name ?? site.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           {selectedCommand.parameters.length > 0 ? (
             <div className="form-row">
