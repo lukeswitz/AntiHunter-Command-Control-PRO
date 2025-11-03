@@ -195,6 +195,7 @@ model CommandTemplate {
 model CommandLog {
   id              String        @id @default(cuid())
   siteId          String?
+  originSiteId    String?
   userId          String?
   target          String
   name            String
@@ -211,9 +212,11 @@ model CommandLog {
   idempotencyKey  String?       @unique
 
   site            Site?         @relation(fields: [siteId], references: [id])
+  originSite      Site?         @relation("CommandOriginSite", fields: [originSiteId], references: [id])
   user            User?         @relation(fields: [userId], references: [id])
 
   @@index([siteId])
+  @@index([originSiteId])
   @@index([status])
   @@index([createdAt])
   @@index([target])
@@ -325,6 +328,7 @@ model Site {
   targets   Target[]
   devices   InventoryDevice[]
   commandLogs CommandLog[]
+  originCommandLogs CommandLog[] @relation("CommandOriginSite")
   audits    AuditLog[]
   templates CommandTemplate[]
   userAccess UserSiteAccess[]
