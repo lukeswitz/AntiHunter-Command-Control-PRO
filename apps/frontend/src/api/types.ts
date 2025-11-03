@@ -152,6 +152,8 @@ export interface SiteSummary {
   name: string;
   color: string;
   region?: string | null;
+  country?: string | null;
+  city?: string | null;
   createdAt: string;
   updatedAt: string;
 }

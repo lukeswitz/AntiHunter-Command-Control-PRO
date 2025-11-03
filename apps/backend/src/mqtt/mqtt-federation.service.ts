@@ -21,6 +21,8 @@ type NodeUpsertMessage = {
     siteId?: string | null;
     siteName?: string | null;
     siteColor?: string | null;
+    siteCountry?: string | null;
+    siteCity?: string | null;
   };
 };
 
@@ -98,6 +100,8 @@ export class MqttFederationService implements OnModuleInit, OnModuleDestroy {
         siteId: node.siteId ?? this.localSiteId,
         siteName: node.siteName ?? null,
         siteColor: node.siteColor ?? null,
+        siteCountry: node.siteCountry ?? null,
+        siteCity: node.siteCity ?? null,
       },
     };
 
@@ -178,7 +182,13 @@ export class MqttFederationService implements OnModuleInit, OnModuleDestroy {
     const nodeLastSeen = nodePayload.lastSeen ? new Date(nodePayload.lastSeen) : undefined;
     const targetSiteId = nodePayload.siteId ?? originSiteId;
 
-    await this.ensureSiteRecord(targetSiteId, nodePayload.siteName, nodePayload.siteColor);
+    await this.ensureSiteRecord(
+      targetSiteId,
+      nodePayload.siteName,
+      nodePayload.siteColor,
+      nodePayload.siteCountry,
+      nodePayload.siteCity,
+    );
 
     await this.nodesService.upsert({
       id: nodePayload.id,
@@ -191,11 +201,19 @@ export class MqttFederationService implements OnModuleInit, OnModuleDestroy {
       siteId: targetSiteId,
       siteName: nodePayload.siteName ?? undefined,
       siteColor: nodePayload.siteColor ?? undefined,
+      siteCountry: nodePayload.siteCountry ?? undefined,
+      siteCity: nodePayload.siteCity ?? undefined,
       originSiteId,
     });
   }
 
-  private async ensureSiteRecord(siteId: string, name?: string | null, color?: string | null) {
+  private async ensureSiteRecord(
+    siteId: string,
+    name?: string | null,
+    color?: string | null,
+    country?: string | null,
+    city?: string | null,
+  ) {
     if (!siteId) {
       return;
     }
@@ -206,11 +224,15 @@ export class MqttFederationService implements OnModuleInit, OnModuleDestroy {
         update: {
           name: name ?? undefined,
           color: color ?? undefined,
+          country: country ?? undefined,
+          city: city ?? undefined,
         },
         create: {
           id: siteId,
           name: name ?? siteId,
           color: color ?? '#9333EA',
+          country: country ?? undefined,
+          city: city ?? undefined,
         },
       });
     } catch (error) {

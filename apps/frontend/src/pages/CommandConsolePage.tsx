@@ -37,6 +37,22 @@ const createTemplateId = () => {
   return `tmpl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
+type NodeTargetMeta = {
+  value: string;
+  baseLabel: string;
+  siteId?: string | null;
+  siteName?: string | null;
+  siteCountry?: string | null;
+  siteCity?: string | null;
+};
+
+type NodeCommandOption = {
+  value: string;
+  label: string;
+  siteId?: string | null;
+  siteLabel?: string | null;
+};
+
 function normalizeTarget(value: string | undefined): string {
   if (!value) {
     return '@ALL';
@@ -136,7 +152,7 @@ function normalizeParamValue(param: CommandParameter, raw: string): string {
   }
 }
 
-function deriveNodeTarget(node: NodeSummary): { value: string; baseLabel: string } {
+function deriveNodeTarget(node: NodeSummary): NodeTargetMeta {
   const rawId = (node.id ?? '').toUpperCase().replace(/^@/, '').replace(/\s+/g, '');
   const rawName = (node.name ?? '').toUpperCase().replace(/\s+/g, '');
 
@@ -152,6 +168,10 @@ function deriveNodeTarget(node: NodeSummary): { value: string; baseLabel: string
   return {
     value: normalizeTarget(safeLabel),
     baseLabel: safeLabel,
+    siteId: node.siteId ?? null,
+    siteName: node.siteName ?? null,
+    siteCountry: node.siteCountry ?? null,
+    siteCity: node.siteCity ?? null,
   };
 }
 
@@ -255,22 +275,30 @@ export function CommandConsolePage() {
     },
   });
 
-  const nodeCommandTargets = useMemo(() => {
-    const dedup = new Map<string, { value: string; label: string }>();
+  const nodeCommandTargets = useMemo<NodeCommandOption[]>(() => {
+    const dedup = new Map<string, NodeCommandOption>();
     availableNodes.forEach((node) => {
       const target = deriveNodeTarget(node);
-      const siteLabel = node.siteName ?? node.siteId ?? null;
-      const displayLabel = siteLabel ? `${target.baseLabel} (${siteLabel})` : target.baseLabel;
-      const dedupKey = `${target.value}::${siteLabel ?? 'local'}`;
+      const locationTokens = [target.siteCountry, target.siteCity].filter(Boolean) as string[];
+      const siteLabel =
+        locationTokens.length > 0
+          ? locationTokens.join(' / ')
+          : (target.siteName ?? target.siteId ?? null);
+      const dedupKey = `${target.value}::${target.siteId ?? 'local'}::${siteLabel ?? ''}`;
       if (!dedup.has(dedupKey)) {
-        dedup.set(dedupKey, { value: target.value, label: displayLabel });
+        dedup.set(dedupKey, {
+          value: target.value,
+          label: siteLabel ? `${target.baseLabel} (${siteLabel})` : target.baseLabel,
+          siteId: target.siteId ?? null,
+          siteLabel: siteLabel ?? undefined,
+        });
       }
     });
     return Array.from(dedup.values());
   }, [availableNodes]);
 
-  const targetOptions = useMemo(() => {
-    const options: Array<{ value: string; label: string }> = [
+  const targetOptions = useMemo<NodeCommandOption[]>(() => {
+    const options: NodeCommandOption[] = [
       { value: '@ALL', label: '@ALL (broadcast)' },
       ...nodeCommandTargets,
     ];
@@ -282,6 +310,20 @@ export function CommandConsolePage() {
 
     return options;
   }, [nodeCommandTargets, form.target]);
+  const selectedTargetOption = useMemo(
+    () => targetOptions.find((option) => option.value === form.target),
+    [targetOptions, form.target],
+  );
+
+  useEffect(() => {
+    if (
+      selectedTargetOption &&
+      Object.prototype.hasOwnProperty.call(selectedTargetOption, 'siteId')
+    ) {
+      const nextSiteId = selectedTargetOption.siteId ?? undefined;
+      setForm((prev) => (prev.siteId === nextSiteId ? prev : { ...prev, siteId: nextSiteId }));
+    }
+  }, [selectedTargetOption]);
 
   const paramsForCommand = useMemo(
     () => buildCommandParams(selectedCommand, form),
@@ -555,12 +597,18 @@ export function CommandConsolePage() {
             <select
               id="command-target"
               value={form.target}
-              onChange={(event) =>
+              onChange={(event) => {
+                const normalized = normalizeTarget(event.target.value);
+                const optionMeta = targetOptions.find((option) => option.value === normalized);
                 setForm((prev) => ({
                   ...prev,
-                  target: normalizeTarget(event.target.value),
-                }))
-              }
+                  target: normalized,
+                  siteId:
+                    optionMeta && Object.prototype.hasOwnProperty.call(optionMeta, 'siteId')
+                      ? (optionMeta.siteId ?? undefined)
+                      : prev.siteId,
+                }));
+              }}
             >
               {targetOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -576,6 +624,7 @@ export function CommandConsolePage() {
               <div className="form-label">Site</div>
               <select
                 value={form.siteId ?? ''}
+                disabled={Boolean(selectedTargetOption?.siteId)}
                 onChange={(event) =>
                   setForm((prev) => ({
                     ...prev,
@@ -585,7 +634,13 @@ export function CommandConsolePage() {
               >
                 {sites.map((site) => (
                   <option key={site.id} value={site.id}>
-                    {site.name ?? site.id}
+                    {(() => {
+                      const locationTokens = [site.country, site.city].filter(Boolean) as string[];
+                      const locationLabel =
+                        locationTokens.length > 0 ? locationTokens.join(' / ') : null;
+                      const baseLabel = site.name ?? site.id;
+                      return locationLabel ? `${baseLabel} (${locationLabel})` : baseLabel;
+                    })()}
                   </option>
                 ))}
               </select>

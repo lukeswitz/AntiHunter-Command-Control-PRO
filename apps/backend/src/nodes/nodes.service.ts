@@ -28,7 +28,7 @@ export class NodesService implements OnModuleInit {
           take: 1,
         },
         site: {
-          select: { id: true, name: true, color: true },
+          select: { id: true, name: true, color: true, country: true, city: true },
         },
       },
     });
@@ -83,13 +83,17 @@ export class NodesService implements OnModuleInit {
     const existing = this.nodes.get(snapshot.id);
     let siteName = snapshot.siteName;
     let siteColor = snapshot.siteColor;
-    if (snapshot.siteId && (!siteName || !siteColor)) {
+    let siteCountry = snapshot.siteCountry;
+    let siteCity = snapshot.siteCity;
+    if (snapshot.siteId && (!siteName || !siteColor || !siteCountry || !siteCity)) {
       const site = await this.prisma.site.findUnique({
         where: { id: snapshot.siteId },
-        select: { name: true, color: true },
+        select: { name: true, color: true, country: true, city: true },
       });
       siteName = site?.name ?? siteName;
       siteColor = site?.color ?? siteColor;
+      siteCountry = site?.country ?? siteCountry;
+      siteCity = site?.city ?? siteCity;
     }
 
     const merged: NodeSnapshot = {
@@ -103,6 +107,8 @@ export class NodesService implements OnModuleInit {
       siteId: snapshot.siteId ?? existing?.siteId,
       siteName: siteName ?? existing?.siteName,
       siteColor: siteColor ?? existing?.siteColor,
+      siteCountry: siteCountry ?? existing?.siteCountry,
+      siteCity: siteCity ?? existing?.siteCity,
     };
 
     this.nodes.set(snapshot.id, merged);
@@ -220,7 +226,13 @@ export class NodesService implements OnModuleInit {
     lastSeen: Date | null;
     positions: Array<{ lat: number; lon: number; ts: Date }>;
     originSiteId: string | null;
-    site?: { id: string; name: string | null; color: string | null } | null;
+    site?: {
+      id: string;
+      name: string | null;
+      color: string | null;
+      country: string | null;
+      city: string | null;
+    } | null;
   }): NodeSnapshot {
     const lastPosition = node.positions.at(0);
     return {
@@ -234,6 +246,8 @@ export class NodesService implements OnModuleInit {
       siteId: node.site?.id ?? undefined,
       siteName: node.site?.name ?? undefined,
       siteColor: node.site?.color ?? undefined,
+      siteCountry: node.site?.country ?? undefined,
+      siteCity: node.site?.city ?? undefined,
       originSiteId: node.originSiteId ?? node.site?.id ?? undefined,
     };
   }

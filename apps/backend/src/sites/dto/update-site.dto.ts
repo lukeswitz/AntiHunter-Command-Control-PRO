@@ -14,4 +14,14 @@ export class UpdateSiteDto {
   @IsString()
   @MaxLength(120)
   region?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  city?: string;
 }

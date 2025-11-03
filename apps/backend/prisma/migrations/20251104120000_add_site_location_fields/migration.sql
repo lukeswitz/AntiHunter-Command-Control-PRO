@@ -1,0 +1,3 @@
+ALTER TABLE "Site"
+ADD COLUMN "country" TEXT,
+ADD COLUMN "city" TEXT;

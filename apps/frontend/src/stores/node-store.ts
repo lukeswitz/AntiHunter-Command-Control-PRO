@@ -11,6 +11,8 @@ export interface NodeSummary {
   siteId?: string | null;
   siteName?: string | null;
   siteColor?: string | null;
+  siteCountry?: string | null;
+  siteCity?: string | null;
 }
 
 export interface PartialNode {
@@ -24,6 +26,8 @@ export interface PartialNode {
   siteId?: string | null;
   siteName?: string | null;
   siteColor?: string | null;
+  siteCountry?: string | null;
+  siteCity?: string | null;
 }
 
 export type IncomingNode = NodeSummary | PartialNode;
@@ -47,7 +51,12 @@ interface NodeStore {
   applyDiff: (diff: NodeDiffPayload) => void;
   updateSiteMeta: (
     siteId: string,
-    metadata: { name?: string | null; color?: string | null },
+    metadata: {
+      name?: string | null;
+      color?: string | null;
+      country?: string | null;
+      city?: string | null;
+    },
   ) => void;
   clearAll: () => void;
 }
@@ -159,6 +168,12 @@ export const useNodeStore = create<NodeStore>((set) => ({
               metadata.name !== undefined ? (metadata.name ?? null) : (node.siteName ?? null),
             siteColor:
               metadata.color !== undefined ? (metadata.color ?? null) : (node.siteColor ?? null),
+            siteCountry:
+              metadata.country !== undefined
+                ? (metadata.country ?? null)
+                : (node.siteCountry ?? null),
+            siteCity:
+              metadata.city !== undefined ? (metadata.city ?? null) : (node.siteCity ?? null),
           };
           updatedNodes[id] = next;
           touched = true;
@@ -230,6 +245,8 @@ function normalizeNode(node: IncomingNode): NodeSummary {
     siteId: node.siteId ?? null,
     siteName: node.siteName ?? null,
     siteColor: node.siteColor ?? null,
+    siteCountry: node.siteCountry ?? null,
+    siteCity: node.siteCity ?? null,
   };
 }
 

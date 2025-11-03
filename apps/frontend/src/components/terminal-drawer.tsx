@@ -21,6 +21,9 @@ export function TerminalDrawer() {
     return entries.filter((entry) => entry.source !== 'raw');
   }, [entries, showRaw]);
 
+  const isScrollable = filteredEntries.length > 50;
+  const displayEntries = filteredEntries;
+
   return (
     <section className="terminal-drawer">
       <header className="terminal-drawer__header">
@@ -38,8 +41,10 @@ export function TerminalDrawer() {
           </button>
         </div>
       </header>
-      <div className="terminal-drawer__list">
-        {filteredEntries.length === 0 ? (
+      <div
+        className={`terminal-drawer__list${isScrollable ? ' terminal-drawer__list--scroll' : ''}`}
+      >
+        {displayEntries.length === 0 ? (
           <div className="empty-state">
             <div>
               {entries.length === 0
@@ -48,7 +53,7 @@ export function TerminalDrawer() {
             </div>
           </div>
         ) : (
-          filteredEntries.map((entry) => (
+          displayEntries.map((entry) => (
             <article
               key={entry.id}
               className={`terminal-entry ${levelToClass[entry.level]}`}

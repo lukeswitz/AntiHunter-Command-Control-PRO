@@ -318,6 +318,8 @@ model Site {
   name      String
   color     String   @default("#2E7D32")
   region    String?
+  country   String?
+  city      String?
   geojson   Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

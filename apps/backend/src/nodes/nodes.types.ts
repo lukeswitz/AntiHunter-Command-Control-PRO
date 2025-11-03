@@ -9,6 +9,8 @@ export interface NodeSnapshot {
   siteId?: string | null;
   siteName?: string | null;
   siteColor?: string | null;
+  siteCountry?: string | null;
+  siteCity?: string | null;
   originSiteId?: string | null;
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+﻿import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiClient } from '../api/client';
@@ -162,6 +162,8 @@ function buildRow(node: {
   siteId?: string | null;
   siteName?: string | null;
   siteColor?: string | null;
+  siteCountry?: string | null;
+  siteCity?: string | null;
 }): NodeRow {
   const lastSeenDate = node.lastSeen ? new Date(node.lastSeen) : undefined;
   const lastSeenDisplay = lastSeenDate ? lastSeenDate.toLocaleString() : 'Unknown';
@@ -175,8 +177,10 @@ function buildRow(node: {
 
   const temperature = extractTemperature(node.lastMessage);
   const sdStatus = extractSdStatus(node.lastMessage);
-  const siteLabel = node.siteName ?? node.siteId ?? 'Local';
-  const displayName = `${siteLabel}:${node.name ?? node.id}`;
+  const locationTokens = [node.siteCountry, node.siteCity].filter(Boolean) as string[];
+  const locationLabel = locationTokens.length > 0 ? locationTokens.join(' / ') : null;
+  const primaryLabel = locationLabel ?? node.siteName ?? node.siteId ?? 'Local';
+  const displayName = `${primaryLabel}:${node.name ?? node.id}`;
   const key = composeNodeKey(node.id, node.siteId ?? undefined);
 
   return {
@@ -193,8 +197,10 @@ function buildRow(node: {
     lat,
     lon,
     siteId: node.siteId ?? undefined,
-    siteLabel,
+    siteLabel: primaryLabel,
     siteColor: node.siteColor ?? undefined,
+    siteCountry: node.siteCountry ?? undefined,
+    siteCity: node.siteCity ?? undefined,
   };
 }
 
@@ -214,6 +220,8 @@ interface NodeRow {
   siteId?: string;
   siteLabel?: string;
   siteColor?: string;
+  siteCountry?: string;
+  siteCity?: string;
 }
 
 function formatRelativeTime(date: Date): string | null {
@@ -241,7 +249,7 @@ function extractTemperature(message?: string | null): string | undefined {
   if (!message) {
     return undefined;
   }
-  const match = /temp(?:erature)?[=:]?\s*(-?\d+(?:\.\d+)?)\s*(?:°?\s*([CFcf]))?/i.exec(message);
+  const match = /temp(?:erature)?[=:]?\s*(-?\d+(?:\.\d+)?)\s*(?:┬░?\s*([CFcf]))?/i.exec(message);
   if (!match) {
     return undefined;
   }
@@ -250,7 +258,7 @@ function extractTemperature(message?: string | null): string | undefined {
     return undefined;
   }
   const unit = match[2] ? match[2].toUpperCase() : 'C';
-  return `${value.toFixed(1)}°${unit}`;
+  return `${value.toFixed(1)}┬░${unit}`;
 }
 
 function extractSdStatus(message?: string | null): string | undefined {

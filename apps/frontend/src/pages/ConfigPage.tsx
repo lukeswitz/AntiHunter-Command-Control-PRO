@@ -674,6 +674,14 @@ export function ConfigPage() {
       const value = patch.region?.trim();
       body.region = value && value.length > 0 ? value : null;
     }
+    if ('country' in patch) {
+      const value = patch.country?.trim();
+      body.country = value && value.length > 0 ? value : null;
+    }
+    if ('city' in patch) {
+      const value = patch.city?.trim();
+      body.city = value && value.length > 0 ? value : null;
+    }
     if (Object.keys(body).length === 0) {
       return;
     }
@@ -1316,6 +1324,40 @@ export function ConfigPage() {
                         onBlur={(event) =>
                           commitSiteSetting(site.id, {
                             region: event.target.value === '' ? null : event.target.value.trim(),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Country</span>
+                      <input
+                        value={site.country ?? ''}
+                        placeholder="Optional"
+                        onChange={(event) =>
+                          updateSiteSetting(site.id, {
+                            country: event.target.value === '' ? null : event.target.value,
+                          })
+                        }
+                        onBlur={(event) =>
+                          commitSiteSetting(site.id, {
+                            country: event.target.value === '' ? null : event.target.value.trim(),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">City</span>
+                      <input
+                        value={site.city ?? ''}
+                        placeholder="Optional"
+                        onChange={(event) =>
+                          updateSiteSetting(site.id, {
+                            city: event.target.value === '' ? null : event.target.value,
+                          })
+                        }
+                        onBlur={(event) =>
+                          commitSiteSetting(site.id, {
+                            city: event.target.value === '' ? null : event.target.value.trim(),
                           })
                         }
                       />

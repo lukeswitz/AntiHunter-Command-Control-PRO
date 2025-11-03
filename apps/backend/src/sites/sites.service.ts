@@ -26,6 +26,8 @@ export class SitesService {
         name: dto.name ?? undefined,
         color: dto.color ?? undefined,
         region: dto.region ?? undefined,
+        country: dto.country ?? undefined,
+        city: dto.city ?? undefined,
       },
     });
   }

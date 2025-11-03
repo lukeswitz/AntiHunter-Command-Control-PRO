@@ -44,8 +44,9 @@ const GPS_SIMPLE_REGEX =
 const NODE_HEARTBEAT_REGEX =
   /^\[NODE_HB\]\s*(?<node>[A-Za-z0-9_-]+)\s*GPS[=:](?<lat>-?\d+\.\d+),\s*(?<lon>-?\d+\.\d+)/i;
 const STATUS_REGEX =
-  /^(?<node>[A-Za-z0-9_-]+):\s*STATUS:\s*Mode:(?<mode>[A-Za-z0-9+]+)\s+Scan:(?<scan>[A-Za-z]+)\s+Hits:(?<hits>\d+)\s+Unique:(?<unique>\d+)\s+Temp:\s*(?<tempC>[0-9.]+).?C\s*\/\s*(?<tempF>[0-9.]+).?F\s+Up:(?<uptime>[0-9:]+)/i;
+  /^(?<node>[A-Za-z0-9_-]+)\s*:?\s*STATUS:\s*Mode:(?<mode>[A-Za-z0-9+]+)\s+Scan:(?<scan>[A-Za-z]+)\s+Hits:(?<hits>\d+)\s+Unique:(?<unique>\d+)\s+Temp:\s*(?<tempC>[0-9.]+).?C\s*\/\s*(?<tempF>[0-9.]+).?F\s+Up:(?<uptime>[0-9:]+)(?:\s+Targets:(?<targets>\d+))?/i;
 const CONFIG_ACK_REGEX = /^(?<node>[A-Za-z0-9_-]+):\s*CONFIG_ACK:(?<type>[A-Z_]+):(?<value>.+)$/i;
+
 const OP_ACK_REGEX =
   /^(?<node>[A-Za-z0-9_-]+):\s*(?<kind>SCAN|DEVICE_SCAN|DRONE|DEAUTH|RANDOMIZATION|BASELINE)_ACK:(?<status>[A-Z_]+)/i;
 const TRI_ACK_REGEX = /^(?<node>[A-Za-z0-9_-]+):\s*TRIANGULATE_ACK:(?<target>.+)$/i;
@@ -56,11 +57,13 @@ const BASELINE_STATUS_REGEX =
   /^(?<node>[A-Za-z0-9_-]+):\s*BASELINE_STATUS:\s*Scanning:(?<scanning>YES|NO)\s*Established:(?<est>YES|NO)\s*Devices[=:](?<devices>\d+)\s*Anomalies[=:](?<anomalies>\d+)\s*Phase1:(?<phase>ACTIVE|COMPLETE)/i;
 const ERASE_ACK_REGEX =
   /^(?<node>[A-Za-z0-9_-]+):\s*ERASE_ACK:(?<status>STARTED|COMPLETE|CANCELLED|FAILED)/i;
+const SCAN_DONE_REGEX = /^(?<node>[A-Za-z0-9_-]+)\s+SCAN_DONE:\s*(?<details>.+)$/i;
 const STARTUP_REGEX = /^(?<node>[A-Za-z0-9_-]+):\s*STARTUP:\s*(?<details>.+)$/i;
 const OK_STATUS_REGEX = /^(?<node>[A-Za-z0-9_-]+)\s+OK\s+Status:(?<status>[A-Z]+)#?$/i;
 const GENERIC_NODE_LINE_REGEX =
-  /^(?:\[(?<tag>[A-Z_]+)\]\s*)?(?<node>[A-Za-z0-9_-]+):\s*(?<body>.+)$/;
+  /^(?:\[(?<tag>[A-Z_]+)\]\s*)?(?<node>[A-Za-z0-9_-]+):\s*(?<body>.+)$/i;
 const FORWARDED_PREFIX_REGEX = /^(?<prefix>[0-9a-f]{2,8}):\s+(?<rest>.+)$/i;
+const ROUTER_TEXT_MSG_REGEX = /\[Router\]\s+Received text msg.*?msg=(#?[\s\S]+)$/i;
 const STATUS_DEDUP_MS = 60_000;
 export class MeshtasticLikeParser implements SerialProtocolParser {
   private readonly triangulationBuffers: Map<string, TriangulationBuffer>;
@@ -175,9 +178,39 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
     let handled = false;
 
     // Normalize router forwarded text frames (credit: @lukeswitz)
-    const routerMatch = /\[Router\]\s+Received text msg.*?msg=([^$]+)/i.exec(line);
+    const routerMatch = ROUTER_TEXT_MSG_REGEX.exec(line);
     if (routerMatch?.[1]) {
-      line = routerMatch[1].trim().replace(/#$/, '');
+      const embeddedMsg = routerMatch[1].trim().replace(/#$/, '');
+      const embeddedResults = this.parseText(embeddedMsg);
+      if (embeddedResults && embeddedResults.length > 0) {
+        return embeddedResults.map((event) => ({ ...event, raw: line }));
+      }
+
+      const genericMatch = GENERIC_NODE_LINE_REGEX.exec(embeddedMsg);
+      if (genericMatch?.groups) {
+        const normalizedNode = this.normalizeNodeId(genericMatch.groups.node);
+        const message = `[${genericMatch.groups.node}] ${genericMatch.groups.body}`;
+        return [
+          {
+            kind: 'alert',
+            level: 'INFO',
+            category: 'text',
+            nodeId: normalizedNode,
+            message,
+            raw: line,
+          },
+        ];
+      }
+
+      return [
+        {
+          kind: 'alert',
+          level: 'INFO',
+          category: 'text',
+          message: embeddedMsg,
+          raw: line,
+        },
+      ];
     }
 
     this.flushExpiredStatuses(results);
@@ -374,7 +407,10 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
         results.push(this.buildStatusAlert(existing));
         this.pendingStatuses.delete(nodeId);
       }
-      const message = `${nodeId} Status Mode:${statusMatch.groups.mode} Scan:${statusMatch.groups.scan} Hits:${statusMatch.groups.hits} Unique:${statusMatch.groups.unique} Temp:${statusMatch.groups.tempC}C/${statusMatch.groups.tempF}F Up:${statusMatch.groups.uptime}`;
+      let message = `${nodeId} Status Mode:${statusMatch.groups.mode} Scan:${statusMatch.groups.scan} Hits:${statusMatch.groups.hits} Unique:${statusMatch.groups.unique} Temp:${statusMatch.groups.tempC}C/${statusMatch.groups.tempF}F Up:${statusMatch.groups.uptime}`;
+      if (statusMatch.groups.targets) {
+        message += ` Targets:${statusMatch.groups.targets}`;
+      }
       const data: Record<string, unknown> = {
         hits: toNumber(statusMatch.groups.hits),
         unique: toNumber(statusMatch.groups.unique),
@@ -382,12 +418,34 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
         tempF: toNumber(statusMatch.groups.tempF),
         uptime: statusMatch.groups.uptime,
       };
+      if (statusMatch.groups.mode) {
+        data.mode = statusMatch.groups.mode;
+      }
+      if (statusMatch.groups.scan) {
+        data.scan = statusMatch.groups.scan;
+      }
+      if (statusMatch.groups.targets) {
+        data.targets = toNumber(statusMatch.groups.targets);
+      }
       this.pendingStatuses.set(nodeId, {
         nodeId,
         message,
         data,
         rawLines: [line],
         createdAt: Date.now(),
+      });
+      return this.deliverOrRaw(results, line);
+    }
+    const scanDoneMatch = SCAN_DONE_REGEX.exec(line);
+    if (scanDoneMatch?.groups) {
+      const nodeId = this.normalizeNodeId(scanDoneMatch.groups.node);
+      const payload = scanDoneMatch.groups.details.trim().replace(/#$/, '');
+      results.push({
+        kind: 'command-result',
+        nodeId,
+        command: 'SCAN_DONE',
+        payload,
+        raw: line,
       });
       return this.deliverOrRaw(results, line);
     }

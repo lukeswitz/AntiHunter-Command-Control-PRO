@@ -2019,6 +2019,10 @@ body.theme-dark .control-chip[disabled] {
   gap: 0.75rem;
 }
 
+.terminal-drawer__list--scroll {
+  max-height: 40rem;
+}
+
 .terminal-entry {
   border-left: 3px solid transparent;
 
