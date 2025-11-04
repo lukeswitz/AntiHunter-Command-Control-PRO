@@ -813,6 +813,7 @@ AntiHunter Command & Control PRO (“Software”) is distributed for **lawful, a
 - **Computer misuse laws.** Scanning or accessing third-party networks without permission may violate the Computer Fraud and Abuse Act, UK Computer Misuse Act, or similar laws. Always obtain written authorization before interfacing with systems you do not control.
 - **Export & sanctions.** You must ensure distribution and use complies with the U.S. EAR, EU dual-use regulations, local sanctions regimes, and any contractual restrictions. The maintainers do not grant export approvals.
 - **Operational safeguards.** Run the Software on hardened, access-controlled infrastructure. You are responsible for segregation of duties, credential management, and preventing unauthorized access to intercepted telemetry or command functions.
+- **Forks and modifications.** If you fork, redistribute, or modify the Software, you are solely responsible for supporting your derivative work. The original authors and contributors are not liable for defects or legal issues introduced by third-party changes, packaging, or integrations.
 
 ### No Warranty / Limitation of Liability
 
