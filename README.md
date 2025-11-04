@@ -170,6 +170,31 @@ Each deployment runs its site-local C2 server and still functions if federation 
 
 Secrets such as MQTT credentials, TLS PEMs, TAK API keys, and SMTP passwords are encrypted at rest in the database. Environment variables (`SITE_ID`, `JWT_SECRET`, `HTTPS_CERT_PATH`, etc.) govern bootstrapping.
 
+#### Hardening Checklist
+
+While the platform ships with secure defaults, production deployments should bake the following controls into their baseline:
+
+- Enforce HTTPS everywhere with modern TLS ciphers (consider terminating behind an ALB / nginx reverse proxy with OCSP stapling).
+- Rotate JWT signing secrets and database credentials regularly; store them in a vault or managed secret store.
+- Enable 2FA for all privileged users and keep recovery codes in offline storage.
+- Apply database row-level backups and point-in-time recovery; schedule regular restore drills.
+- Lock down the serial host: run the backend service under a dedicated system account with least privilege and disable unused TTY devices.
+- Review firewall policies and geo/IP blocking rules, auto-expire temporary bans, and forward logs to a SOC/SIEM.
+- Monitor MQTT broker access logs; require mutual TLS when traversing untrusted networks.
+- Harden Docker hosts (if used): disable root SSH login, keep the kernel patched, and enable auditd or similar for command tracking.
+
+#### Port Exposure Reference
+
+| Service / Flow                | Default Port | Notes & Hardening Steps                                                                               |
+|-------------------------------|--------------|-------------------------------------------------------------------------------------------------------|
+| HTTPS API + Socket.IO         | 443 (or 3000) | Reverse proxy with TLS termination; restrict to trusted operator ranges or VPN.                      |
+| Serial worker (local device)  | n/a (USB)     | Physical access only; ensure `/dev/tty*` or COM ports are root-owned and audit device plug events.   |
+| PostgreSQL / Prisma           | 5432          | Bind to localhost/VPC only; require SCRAM auth and TLS; rotate credentials.                          |
+| MQTT broker (federation)      | 1883 / 8883   | Prefer 8883 with mutual TLS; enforce client ID allowlists; rate-limit connection attempts.           |
+| TAK/CoT bridge                | 8087 / 8089   | Use TLS profiles when possible; generate per-client API keys; segregate on dedicated security group. |
+| Prometheus / Metrics scrape   | 9100+         | Keep behind VPN and IP allowlists; disable if metrics are collected by sidecars.                     |
+| SMTP relay                    | 587 / 465     | Require STARTTLS/SMTPS with credential auth; scope accounts to command notifications only.           |
+
 ### Resilience & Fallback Paths
 
 * **Local-first operation:** Each site keeps its own PostgreSQL instance and continues ingesting/commanding nodes if the broker or WAN link fails. Federation queues simply back off until the connection returns.
@@ -410,8 +435,23 @@ Optional environment flags:
 | `TAK_USERNAME`     | Optional basic-auth username for TAK gateways             |
 | `TAK_PASSWORD`     | Optional basic-auth password (otherwise set via UI)       |
 | `TAK_API_KEY`      | Optional API key for HTTPS-based TAK cores                |
+| `TWO_FACTOR_ISSUER` | Label shown in authenticator apps (default `AntiHunter Command Center`) |
+| `TWO_FACTOR_TOKEN_EXPIRY` | Lifetime of the temporary two-factor challenge token (default `10m`) |
+| `TWO_FACTOR_WINDOW` | Allowed OTP drift window (number of 30s steps, default `1`) |
+| `TWO_FACTOR_SECRET_KEY` | 32+ character passphrase used to encrypt stored authenticator secrets (AES-256-GCM). Leave unset only for local development. |
 
 Frontend currently consumes backend settings via API, so no extra `.env` is needed.
+
+### Two-Factor Authentication (optional)
+
+1. Choose a 32+ character secret used to encrypt TOTP seeds and add it to `apps/backend/.env`:
+   ```env
+   TWO_FACTOR_SECRET_KEY="change-this-to-a-long-random-passphrase"
+   TWO_FACTOR_ISSUER="AntiHunter Command Center"
+   ```
+   Restart the backend after updating the file.
+2. Users can now browse to **Account → Two-Factor Authentication**, click **Enable Two-Factor**, scan the QR code with Google Authenticator (or any TOTP app), submit the current code, and download/store the generated recovery codes.
+3. Administrators can regenerate recovery codes or disable 2FA from the same panel. Temporary login tokens for 2FA challenges expire after `TWO_FACTOR_TOKEN_EXPIRY` (default 10 minutes).
 
 ### Enabling HTTPS (optional)
 

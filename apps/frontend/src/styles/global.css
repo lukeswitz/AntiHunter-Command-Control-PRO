@@ -3335,3 +3335,86 @@ body.theme-dark .alert-color-item {
   gap: 0.75rem;
   margin-top: 0.75rem;
 }
+.config-page .config-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  align-items: start;
+}
+
+.config-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: sticky;
+  top: 6.5rem;
+  align-self: start;
+}
+
+.config-menu__item {
+  border: 1px solid var(--color-panel-border);
+  border-radius: 0.75rem;
+  background: var(--color-panel);
+  box-shadow: 0 6px 18px var(--color-panel-shadow);
+  padding: 0.85rem 1rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.config-menu__item:hover,
+.config-menu__item:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.config-menu__item--active {
+  border-color: var(--color-accent);
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--color-accent);
+}
+
+.config-menu__label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.config-menu__description {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.config-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.config-card--hidden {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .config-page .config-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .config-menu {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .config-menu__item {
+    flex: 1 1 160px;
+  }
+}

@@ -114,6 +114,33 @@ const DEFAULT_ALARM_CONFIG: AlarmConfig = {
   backgroundAllowed: false,
 };
 
+type ConfigSectionId =
+  | 'alarms'
+  | 'mail'
+  | 'security'
+  | 'appearance'
+  | 'sites'
+  | 'serial'
+  | 'tak'
+  | 'mqtt'
+  | 'detection'
+  | 'map'
+  | 'oui';
+
+const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: string }> = [
+  { id: 'alarms', label: 'Alarms', description: 'Audio profiles & cooldowns' },
+  { id: 'mail', label: 'Mail Server', description: 'Outbound email delivery' },
+  { id: 'security', label: 'Security Defaults', description: 'Authentication requirements' },
+  { id: 'appearance', label: 'Alert Colors', description: 'Marker and alert styling' },
+  { id: 'sites', label: 'Sites', description: 'Site names, regions, and colors' },
+  { id: 'serial', label: 'Serial Connection', description: 'Device path and protocol' },
+  { id: 'tak', label: 'TAK Bridge', description: 'Cursor-on-Target relay' },
+  { id: 'mqtt', label: 'MQTT Federation', description: 'Remote site replication' },
+  { id: 'detection', label: 'Detection Defaults', description: 'Scan and alert presets' },
+  { id: 'map', label: 'Map & Coverage', description: 'Map viewport and coverage rings' },
+  { id: 'oui', label: 'OUI Resolver', description: 'Vendor cache imports & exports' },
+];
+
 export function ConfigPage() {
   const queryClient = useQueryClient();
 
@@ -201,6 +228,10 @@ export function ConfigPage() {
     text: string;
   } | null>(null);
   const [takSendPayload, setTakSendPayload] = useState('');
+  const [activeSection, setActiveSection] = useState<ConfigSectionId>('alarms');
+
+  const cardClass = (...sections: ConfigSectionId[]) =>
+    sections.includes(activeSection) ? 'config-card' : 'config-card config-card--hidden';
 
   const runtimeSiteId =
     runtimeConfigQuery.data?.siteId ??
@@ -810,7 +841,7 @@ export function ConfigPage() {
     (appSettings.mailPasswordSet && mailPasswordInput.length === 0);
 
   return (
-    <section className="panel">
+    <section className="panel config-page">
       <header className="panel__header">
         <div>
           <h1 className="panel__title">Configuration</h1>
@@ -864,8 +895,28 @@ export function ConfigPage() {
         ) : null}
       </header>
 
-      <div className="config-grid">
-        <section className="config-card">
+      <div className="config-layout">
+        <nav className="config-menu" aria-label="Configuration sections">
+          {CONFIG_SECTIONS.map((section) => {
+            const isActive = section.id === activeSection;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                className={`config-menu__item${isActive ? ' config-menu__item--active' : ''}`}
+                onClick={() => setActiveSection(section.id)}
+                aria-pressed={isActive}
+              >
+                <span className="config-menu__label">{section.label}</span>
+                <span className="config-menu__description">{section.description}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="config-content">
+          <div className="config-grid">
+        <section className={cardClass('alarms')}>
           <header>
             <h2>Alarm Profiles</h2>
             <p>Adjust volume, rate limit, and audio tone for each alarm level.</p>
@@ -954,7 +1005,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('alarms')}>
           <header>
             <h2>Alarm Cooldowns</h2>
             <p>Define the minimum interval between repeated alarms of the same level.</p>
@@ -994,7 +1045,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('mail')}>
           <header>
             <h2>Mail Server</h2>
             <p>Configure SMTP delivery for invitations and alert notifications.</p>
@@ -1135,7 +1186,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('security')}>
           <header>
             <h2>Security Defaults</h2>
             <p>Set application URLs and token expiry policies.</p>
@@ -1180,7 +1231,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('appearance')}>
           <header>
             <h2>Alert Colors</h2>
             <p>Customize map marker and radius colors for each alarm level.</p>
@@ -1223,7 +1274,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('sites')}>
           <header>
             <h2>Site Settings</h2>
             <p>Update site names and colors for multi-site deployments.</p>
@@ -1369,7 +1420,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('serial')}>
           <header>
             <h2>Serial Connection</h2>
             <p>Review connection defaults and rate limits.</p>
@@ -1588,7 +1639,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('tak')}>
           <header>
             <h2>TAK Bridge</h2>
             <p>Stream nodes, alerts, and command acknowledgements into your TAK ecosystem.</p>
@@ -1964,7 +2015,7 @@ export function ConfigPage() {
             )}
           </div>
         </section>
-        <section className="config-card">
+        <section className={cardClass('mqtt')}>
           <header>
             <h2>MQTT Federation</h2>
             <p>Configure broker connectivity for remote sites and command replication.</p>
@@ -2241,7 +2292,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('detection')}>
           <header>
             <h2>Detection Defaults</h2>
             <p>Preset channels and durations for scan/baseline workflows.</p>
@@ -2379,7 +2430,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('map')}>
           <header>
             <h2>Map & Coverage</h2>
             <p>Tiles, attribution, and coverage radius defaults.</p>
@@ -2439,7 +2490,7 @@ export function ConfigPage() {
           </div>
         </section>
 
-        <section className="config-card">
+        <section className={cardClass('oui')}>
           <header>
             <h2>OUI Resolver</h2>
             <p>Manage vendor lookup cache for MAC address resolution.</p>
@@ -2493,6 +2544,8 @@ export function ConfigPage() {
             </div>
           </div>
         </section>
+          </div>
+        </div>
       </div>
     </section>
   );
