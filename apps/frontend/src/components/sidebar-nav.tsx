@@ -1,4 +1,4 @@
-﻿import type { ComponentType } from 'react';
+import type { ComponentType } from 'react';
 import {
   MdMap,
   MdSensors,
@@ -24,7 +24,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/console', label: 'Console', icon: MdTerminal },
   { to: '/inventory', label: 'Inventory', icon: MdWifiTethering },
   { to: '/targets', label: 'Targets', icon: MdMyLocation },
-  { to: '/geofences', label: 'Geofence', icon: MdOutlineAreaChart },
+  { to: '/geofences', label: 'Geofences', icon: MdOutlineAreaChart },
+  { to: '/strategy', label: 'Strategy Advisor', icon: MdOutlineAreaChart },
   { to: '/nodes', label: 'Nodes', icon: MdSensors },
   { to: '/scheduler', label: 'Scheduler', icon: MdEventNote },
   { to: '/config', label: 'Config', icon: MdSettings },

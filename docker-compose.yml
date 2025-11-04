@@ -5,12 +5,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: command_center
-      POSTGRES_USER: cc_user
-      POSTGRES_PASSWORD: cc_pass
+      POSTGRES_USER: command_center
+      POSTGRES_PASSWORD: command_center
+    ports:
+      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cc_user -d command_center"]
+      test: ["CMD-SHELL", "pg_isready -U command_center -d command_center"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,7 +34,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://cc_user:cc_pass@postgres:5432/command_center
+      DATABASE_URL: postgresql://command_center:command_center@postgres:5432/command_center
       PORT: 3000
       HTTP_PREFIX: api
       LOG_LEVEL: info

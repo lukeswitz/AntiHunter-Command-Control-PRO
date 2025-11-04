@@ -18,6 +18,7 @@ import { InventoryPage } from './pages/InventoryPage';
 import { MapPage } from './pages/MapPage';
 import { NodesPage } from './pages/NodesPage';
 import { SchedulerPage } from './pages/SchedulerPage';
+import { StrategyAdvisorPage } from './pages/StrategyAdvisorPage';
 import { TargetsPage } from './pages/TargetsPage';
 import { UserPage } from './pages/UserPage';
 import { useTheme } from './providers/theme-provider';
@@ -71,6 +72,7 @@ export default function App() {
               <Route path="/geofences" element={<GeofencePage />} />
               <Route path="/nodes" element={<NodesPage />} />
               <Route path="/targets" element={<TargetsPage />} />
+              <Route path="/strategy" element={<StrategyAdvisorPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/console" element={<CommandConsolePage />} />
               <Route path="/config" element={<ConfigPage />} />

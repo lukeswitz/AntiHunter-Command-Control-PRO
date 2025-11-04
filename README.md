@@ -381,7 +381,7 @@ Create `apps/backend/.env`:
 
 ```
 
-DATABASE_URL="postgresql://cc_user:cc_pass@localhost:5432/command_center"
+DATABASE_URL="postgresql://command_center:command_center@localhost:5432/command_center"
 
 PORT=3000
 HTTPS_ENABLED=false

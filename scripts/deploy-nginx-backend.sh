@@ -15,10 +15,18 @@ LE_CERT_PATH="/etc/letsencrypt/live/${DOMAIN}"
 BACKEND_SERVICE="ahcc-backend.service"
 BACKEND_ENV_FILE="$REPO_DIR/apps/backend/.env.production"
 
-DATABASE_URL="postgresql://command_center:command_center@postgres:5432/command_center"
+DB_USER="command_center"
+DB_PASSWORD="command_center"
+DB_NAME="command_center"
+DB_HOST_LOCAL="${DB_HOST_LOCAL:-localhost}"
+DB_PORT="${DB_PORT:-5432}"
+DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST_LOCAL}:${DB_PORT}/${DB_NAME}"
 NODE_ENV="production"
 PORT="3000"
 JWT_SECRET="${JWT_SECRET:-changeme_super_secret}"
+
+COMPOSE_BIN="${COMPOSE_BIN:-docker compose}"
+COMPOSE_POSTGRES_SERVICE="${COMPOSE_POSTGRES_SERVICE:-postgres}"
 
 # -----------------------------
 # Helper functions
@@ -26,13 +34,85 @@ JWT_SECRET="${JWT_SECRET:-changeme_super_secret}"
 log() { echo -e "\033[1;32m[$(date '+%Y-%m-%d %H:%M:%S')] $*\033[0m"; }
 error_exit() { echo -e "\033[1;31mERROR: $*\033[0m" >&2; exit 1; }
 
+ensure_apt_packages() {
+  local packages=(curl git nginx rsync ca-certificates lsb-release postgresql-client)
+  local missing=()
+  for pkg in "${packages[@]}"; do
+    dpkg -s "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
+  done
+  if (( ${#missing[@]} > 0 )); then
+    log "Installing system packages: ${missing[*]}..."
+    apt-get update
+    apt-get install -y "${missing[@]}"
+  fi
+}
+
+ensure_node() {
+  if command -v node >/dev/null 2>&1; then
+    return
+  fi
+  log "Installing Node.js 20.x..."
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+}
+
+ensure_pnpm() {
+  if command -v pnpm >/dev/null 2>&1; then
+    return
+  fi
+  if command -v corepack >/dev/null 2>&1; then
+    log "Activating pnpm via corepack..."
+    corepack enable
+    corepack prepare pnpm@9 --activate
+  else
+    log "Installing pnpm globally via npm..."
+    npm install -g pnpm@9
+  fi
+}
+
+bootstrap_dependencies() {
+  ensure_apt_packages
+  ensure_node
+  ensure_pnpm
+}
+
+wait_for_postgres() {
+  local retries=30
+  while (( retries > 0 )); do
+    if PGPASSWORD="$DB_PASSWORD" pg_isready -h "$DB_HOST_LOCAL" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; then
+      log "PostgreSQL is reachable at ${DB_HOST_LOCAL}:${DB_PORT}"
+      return 0
+    fi
+    sleep 2
+    retries=$((retries - 1))
+  done
+  return 1
+}
+
+ensure_postgres() {
+  if wait_for_postgres; then
+    return
+  fi
+
+  if command -v docker >/dev/null 2>&1; then
+    log "Attempting to start Postgres via docker compose..."
+    (cd "$REPO_DIR" && ${COMPOSE_BIN} up -d "$COMPOSE_POSTGRES_SERVICE") || error_exit "Failed to start Postgres service with docker compose."
+    if wait_for_postgres; then
+      return
+    fi
+  fi
+
+  error_exit "Postgres is not reachable at ${DB_HOST_LOCAL}:${DB_PORT}. Start the database service and rerun."
+}
+
 check_prereqs() {
-  command -v git >/dev/null      || error_exit "git not found"
-  command -v pnpm >/dev/null     || error_exit "pnpm not found"
-  command -v node >/dev/null     || error_exit "node not found"
-  command -v nginx >/dev/null    || error_exit "nginx not found"
-  command -v systemctl >/dev/null|| error_exit "systemctl not found"
-  [[ -d "$LE_CERT_PATH" ]]       || error_exit "Let's Encrypt cert path $LE_CERT_PATH missing"
+  command -v git >/dev/null       || error_exit "git not found"
+  command -v pnpm >/dev/null      || error_exit "pnpm not found"
+  command -v node >/dev/null      || error_exit "node not found"
+  command -v nginx >/dev/null     || error_exit "nginx not found"
+  command -v rsync >/dev/null     || error_exit "rsync not found"
+  command -v systemctl >/dev/null || error_exit "systemctl not found"
+  [[ -d "$LE_CERT_PATH" ]]        || error_exit "Let's Encrypt cert path $LE_CERT_PATH missing"
 }
 
 update_repo() {
@@ -45,6 +125,13 @@ update_repo() {
 install_deps() {
   log "Installing workspace dependencies..."
   pnpm install
+}
+
+generate_prisma_client() {
+  log "Running database migrations..."
+  DATABASE_URL="$DATABASE_URL" pnpm --filter @command-center/backend prisma:migrate
+  log "Generating Prisma client..."
+  DATABASE_URL="$DATABASE_URL" pnpm --filter @command-center/backend prisma:generate
 }
 
 build_backend() {
@@ -187,12 +274,16 @@ EOF
 # -----------------------------
 # Main
 # -----------------------------
+bootstrap_dependencies
 check_prereqs
 update_repo
 install_deps
+ensure_postgres
+generate_prisma_client
 build_backend
 write_backend_env
 deploy_backend_service
 build_frontend
 install_nginx_site
 print_post_deploy_checks
+
