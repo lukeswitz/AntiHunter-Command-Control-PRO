@@ -805,30 +805,21 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 
 ## Legal Disclaimer
 
-```
+AntiHunter Command & Control PRO (“Software”) is distributed for **lawful, authorized defensive use only**. You may operate this project solely on infrastructure, networks, devices, radio spectrum, and datasets that you own or for which you hold explicit, written permission to assess. By downloading, compiling, or executing the Software you agree to the following conditions:
 
-AntiHunter (AH) is provided for lawful, authorized use only-such as research, training, and security operations on systems and radio spectrum you own or have explicit written permission to assess. You are solely responsible for compliance with all applicable laws and policies, including privacy/data-protection (e.g., GDPR), radio/telecom regulations (LoRa ISM band limits, duty cycle), and export controls. Do not use AH to track, surveil, or target individuals, or to collect personal data without a valid legal basis and consent where required.
+- **Authorization & intent.** Use is limited to security research, blue-team training, regulatory-compliant monitoring, or other defensive activities. Offensive operations, targeted surveillance, harassment, or tracking of individuals without their informed consent are strictly prohibited.
+- **Telecommunications compliance.** You are responsible for abiding by every jurisdictional regulation governing radio frequency use (e.g., FCC/CE/Ofcom rules, LoRa/ISM duty-cycle limits, licensing conditions) and any import/export controls that apply to cryptography, telemetry, or spectrum-monitoring tools.
+- **Privacy & data protection.** Collect telemetry only with a lawful basis (GDPR, CCPA, ePrivacy, etc.). Obtain consent where required, minimize personal data, and apply retention/destruction schedules that match the applicable law. The maintainers do not process or host your data.
+- **Computer misuse laws.** Scanning or accessing third-party networks without permission may violate the Computer Fraud and Abuse Act, UK Computer Misuse Act, or similar laws. Always obtain written authorization before interfacing with systems you do not control.
+- **Export & sanctions.** You must ensure distribution and use complies with the U.S. EAR, EU dual-use regulations, local sanctions regimes, and any contractual restrictions. The maintainers do not grant export approvals.
+- **Operational safeguards.** Run the Software on hardened, access-controlled infrastructure. You are responsible for segregation of duties, credential management, and preventing unauthorized access to intercepted telemetry or command functions.
 
+### No Warranty / Limitation of Liability
 
+THE SOFTWARE IS PROVIDED “AS IS” AND “AS AVAILABLE,” WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, OR ACCURACY. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS, DEVELOPERS, MAINTAINERS, AND CONTRIBUTORS SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES (INCLUDING, WITHOUT LIMITATION, LOSS OF DATA, PROFITS, GOODWILL, OR BUSINESS INTERRUPTION) ARISING FROM OR RELATED TO YOUR USE OF THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. WHERE LIABILITY CANNOT BE FULLY DISCLAIMED, THE TOTAL AGGREGATE LIABILITY SHALL NOT EXCEED THE GREATER OF (A) THE AMOUNT PAID, IF ANY, FOR THE COPY OF THE SOFTWARE THAT GAVE RISE TO THE CLAIM OR (B) USD $0.
 
-Authors and contributors are not liable for misuse, damages, or legal consequences arising from use of this project. By using AHCC, you accept full responsibility for your actions and agree to indemnify the authors and contributors against any claims related to your use. These tools are designed for ethical blue team use, such as securing events, auditing networks, or training exercises. To implement in code, ensure compliance with local laws (e.g., FCC regulations on transmissions) and pair with a directional antenna for enhanced accuracy.
+### Responsibility for Compliance
 
+You alone are responsible for ensuring your deployment complies with all applicable laws, regulations, licenses, permits, organizational policies, and third-party rights. No advice or information, whether oral or written, obtained from the project or through the Software, creates any warranty or obligation not expressly stated in this disclaimer. Continued use signifies your agreement to indemnify and hold harmless the authors, developers, maintainers, and contributors from claims arising out of or related to your activities with the Software.
 
-
-THE SOFTWARE IN THIS REPOSITORY ("SOFTWARE") IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, OR RELIABILITY. TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE DEVELOPERS, MAINTAINERS, OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF OR OTHER DEALINGS IN THE SOFTWARE, INCLUDING WITHOUT LIMITATION ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR LOSS OF DATA, PROFITS, GOODWILL, OR BUSINESS INTERRUPTION, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-
-
-
-YOU ALONE ARE RESPONSIBLE FOR COMPLYING WITH ALL APPLICABLE LAWS, REGULATIONS, AND THIRD-PARTY RIGHTS. NO ADVICE OR INFORMATION, WHETHER ORAL OR WRITTEN, OBTAINED FROM THE PROJECT OR THROUGH THE SOFTWARE, CREATES ANY WARRANTY OR OBLIGATION NOT EXPRESSLY STATED HEREIN. IF APPLICABLE LAW DOES NOT ALLOW THE EXCLUSION OF CERTAIN WARRANTIES OR LIMITATION OF LIABILITY, THE DEVELOPERS', MAINTAINERS', AND CONTRIBUTORS' AGGREGATE LIABILITY SHALL NOT EXCEED THE GREATER OF: (A) THE AMOUNT YOU PAID (IF ANY) FOR THE COPY OF THE SOFTWARE THAT GAVE RISE TO THE CLAIM, OR (B) USD $0.
-
-
-
-NOTWITHSTANDING ANYTHING TO THE CONTRARY, THE PROJECT MAINTAINERS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM OR RELATED TO ANY THIRD-PARTY INTELLECTUAL PROPERTY CLAIMS, INCLUDING BUT NOT LIMITED TO ATTORNEYS' FEES, SETTLEMENT COSTS, OR INJUNCTIVE RELIEF.
-
-
-
-BY USING THIS SOFTWARE, YOU ACKNOWLEDGE THE INHERENT RISKS ASSOCIATED WITH INTELLECTUAL PROPERTY COMPLIANCE AND ASSUME FULL RESPONSIBILITY FOR ENSURING YOUR USE COMPLIES WITH ALL APPLICABLE LAWS AND THIRD-PARTY RIGHTS.
-
-
-
-```
+If you do not agree to these terms, **do not build, deploy, or run** AntiHunter Command & Control PRO.
