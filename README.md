@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="TopREADMElogo.png" alt="AntiHunter Command Center Logo" width="320" />
 </p>
 
@@ -203,7 +203,7 @@ Multi-site deployments share state through a single broker. All topics live unde
 | `ahcc/<siteId>/targets/upsert`   | publish + subscribe | Target lifecycle payloads (status, notes, tags, location, device metadata).                                                             |
 | `ahcc/<siteId>/targets/delete`   | publish + subscribe | `{ targetId }` payload notifying a target deletion.                                                                                     |
 | `ahcc/<siteId>/commands/events`  | publish + subscribe | Command lifecycle messages (`command.event`) so consoles stay aligned.                                                                  |
-| `ahcc/<siteId>/commands/request` | publish + subscribe | Remote command execution request for another site�s serial worker.                                                                      |
+| `ahcc/<siteId>/commands/request` | publish + subscribe | Remote command execution request for another site?s serial worker.                                                                      |
 | `ahcc/<siteId>/events/<type>`    | publish + subscribe | High-value broadcasts (`event.alert`, `event.target`, `command.ack`, `command.result`). `<type>` is sanitized (slashes/dots -> dashes). |
 
 All topics use QoS 1 by default (configurable per site). Publishers short-circuit when the `originSiteId` matches their own so messages are not looped. If additional replication streams are added, follow the `ahcc/<site>/<resource>/<action>` convention.
@@ -328,7 +328,7 @@ brew services start postgresql
    pnpm --filter @command-center/frontend dev
    ```
 
-6. **Configure serial** � list ports, then set Config ? Serial
+6. **Configure serial** ? list ports, then set Config ? Serial
 
    ```bash
    pnpm --filter @command-center/backend exec node -e "const { SerialPortStream } = require('@serialport/stream'); SerialPortStream.list().then(list => console.log(list));"
@@ -863,6 +863,16 @@ Serve `apps/frontend/dist` with your preferred static host (Nginx, S3, etc.) and
    - `git pull`, `pnpm install`, `prisma migrate deploy`, rebuild bundles, restart services.
    - See [Updating an Existing Deployment](#updating-an-existing-deployment) and [Troubleshooting](#troubleshooting) for migration recovery steps (P1000/P3009/P3018).
 
+### Automated Deployment Script
+
+For an all-in-one rollout, adjust `scripts/deploy-nginx-backend.sh` and run it with sudo. The script pulls the latest code, builds backend and frontend, writes the backend `.env`, (re)creates the systemd service, installs an HTTPS Nginx site, and reloads everything.
+
+```bash
+sudo scripts/deploy-nginx-backend.sh
+```
+
+Review the variables at the top of the script (`REPO_DIR`, `DOMAIN`, certificate paths, database URL, etc.) before executing. The script prints post-deploy health checks you can curl to confirm the stack is healthy.
+
 
 ## Serial Hardware & Meshtastic Sniffer
 
@@ -953,7 +963,7 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 
 ## Legal Disclaimer
 
-AntiHunter Command & Control PRO (�Software�) is distributed for **lawful, authorized defensive use only**. You may operate this project solely on infrastructure, networks, devices, radio spectrum, and datasets that you own or for which you hold explicit, written permission to assess. By downloading, compiling, or executing the Software you agree to the following conditions:
+AntiHunter Command & Control PRO (?Software?) is distributed for **lawful, authorized defensive use only**. You may operate this project solely on infrastructure, networks, devices, radio spectrum, and datasets that you own or for which you hold explicit, written permission to assess. By downloading, compiling, or executing the Software you agree to the following conditions:
 
 - **Authorization & intent.** Use is limited to security research, blue-team training, regulatory-compliant monitoring, or other defensive activities. Offensive operations, targeted surveillance, harassment, or tracking of individuals without their informed consent are strictly prohibited.
 - **Telecommunications compliance.** You are responsible for abiding by every jurisdictional regulation governing radio frequency use (e.g., FCC/CE/Ofcom rules, LoRa/ISM duty-cycle limits, licensing conditions) and any import/export controls that apply to cryptography, telemetry, or spectrum-monitoring tools.
@@ -965,13 +975,14 @@ AntiHunter Command & Control PRO (�Software�) is distributed for **lawful, a
 
 ### No Warranty / Limitation of Liability
 
-THE SOFTWARE IS PROVIDED �AS IS� AND �AS AVAILABLE,� WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, OR ACCURACY. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS, DEVELOPERS, MAINTAINERS, AND CONTRIBUTORS SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES (INCLUDING, WITHOUT LIMITATION, LOSS OF DATA, PROFITS, GOODWILL, OR BUSINESS INTERRUPTION) ARISING FROM OR RELATED TO YOUR USE OF THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. WHERE LIABILITY CANNOT BE FULLY DISCLAIMED, THE TOTAL AGGREGATE LIABILITY SHALL NOT EXCEED THE GREATER OF (A) THE AMOUNT PAID, IF ANY, FOR THE COPY OF THE SOFTWARE THAT GAVE RISE TO THE CLAIM OR (B) USD $0.
+THE SOFTWARE IS PROVIDED ?AS IS? AND ?AS AVAILABLE,? WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, OR ACCURACY. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS, DEVELOPERS, MAINTAINERS, AND CONTRIBUTORS SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES (INCLUDING, WITHOUT LIMITATION, LOSS OF DATA, PROFITS, GOODWILL, OR BUSINESS INTERRUPTION) ARISING FROM OR RELATED TO YOUR USE OF THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. WHERE LIABILITY CANNOT BE FULLY DISCLAIMED, THE TOTAL AGGREGATE LIABILITY SHALL NOT EXCEED THE GREATER OF (A) THE AMOUNT PAID, IF ANY, FOR THE COPY OF THE SOFTWARE THAT GAVE RISE TO THE CLAIM OR (B) USD $0.
 
 ### Responsibility for Compliance
 
 You alone are responsible for ensuring your deployment complies with all applicable laws, regulations, licenses, permits, organizational policies, and third-party rights. No advice or information, whether oral or written, obtained from the project or through the Software, creates any warranty or obligation not expressly stated in this disclaimer. Continued use signifies your agreement to indemnify and hold harmless the authors, developers, maintainers, and contributors from claims arising out of or related to your activities with the Software.
 
 If you do not agree to these terms, **do not build, deploy, or run** AntiHunter Command & Control PRO.
+
 
 
 
