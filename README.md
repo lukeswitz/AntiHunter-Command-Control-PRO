@@ -572,6 +572,38 @@ Prefer a single command? From the repo root run `pnpm AHCC` to start both worksp
 
 The Vite dev server proxies `/api/*`, `/healthz`, `/readyz`, `/metrics`, `/socket.io` back to the NestJS service so CORS is not a concern in development.
 
+### Updating an Existing Deployment
+
+When you already have AntiHunter Command & Control PRO running in a live environment, follow this checklist after pulling new commits:
+
+1. **Fetch latest code and dependencies**
+   ```bash
+   git pull origin main
+   pnpm install
+   ```
+2. **Apply database migrations** (required whenever new migrations exist).
+   ```bash
+   pnpm --filter @command-center/backend exec prisma migrate deploy
+   ```
+   - In containerized or managed environments, execute the same command inside the deployment target prior to restarting services.
+   - If the migration fails, resolve the database issue before proceeding; never run the backend against a partially migrated schema.
+3. **Rebuild backend and frontend bundles**
+   ```bash
+   pnpm --filter @command-center/backend build
+   pnpm --filter @command-center/frontend build
+   ```
+   Deploy the resulting artifacts (`apps/backend/dist`, `apps/frontend/dist`) or rebuild Docker images as needed.
+4. **Restart services** so the updated code is loaded (systemd, PM2, Docker Compose, Kubernetes, etc.).
+5. **Verify health**
+   - Backend: check `/healthz` and review logs for the latest migration status.
+   - Frontend: confirm the new build is served (version banner or build timestamp).
+   - Optional: run `pnpm lint` or smoke tests relevant to your environment.
+6. **Maintain rollback readiness**
+   - Back up the database before upgrading.
+   - If a release introduces issues you cannot fix quickly, restore the snapshot and redeploy the previous commit.
+
+> **Tip:** For multi-site or federated deployments, run the migration step once (against the shared database) before restarting each site. Keeping every instance on the same schema prevents replication drift.
+
 ## Running with Docker
 
 > Tested with Docker Engine 25+ and Compose V2. Make sure virtualization is enabled and (on Windows/macOS) that file sharing is configured for the repository folder.
