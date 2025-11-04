@@ -30,11 +30,12 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
     - [Updating an Existing Deployment](#updating-an-existing-deployment)
 12. [Running with Docker](#running-with-docker)
 13. [Building for Production](#building-for-production)
-14. [Serial Hardware & Meshtastic Sniffer](#serial-hardware--meshtastic-sniffer)
-15. [Useful Scripts](#useful-scripts)
-16. [Operations & Maintenance](#operations--maintenance)
-17. [Troubleshooting](#troubleshooting)
-18. [Legal Disclaimer](#legal-disclaimer)
+14. [Production Deployment](#production-deployment)
+15. [Serial Hardware & Meshtastic Sniffer](#serial-hardware--meshtastic-sniffer)
+16. [Useful Scripts](#useful-scripts)
+17. [Operations & Maintenance](#operations--maintenance)
+18. [Troubleshooting](#troubleshooting)
+19. [Legal Disclaimer](#legal-disclaimer)
 
 ---
 
@@ -751,6 +752,57 @@ pnpm build
 ```
 
 Serve `apps/frontend/dist` with your preferred static host (Nginx, S3, etc.) and run `node dist/main.js` for the backend (or deploy via PM2/systemd).
+## Production Deployment
+
+1. **Provision infrastructure**
+   - PostgreSQL 15+ (managed or self-hosted). Create the `command_center` database and record the connection string.
+   - Hosts or containers for the NestJS backend (Node.js 20+) and the React/Vite frontend (served as static files via Nginx/CDN/etc.).
+   - Optional reverse proxy, TLS certificates, logging/monitoring stack.
+
+2. **Configure environment**
+   - Backend `.env` (or service variables) must define at least:
+     ```bash
+     NODE_ENV=production
+     PORT=3000
+     DATABASE_URL=postgresql://command_center:command_center@postgres:5432/command_center
+     JWT_SECRET=change_me_to_a_random_value
+     ALLOW_FOREVER=false
+     ALLOW_ERASE_FORCE=false
+     ```
+   - Add mail, MQTT, TAK, and serial settings as needed. The sample `.env.example` documents every flag.
+   - Frontend builds read `VITE_BACKEND_URL` (defaults to `/api`). Adjust if you host the API under a different base path.
+
+3. **Apply database migrations**
+   ```bash
+   pnpm --filter @command-center/backend exec prisma migrate deploy
+   ```
+   (In Docker use `docker compose run --rm --no-deps backend ...`.)
+
+4. **Seed defaults (optional)**
+   Run this once per environment to create the initial admin and config rows:
+   ```bash
+   pnpm --filter @command-center/backend prisma:seed
+   ```
+   Inside Docker, install backend dev dependencies first (see the note under [Useful Scripts](#useful-scripts)).
+
+5. **Build backend and frontend artifacts**
+   ```bash
+   pnpm --filter @command-center/backend build
+   pnpm --filter @command-center/frontend build
+   ```
+
+6. **Deploy**
+   - Serve `apps/frontend/dist` with your preferred static host or CDN.
+   - Run `node dist/main.js` (or a Docker/Kubernetes equivalent) for the backend under a supervisor (systemd, PM2, etc.) and expose port 3000 or proxy it behind TLS.
+
+7. **Harden and monitor**
+   - Enforce HTTPS, rate limiting, firewall rules, and logging/metrics.
+   - Configure the in-app Firewall module (default policy, geo blocking, brute-force thresholds) and enable 2FA for privileged accounts.
+
+8. **Upgrade cycle**
+   - `git pull`, `pnpm install`, `prisma migrate deploy`, rebuild bundles, restart services.
+   - See [Updating an Existing Deployment](#updating-an-existing-deployment) and [Troubleshooting](#troubleshooting) for migration recovery steps (P1000/P3009/P3018).
+
 
 ## Serial Hardware & Meshtastic Sniffer
 
@@ -859,3 +911,4 @@ THE SOFTWARE IS PROVIDED “AS IS” AND “AS AVAILABLE,” WITHOUT WARRANTY OF
 You alone are responsible for ensuring your deployment complies with all applicable laws, regulations, licenses, permits, organizational policies, and third-party rights. No advice or information, whether oral or written, obtained from the project or through the Software, creates any warranty or obligation not expressly stated in this disclaimer. Continued use signifies your agreement to indemnify and hold harmless the authors, developers, maintainers, and contributors from claims arising out of or related to your activities with the Software.
 
 If you do not agree to these terms, **do not build, deploy, or run** AntiHunter Command & Control PRO.
+
