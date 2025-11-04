@@ -1,11 +1,14 @@
 export const LEGAL_DISCLAIMER = `
-By accessing and using the AntiHunter Command & Control Platform (the "Software") you acknowledge and agree to the following:
+AntiHunter Command & Control PRO ("Software") is distributed for lawful, authorized defensive use only. You may operate this project solely on infrastructure, networks, devices, radio spectrum, and datasets that you own or for which you hold explicit, written permission to assess. By continuing you acknowledge and agree to the following obligations:
 
-1. Authorized Use Only. You are granted access solely for authorized defensive, security, or testing operations that comply with all applicable laws and regulations.
-2. Compliance Obligations. You are responsible for obtaining any approvals, consents, or licenses required to monitor or interact with the networks and devices under your control. Unauthorized monitoring or interference with third-party systems is prohibited.
-3. Logging and Auditing. Your activities may be logged and audited. You consent to the capture and retention of operational and security telemetry for compliance purposes.
-4. No Warranty. The Software is provided "as is" without warranties of any kind. You assume all risks arising from its deployment, including any unintended network or device impact.
-5. Indemnification. You agree to indemnify and hold harmless the Software authors and operators against any claims or damages arising from your misuse or unauthorized actions.
+1. Authorization & intent. Use is limited to security research, blue-team training, regulatory-compliant monitoring, or other defensive activities. Offensive operations, targeted surveillance, harassment, or tracking of individuals without informed consent are strictly prohibited.
+2. Telecommunications compliance. You are responsible for complying with every jurisdictional regulation governing radio frequency use (e.g., FCC/CE/Ofcom rules, LoRa/ISM duty-cycle limits, licensing conditions) and any import/export controls that apply to cryptography, telemetry, or spectrum-monitoring tools.
+3. Privacy & data protection. Collect telemetry only with a lawful basis (GDPR, CCPA, ePrivacy, etc.). Obtain consent where required, minimize personal data, and implement data-retention/destruction schedules that satisfy the applicable laws. The maintainers do not process or host your data.
+4. Computer misuse laws. Scanning or accessing third-party networks without permission may violate the Computer Fraud and Abuse Act, UK Computer Misuse Act, or similar laws. You must secure explicit written authorization before interfacing with systems you do not control.
+5. Export, sanctions, and operational safeguards. Ensure your deployment complies with export controls, sanctions regimes, and organizational security policies. Run the Software on hardened, access-controlled infrastructure and prevent unauthorized access to intercepted telemetry or command functions.
+6. Forks and modifications. If you fork, redistribute, or modify the Software, you alone are responsible for supporting your derivative work. The original authors and contributors are not liable for defects or legal issues introduced by third-party changes, packaging, or integrations.
 
-By checking the acknowledgement box you certify that you have read, understood, and agree to abide by the terms above. If you do not agree, you must discontinue use immediately.
+NO WARRANTY / LIMITATION OF LIABILITY: THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY OF ANY KIND. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS, DEVELOPERS, MAINTAINERS, AND CONTRIBUTORS ARE NOT LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES (INCLUDING LOSS OF DATA, PROFITS, GOODWILL, OR BUSINESS INTERRUPTION) ARISING FROM OR RELATED TO YOUR USE OF THE SOFTWARE. WHERE LIABILITY CANNOT BE WAIVED, THE TOTAL AGGREGATE LIABILITY SHALL NOT EXCEED THE GREATER OF (A) THE AMOUNT PAID, IF ANY, FOR THE COPY OF THE SOFTWARE THAT GAVE RISE TO THE CLAIM OR (B) USD $0.
+
+By checking the acknowledgement box you confirm that you have read, understood, and agree to be bound by these terms. If you do not agree, you must discontinue use immediately.
 `.trim();
