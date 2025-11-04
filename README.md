@@ -17,38 +17,24 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
 ## Table of Contents
 
 1. [Overview](#overview)
-
 2. [Feature Highlights](#feature-highlights)
-
-3. [Architecture](#architecture)
-
-4. [Repository Layout](#repository-layout)
-
-5. [Prerequisites](#prerequisites)
-
-6. [Platform Setup](#platform-setup)
-
-7. [Installation](#installation)
-
-8. [Configuration](#configuration)
-
-9. [Database & Migrations](#database--migrations)
-
-10. [Running the Stack](#running-the-stack)
-
-11. [Running with Docker](#running-with-docker)
-
-12. [Building for Production](#building-for-production)
-
-13. [Serial Hardware & Meshtastic Sniffer](#serial-hardware--meshtastic-sniffer)
-
-14. [Useful Scripts](#useful-scripts)
-
-15. [Operations & Maintenance](#operations--maintenance)
-
-16. [Troubleshooting](#troubleshooting)
-
-17. [Legal Disclaimer](#legal-disclaimer)
+3. [UI Modules at a Glance](#ui-modules-at-a-glance)
+4. [Architecture](#architecture)
+5. [Repository Layout](#repository-layout)
+6. [Prerequisites](#prerequisites)
+7. [Platform Setup](#platform-setup)
+8. [Installation](#installation)
+9. [Configuration](#configuration)
+10. [Database & Migrations](#database--migrations)
+11. [Running the Stack](#running-the-stack)
+    - [Updating an Existing Deployment](#updating-an-existing-deployment)
+12. [Running with Docker](#running-with-docker)
+13. [Building for Production](#building-for-production)
+14. [Serial Hardware & Meshtastic Sniffer](#serial-hardware--meshtastic-sniffer)
+15. [Useful Scripts](#useful-scripts)
+16. [Operations & Maintenance](#operations--maintenance)
+17. [Troubleshooting](#troubleshooting)
+18. [Legal Disclaimer](#legal-disclaimer)
 
 ---
 
