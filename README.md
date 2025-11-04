@@ -142,9 +142,7 @@ Manage your profile, theme preferences, and admin-level user management tasks.
 
 ## Architecture
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/TheRealSirHaXalot/AntiHunter-Command-Control-PRO/main/images/architecture-overview.svg" alt="AntiHunter multi-site architecture" width="820">
-</p>
+![AntiHunter multi-site architecture](images/architecture-overview.png)
 
 ### System Overview
 
