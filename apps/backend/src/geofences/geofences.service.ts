@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AlarmLevel, Geofence, Prisma, Site } from '@prisma/client';
 import { Observable, Subject } from 'rxjs';
@@ -127,7 +122,8 @@ export class GeofencesService {
       throw new BadRequestException('polygon must contain at least 3 vertices');
     }
 
-    const siteId = dto.siteId && dto.siteId.trim().length > 0 ? dto.siteId.trim() : this.localSiteId;
+    const siteId =
+      dto.siteId && dto.siteId.trim().length > 0 ? dto.siteId.trim() : this.localSiteId;
     await this.ensureSiteRecord(siteId);
 
     const alarmConfig = dto.alarm;
@@ -178,7 +174,8 @@ export class GeofencesService {
       data.color = dto.color;
     }
     if (dto.siteId !== undefined) {
-      const siteId = dto.siteId && dto.siteId.trim().length > 0 ? dto.siteId.trim() : this.localSiteId;
+      const siteId =
+        dto.siteId && dto.siteId.trim().length > 0 ? dto.siteId.trim() : this.localSiteId;
       data.siteId = siteId;
       await this.ensureSiteRecord(siteId);
     }

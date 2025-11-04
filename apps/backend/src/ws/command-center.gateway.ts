@@ -24,8 +24,8 @@ import { AuthService } from '../auth/auth.service';
 import { CommandState, CommandsService } from '../commands/commands.service';
 import { SendCommandDto } from '../commands/dto/send-command.dto';
 import { EventBusService, CommandCenterEvent } from '../events/event-bus.service';
-import { NodesService } from '../nodes/nodes.service';
 import { GeofenceEvent, GeofenceResponse, GeofencesService } from '../geofences/geofences.service';
+import { NodesService } from '../nodes/nodes.service';
 
 @WebSocketGateway({
   namespace: '/ws',

@@ -1,14 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Prisma, Role, SiteAccessLevel } from '@prisma/client';
 import * as argon2 from 'argon2';
-import * as jwt from 'jsonwebtoken';
 import { Request } from 'express';
+import * as jwt from 'jsonwebtoken';
 
 import { AuthTokenPayload } from './auth.types';
 import { LEGAL_DISCLAIMER } from './legal-disclaimer';
+import { FirewallService } from '../firewall/firewall.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DEFAULT_FEATURES_BY_ROLE } from '../users/user-permissions.constants';
-import { FirewallService } from '../firewall/firewall.service';
 
 interface PreferencesResponse {
   theme: string;

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { authenticator } from 'otplib';
 import * as crypto from 'crypto';
+import { authenticator } from 'otplib';
 
 import { PrismaService } from '../prisma/prisma.service';
 

@@ -45,11 +45,7 @@ export class FirewallController {
   }
 
   @Post('logs/:id/block')
-  blockFromLog(
-    @Req() req: Request,
-    @Param('id') id: string,
-    @Body() dto: BlockFirewallLogDto,
-  ) {
+  blockFromLog(@Req() req: Request, @Param('id') id: string, @Body() dto: BlockFirewallLogDto) {
     return this.firewallService.blockFromLog(id, dto, req.auth?.sub);
   }
 }

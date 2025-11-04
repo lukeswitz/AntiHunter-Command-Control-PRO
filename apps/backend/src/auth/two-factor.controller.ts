@@ -45,7 +45,10 @@ export class TwoFactorController {
     if (!dto.code && !dto.password) {
       throw new BadRequestException('Provide a current code or password to disable 2FA');
     }
-    await this.twoFactorService.disableTwoFactor(userId, { code: dto.code, password: dto.password });
+    await this.twoFactorService.disableTwoFactor(userId, {
+      code: dto.code,
+      password: dto.password,
+    });
     const user = await this.authService.getUserById(userId);
     return { user };
   }
@@ -99,4 +102,3 @@ export class TwoFactorController {
     }
   }
 }
-

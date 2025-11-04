@@ -8,7 +8,7 @@ export class GeofenceAlarmConfigDto {
 
   @IsString()
   @IsIn(ALARM_LEVELS)
-  level!: typeof ALARM_LEVELS[number];
+  level!: (typeof ALARM_LEVELS)[number];
 
   @IsString()
   @MinLength(1)

@@ -10,6 +10,9 @@ import configuration from './config/configuration';
 import { validateEnvironment } from './config/environment.validation';
 import { EventsModule } from './events/events.module';
 import { ExportsModule } from './exports/exports.module';
+import { FirewallMiddleware } from './firewall/firewall.middleware';
+import { FirewallModule } from './firewall/firewall.module';
+import { GeofencesModule } from './geofences/geofences.module';
 import { HealthModule } from './health/health.module';
 import { IngestModule } from './ingest/ingest.module';
 import { InventoryModule } from './inventory/inventory.module';
@@ -24,9 +27,6 @@ import { TakModule } from './tak/tak.module';
 import { TargetsModule } from './targets/targets.module';
 import { UsersModule } from './users/users.module';
 import { WsModule } from './ws/ws.module';
-import { GeofencesModule } from './geofences/geofences.module';
-import { FirewallModule } from './firewall/firewall.module';
-import { FirewallMiddleware } from './firewall/firewall.middleware';
 
 @Module({
   imports: [

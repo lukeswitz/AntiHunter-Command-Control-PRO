@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   FirewallConfig,
@@ -27,7 +23,6 @@ import {
   FirewallRuleResponse,
 } from './firewall.types';
 import { PrismaService } from '../prisma/prisma.service';
-
 
 interface AuthFailureState {
   count: number;
@@ -569,7 +564,7 @@ export class FirewallService {
     };
   }
 
-  private mapLog(log: Prisma.FirewallLogGetPayload<{}>): FirewallLogResponse {
+  private mapLog(log: Prisma.FirewallLogGetPayload<Record<string, never>>): FirewallLogResponse {
     return {
       id: log.id,
       ip: log.ip,
