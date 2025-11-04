@@ -142,14 +142,43 @@ Manage your profile, theme preferences, and admin-level user management tasks.
 
 ## Architecture
 
-| Layer        | Technology                                              | Notes                                                              |
-| ------------ | ------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Backend**  | NestJS, Prisma, Socket.IO                               | REST + WS APIs, serial ingest worker, command queue, alarm service |
-| **Database** | PostgreSQL                                              | Prisma migrations, seeds for singleton config tables, audit trail  |
-| **Frontend** | React (Vite), Zustand, React Query, Leaflet (map)       | SPA with map, targets, inventory, console, config modules          |
-| **Tooling**  | pnpm workspace, TypeScript strict mode, ESLint/Prettier | developer experience, linting, formatting                          |
+<p align="center">
+  <img src="images/architecture-overview.svg" alt="AntiHunter multi-site architecture" width="820">
+</p>
 
-Data flows from serial workers -> Prisma (nodes/device tables) -> WS events -> Zustand stores -> React components. Commands and alarms run in the opposite direction, bubbling from the UI down to the serial layer.
+### System Overview
+
+| Layer        | Technology stack                                       | Role in the platform                                                                                 |
+| ------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| **Detection**| AntiHunter mesh nodes (LoRa / Meshtastic payloads)     | Collects RF/BLE telemetry, vibration alerts, experimental RADAR/SIGINT streams                       |
+| **Edge C2**  | NestJS workers + Serial service + Gateway bridge       | Parses frames, normalises events, persists data, and originates outbound commands                    |
+| **Core C2**  | NestJS REST/WS API, Socket.IO, Prisma on PostgreSQL    | Surfaces APIs, websockets, scheduler, alarms, audit logging, command lifecycle tracking              |
+| **Federation**| MQTT v3.1+ broker (QoS 1) & TAK/CoT bridge            | Shares node/device/command deltas across sites and publishes CoT feeds to TAK clients                |
+| **Frontend** | React (Vite), React Query, Zustand, Leaflet, Tailwind  | SPA with map, console, inventory, targets, configuration, scheduling, and admin consoles             |
+| **Tooling**  | pnpm workspaces, TypeScript strict mode, ESLint, Prettier | Developer experience, linting, formatting, and shared config across apps                           |
+
+Each deployment runs its site-local C2 server and still functions if federation links are unavailable. The backend persists node, target, inventory, alarm, and audit records via Prisma/PostgreSQL. Socket.IO pushes live updates into Zustand stores so React screens stay real-time.
+
+### Security & Protocols
+
+| Surface              | Protocols & safeguards                                                                                                                |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| **Device ingest**    | Serial (USB/UART) ➜ Meshtastic JSON/CBOR frames; optional signed frame validation; port selection locked behind RBAC.                 |
+| **C2 API**           | HTTPS (configurable TLS certificates) + JWT auth; REST/WS share the same bearer token; role-aware guards on every controller.         |
+| **Federation**       | MQTT (mqtt://, mqtts://, ws://, wss://) with per-site client IDs, QoS 1, optional mutual TLS (CA/cert/key). Topics namespaced `ahcc/`.|
+| **Operator UI**      | HTTPS SPA; per-user preferences (theme, time format) stored server-side; alarm sounds served via signed URLs.                         |
+| **TAK Integration**  | Cursor-on-Target over TCP/UDP/HTTPS; selectable streams (nodes, alerts, targets, command ACKs); optional TLS and username/password.   |
+| **Auditing**         | Every command, config change, and RBAC update persisted in the `AuditLog`; paired with per-command `CommandLog` lifecycle.            |
+
+Secrets such as MQTT credentials, TLS PEMs, TAK API keys, and SMTP passwords are encrypted at rest in the database. Environment variables (`SITE_ID`, `JWT_SECRET`, `HTTPS_CERT_PATH`, etc.) govern bootstrapping.
+
+### Resilience & Fallback Paths
+
+* **Local-first operation:** Each site keeps its own PostgreSQL instance and continues ingesting/commanding nodes if the broker or WAN link fails. Federation queues simply back off until the connection returns.
+* **Command retry windows:** Serial sends use bounded retries with jittered backoff; failed ACKs surface as `ACK_TIMEOUT`/`RESULT_TIMEOUT` while the log entry persists for post-mortem review.
+* **Alarm durability:** Alerts are recorded and replayed on reconnect, so socket re-subscriptions restitch event history.
+* **Scheduler safeguard:** Work orders are stored in DB; missed executions (e.g., server restart) are re-evaluated on boot.
+* **Data exports:** Inventory, targets, and command logs can be exported (CSV/JSON/GeoJSON) to seed a fresh node if a site must be rebuilt.
 
 ### MQTT Topic Topology
 
