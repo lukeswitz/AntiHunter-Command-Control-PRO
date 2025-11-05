@@ -136,6 +136,8 @@ type FirewallUpdatePayload = Partial<{
   geoMode: FirewallGeoMode;
   allowedCountries: string[];
   blockedCountries: string[];
+  ipAllowList: string[];
+  ipBlockList: string[];
   failThreshold: number;
   failWindowSeconds: number;
   banDurationSeconds: number;
