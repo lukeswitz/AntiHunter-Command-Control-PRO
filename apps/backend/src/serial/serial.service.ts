@@ -1,5 +1,4 @@
 import { create, toBinary } from '@bufbuild/protobuf';
-import { Mesh, Portnums } from '@meshtastic/protobufs';
 import {
   BadRequestException,
   Injectable,
@@ -12,16 +11,17 @@ import type { AutoDetectTypes } from '@serialport/bindings-cpp';
 import * as SerialPortBindings from '@serialport/bindings-cpp';
 import { ReadlineParser } from '@serialport/parser-readline';
 import { SerialPortStream } from '@serialport/stream';
-import PQueue from 'p-queue';
 import { Observable, Subject } from 'rxjs';
 
-import { createParser, ProtocolKey } from './protocol-registry';
+import { createParser, ensureMeshtasticProtobufs, ProtocolKey } from './protocol-registry';
 import { DEFAULT_SERIAL_SITE_ID, SerialConfigService } from './serial-config.service';
 import { SERIAL_DELIMITER_CANDIDATES } from './serial.config.defaults';
 import { SerialParseResult, SerialProtocolParser } from './serial.types';
 import { buildCommandPayload } from '../commands/command-builder';
 
 const Binding = resolveBinding();
+type MeshProtoModule = typeof import('@meshtastic/protobufs');
+let meshProtoModulePromise: Promise<MeshProtoModule> | null = null;
 
 function resolveBinding(): AutoDetectTypes {
   const withNamedExport = (SerialPortBindings as { autoDetect?: () => AutoDetectTypes }).autoDetect;
@@ -35,6 +35,58 @@ function resolveBinding(): AutoDetectTypes {
   }
 
   throw new Error('No serialport binding available for the current platform');
+}
+
+class AsyncQueue {
+  private pending: Array<() => Promise<void>> = [];
+  private active = false;
+
+  add<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.pending.push(async () => {
+        try {
+          const result = await task();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      void this.process();
+    });
+  }
+
+  clear(): void {
+    this.pending = [];
+  }
+
+  private async process(): Promise<void> {
+    if (this.active) {
+      return;
+    }
+    this.active = true;
+    while (this.pending.length > 0) {
+      const next = this.pending.shift();
+      if (!next) {
+        continue;
+      }
+      try {
+        await next();
+      } catch {
+        // Individual task already rejected; continue processing the queue.
+      }
+    }
+    this.active = false;
+    if (this.pending.length > 0) {
+      void this.process();
+    }
+  }
+}
+
+async function loadMeshModule(): Promise<MeshProtoModule> {
+  if (!meshProtoModulePromise) {
+    meshProtoModulePromise = import('@meshtastic/protobufs');
+  }
+  return meshProtoModulePromise;
 }
 
 type SerialPortInfo = {
@@ -174,7 +226,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SerialService.name);
   private lastError?: string;
   private connectionOptions?: SerialConnectionOptions;
-  private readonly commandQueue = new PQueue({ concurrency: 1 });
+  private readonly commandQueue = new AsyncQueue();
   private readonly globalRate: RateCounter = { count: 0, resetAt: 0 };
   private readonly targetRates = new Map<string, RateCounter>();
   private readonly globalRateLimit: number;
@@ -439,6 +491,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    const { Mesh, Portnums } = await loadMeshModule();
+
     const channelConfig =
       this.configService.get<number>('serial.commandChannel') ??
       this.configService.get<number>('serial.sendChannel') ??
@@ -614,6 +668,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       this.port.once('error', handleError);
     });
 
+    if (options.protocol === 'meshtastic-like') {
+      await ensureMeshtasticProtobufs();
+    }
     this.protocolParser = createParser(options.protocol);
     this.protocolParser.reset();
 

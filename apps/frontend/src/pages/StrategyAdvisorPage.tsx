@@ -170,6 +170,14 @@ const STRATEGY_PRESETS: StrategyPreset[] = [
   },
 ] as const;
 
+const STRATEGY_PANELS = [
+  { id: 'plan', label: 'Plan', description: 'Presets & coverage tuning' },
+  { id: 'areas', label: 'Areas & Anchors', description: 'Geofences, anchors, obstacles' },
+  { id: 'summary', label: 'Summary', description: 'Totals & quick exports' },
+] as const;
+
+type StrategyPanelId = (typeof STRATEGY_PANELS)[number]['id'];
+
 interface AnchorPoint {
   id: string;
   name: string;
@@ -206,6 +214,7 @@ export function StrategyAdvisorPage() {
   const loadGeofences = useGeofenceStore((state) => state.loadGeofences);
 
   const [selectedGeofenceIds, setSelectedGeofenceIds] = useState<string[]>([]);
+  const [activePanel, setActivePanel] = useState<StrategyPanelId>('plan');
   const [activePresetId, setActivePresetId] = useState<string>(STRATEGY_PRESETS[0].id);
   const [profileId, setProfileId] = useState<NodeProfileId>(STRATEGY_PRESETS[0].profileId);
   const [radius, setRadius] = useState<number>(STRATEGY_PRESETS[0].radius ?? DEFAULT_RADIUS);
@@ -528,6 +537,9 @@ export function StrategyAdvisorPage() {
     setObstacleError(null);
   };
 
+  const panelClass = (...panels: StrategyPanelId[]) =>
+    panels.includes(activePanel) ? 'strategy-panel' : 'strategy-panel strategy-panel--hidden';
+
   const updateNodeOverride = (nodeId: string, changes: NodeOverride) => {
     const baseNode = baseNodeLookup.get(nodeId);
     if (!baseNode) {
@@ -811,392 +823,433 @@ ${nodesKml}
         </div>
       </header>
       <div className="strategy-layout">
-        <aside className="strategy-settings">
-          <div className="form-section">
-            <label className="form-label" htmlFor={presetSelectId}>
-              Scenario preset
-            </label>
-            <select
-              id={presetSelectId}
-              className="control-input"
-              value={activePresetId}
-              onChange={handlePresetChange}
-            >
-              {STRATEGY_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-              <option value={CUSTOM_PRESET_ID}>Custom (manual adjustments)</option>
-            </select>
-            <p className="form-hint">
-              Presets apply recommended radius, overlap, and offsets. Any manual change switches to
-              the “Custom” profile.
-            </p>
-            {activePresetId !== CUSTOM_PRESET_ID ? (
-              <p className="form-hint">
-                {STRATEGY_PRESETS.find((preset) => preset.id === activePresetId)?.description}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="form-section">
-            <label className="form-label" htmlFor={profileSelectId}>
-              Node profile
-            </label>
-            <select
-              id={profileSelectId}
-              className="control-input"
-              value={profileId}
-              onChange={handleProfileChange}
-            >
-              {NODE_PROFILES.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.label}
-                </option>
-              ))}
-            </select>
-            <p className="form-hint">{activeProfile.notes}</p>
-          </div>
-
-          <div className="form-section form-grid">
-            <div className="form-group">
-              <label className="form-label" htmlFor={radiusInputId}>
-                Coverage radius (m)
-              </label>
-              <input
-                id={radiusInputId}
-                className="control-input"
-                type="number"
-                min={1}
-                value={radius}
-                onChange={(event) => handleRadiusChange(Number(event.target.value))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor={overlapInputId}>
-                Overlap (m)
-              </label>
-              <input
-                id={overlapInputId}
-                className="control-input"
-                type="number"
-                min={0}
-                value={overlap}
-                onChange={(event) => handleOverlapChange(Number(event.target.value))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor={offsetInputId}>
-                Offset from boundary (m)
-              </label>
-              <input
-                id={offsetInputId}
-                className="control-input"
-                type="number"
-                value={offset}
-                onChange={(event) => handleOffsetChange(Number(event.target.value))}
-              />
-              <p className="form-hint">
-                Positive offsets push nodes outward; negative offsets pull nodes inward.
-              </p>
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor={maxAnchorInputId}>
-                Max backhaul distance (m)
-              </label>
-              <input
-                id={maxAnchorInputId}
-                className="control-input"
-                type="number"
-                min={0}
-                value={maxAnchorDistance ?? ''}
-                placeholder="Optional"
-                onChange={(event) => {
-                  const parsed = event.target.value.trim();
-                  handleMaxAnchorChange(parsed === '' ? undefined : Number(parsed));
-                }}
-              />
-              <p className="form-hint">
-                Leave blank to ignore distance checks. Nodes beyond this distance are flagged.
-              </p>
-            </div>
-          </div>
-
-          <div className="form-section">
-            <span className="form-label" id={geofenceCheckboxGroupId}>
-              Geofences to include
-            </span>
-            <div
-              className="geofence-checkboxes"
-              role="group"
-              aria-labelledby={geofenceCheckboxGroupId}
-            >
-              {geofences.length === 0 ? (
-                <p className="form-hint">
-                  No geofences available. Create one on the Geofences page.
-                </p>
-              ) : (
-                geofences.map((geofence) => (
-                  <label key={geofence.id} className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={selectedGeofenceIds.includes(geofence.id)}
-                      onChange={(event) => handleGeofenceToggle(geofence.id, event.target.checked)}
-                    />
-                    <span>
-                      {geofence.name}{' '}
-                      <span className="muted">
-                        ({geofence.polygon ? `${geofence.polygon.length} vertices` : 'no polygon'})
-                      </span>
-                    </span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="form-section">
-            <div className="form-label">Backhaul anchors</div>
-            <p className="form-hint">
-              Anchors represent power or network drops. Nodes exceeding the max distance from the
-              nearest anchor are flagged for review.
-            </p>
-            <form className="anchor-form" onSubmit={handleAnchorAdd}>
-              <div className="anchor-grid">
-                <label className="form-label" htmlFor={anchorNameId}>
-                  Name
-                </label>
-                <input
-                  id={anchorNameId}
-                  name="name"
-                  className="control-input"
-                  value={anchorDraft.name}
-                  onChange={handleAnchorDraftChange}
-                  placeholder="Roof drop, mast, etc."
-                />
-                <label className="form-label" htmlFor={anchorLatId}>
-                  Latitude
-                </label>
-                <input
-                  id={anchorLatId}
-                  name="lat"
-                  className="control-input"
-                  value={anchorDraft.lat}
-                  onChange={handleAnchorDraftChange}
-                  placeholder="e.g. 40.7128"
-                />
-                <label className="form-label" htmlFor={anchorLonId}>
-                  Longitude
-                </label>
-                <input
-                  id={anchorLonId}
-                  name="lon"
-                  className="control-input"
-                  value={anchorDraft.lon}
-                  onChange={handleAnchorDraftChange}
-                  placeholder="e.g. -74.0060"
-                />
-              </div>
-              <div className="anchor-actions">
-                <button type="submit" className="control-chip">
-                  Add anchor
+        <aside className="strategy-menu-column">
+          <nav className="strategy-menu" aria-label="Strategy advisor sections">
+            {STRATEGY_PANELS.map((panel) => {
+              const isActive = panel.id === activePanel;
+              return (
+                <button
+                  key={panel.id}
+                  type="button"
+                  className={`strategy-menu__item${isActive ? ' is-active' : ''}`}
+                  aria-pressed={isActive}
+                  onClick={() => setActivePanel(panel.id)}
+                >
+                  <span className="strategy-menu__label">{panel.label}</span>
+                  <span className="strategy-menu__hint">{panel.description}</span>
                 </button>
-              </div>
-            </form>
-            {anchors.length > 0 ? (
-              <ul className="strategy-anchor-list">
-                {anchors.map((anchor) => (
-                  <li key={anchor.id}>
-                    <span>
-                      {anchor.name} - {anchor.lat.toFixed(5)}, {anchor.lon.toFixed(5)}
-                    </span>
-                    <button
-                      type="button"
-                      className="control-chip control-chip--danger"
-                      onClick={() => handleAnchorRemove(anchor.id)}
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-
-          <div className="form-section">
-            <label className="form-label" htmlFor={obstacleInputId}>
-              Obstruction GeoJSON (optional)
-            </label>
-            <input
-              id={obstacleInputId}
-              type="file"
-              accept="application/geo+json,application/json"
-              onChange={handleObstacleUpload}
-            />
-            {obstacleError ? (
-              <p className="form-error">{obstacleError}</p>
-            ) : (
-              <p className="form-hint">
-                Upload polygons representing no-go areas (buildings, water, etc.). Nodes close to or
-                within these areas are adjusted automatically.
-              </p>
-            )}
-            {avoidancePolygons.length > 0 ? (
-              <div className="strategy-obstacles__actions">
-                <span className="muted">{avoidancePolygons.length} exclusion zone(s) active.</span>
-                <button type="button" className="control-chip" onClick={handleObstacleClear}>
-                  Clear exclusions
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="strategy-summary">
-            <dl>
-              <div>
-                <dt>Perimeter</dt>
-                <dd>{strategy.perimeter.toFixed(1)} m</dd>
-              </div>
-              <div>
-                <dt>Nodes</dt>
-                <dd>{strategy.nodes.length}</dd>
-              </div>
-              <div>
-                <dt>Avg spacing</dt>
-                <dd>{strategy.spacing.toFixed(1)} m</dd>
-              </div>
-            </dl>
-          </div>
+              );
+            })}
+          </nav>
         </aside>
-        <div className="strategy-map">
-          <MapContainer
-            bounds={mapBounds}
-            boundsOptions={{ padding: [32, 32] }}
-            className="strategy-map__canvas"
-            scrollWheelZoom
-            preferCanvas
-          >
-            <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-            <MapBoundsUpdater bounds={mapBounds} enabled={selectedGeofences.length > 0} />
-            <SelectedNodeFocus node={selectedNode} />
-            {selectedGeofences.map((geofence) =>
-              geofence.polygon && geofence.polygon.length > 0 ? (
-                <Polygon
-                  key={geofence.id}
-                  positions={geofence.polygon.map((vertex) => [vertex.lat, vertex.lon])}
-                  pathOptions={{
-                    color: geofence.color ?? '#2563eb',
-                    weight: 3,
-                    fillOpacity: 0.05,
-                  }}
-                />
-              ) : null,
-            )}
-            {avoidancePolygons.map((polygon, index) => (
-              <Polygon
-                key={`obstacle-${index}`}
-                positions={polygon.map((vertex) => [vertex.lat, vertex.lon])}
-                pathOptions={{ color: '#dc2626', weight: 1, fillOpacity: 0.2, dashArray: '6 6' }}
-              />
-            ))}
-            {anchors.map((anchor) => (
-              <Marker key={anchor.id} position={[anchor.lat, anchor.lon]} icon={buildAnchorIcon()}>
-                <Tooltip direction="top" offset={[0, -12]} opacity={1} sticky>
-                  <strong>{anchor.name}</strong>
-                  <div>
-                    {anchor.lat.toFixed(5)}, {anchor.lon.toFixed(5)}
-                  </div>
-                </Tooltip>
-              </Marker>
-            ))}
-            {strategy.nodes.map((node) => (
-              <Marker
-                key={node.id}
-                position={[node.lat, node.lon]}
-                icon={buildStrategyIcon(node)}
-                eventHandlers={{
-                  click: () => handleSelectNode(node.id),
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -18]} opacity={1} sticky>
-                  <div>
-                    <strong>{node.id}</strong>
-                    <div>Profile: {node.profileId}</div>
-                    <div>Type: {node.type.toUpperCase()}</div>
-                    <div>Radius: {node.radius.toFixed(0)} m</div>
-                    <div>Angle: {node.arcWidth.toFixed(0)}&deg;</div>
-                    <div>Spacing: {node.spacing.toFixed(0)} m</div>
-                    {node.orientation != null ? (
-                      <div>Orientation: {node.orientation.toFixed(1)}&deg;</div>
-                    ) : null}
-                    {node.anchorDistance != null ? (
-                      <div>Anchor distance: {node.anchorDistance.toFixed(1)} m</div>
-                    ) : null}
-                    {node.flags.length > 0 ? <div>Flags: {node.flags.join(', ')}</div> : null}
-                  </div>
-                </Tooltip>
-              </Marker>
-            ))}
-            {strategy.nodes.map((node) => (
-              <Circle
-                key={`${node.id}-radius`}
-                center={[node.lat, node.lon]}
-                radius={node.radius}
-                pathOptions={{ color: '#2563eb', weight: 1, dashArray: '4 4' }}
-              />
-            ))}
-            {selectedNode ? (
-              <Circle
-                key={`${selectedNode.id}-focus`}
-                center={[selectedNode.lat, selectedNode.lon]}
-                radius={selectedNode.radius}
-                pathOptions={{
-                  color: '#facc15',
-                  weight: 3,
-                  dashArray: '2 6',
-                  opacity: 0.9,
-                }}
-              />
-            ) : null}
-            {strategy.nodes
-              .filter((node) => node.arcWidth < 360 && node.orientation != null)
-              .map((node) => {
-                const sector = createSectorPolygon(node);
-                const profile = PROFILE_BY_ID.get(node.profileId);
-                return sector.length > 0 ? (
+        <div className="strategy-content">
+          <div className="strategy-map">
+            <MapContainer
+              bounds={mapBounds}
+              boundsOptions={{ padding: [32, 32] }}
+              className="strategy-map__canvas"
+              scrollWheelZoom
+              preferCanvas
+            >
+              <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+              <MapBoundsUpdater bounds={mapBounds} enabled={selectedGeofences.length > 0} />
+              <SelectedNodeFocus node={selectedNode} />
+              {selectedGeofences.map((geofence) =>
+                geofence.polygon && geofence.polygon.length > 0 ? (
                   <Polygon
-                    key={`${node.id}-sector`}
-                    positions={sector}
+                    key={geofence.id}
+                    positions={geofence.polygon.map((vertex) => [vertex.lat, vertex.lon])}
                     pathOptions={{
-                      color: profile?.color ?? '#f97316',
-                      weight: 1,
-                      fillOpacity: 0.15,
+                      color: geofence.color ?? '#2563eb',
+                      weight: 3,
+                      fillOpacity: 0.05,
                     }}
                   />
-                ) : null;
-              })}
-            {strategy.nodes
-              .filter((node) => node.orientation != null)
-              .map((node) => {
-                const endPoint = projectInDirection(
-                  node.lat,
-                  node.lon,
-                  node.radius * 1.2,
-                  node.orientation!,
-                );
-                return (
-                  <Polyline
-                    key={`${node.id}-orientation`}
-                    positions={[[node.lat, node.lon], endPoint]}
-                    pathOptions={{ color: '#f97316', weight: 2 }}
+                ) : null,
+              )}
+              {avoidancePolygons.map((polygon, index) => (
+                <Polygon
+                  key={`obstacle-${index}`}
+                  positions={polygon.map((vertex) => [vertex.lat, vertex.lon])}
+                  pathOptions={{ color: '#dc2626', weight: 1, fillOpacity: 0.2, dashArray: '6 6' }}
+                />
+              ))}
+              {anchors.map((anchor) => (
+                <Marker
+                  key={anchor.id}
+                  position={[anchor.lat, anchor.lon]}
+                  icon={buildAnchorIcon()}
+                >
+                  <Tooltip direction="top" offset={[0, -12]} opacity={1} sticky>
+                    <strong>{anchor.name}</strong>
+                    <div>
+                      {anchor.lat.toFixed(5)}, {anchor.lon.toFixed(5)}
+                    </div>
+                  </Tooltip>
+                </Marker>
+              ))}
+              {strategy.nodes.map((node) => (
+                <Marker
+                  key={node.id}
+                  position={[node.lat, node.lon]}
+                  icon={buildStrategyIcon(node)}
+                  eventHandlers={{
+                    click: () => handleSelectNode(node.id),
+                  }}
+                >
+                  <Tooltip direction="top" offset={[0, -18]} opacity={1} sticky>
+                    <div>
+                      <strong>{node.id}</strong>
+                      <div>Profile: {node.profileId}</div>
+                      <div>Type: {node.type.toUpperCase()}</div>
+                      <div>Radius: {node.radius.toFixed(0)} m</div>
+                      <div>Angle: {node.arcWidth.toFixed(0)}&deg;</div>
+                      <div>Spacing: {node.spacing.toFixed(0)} m</div>
+                      {node.orientation != null ? (
+                        <div>Orientation: {node.orientation.toFixed(1)}&deg;</div>
+                      ) : null}
+                      {node.anchorDistance != null ? (
+                        <div>Anchor distance: {node.anchorDistance.toFixed(1)} m</div>
+                      ) : null}
+                      {node.flags.length > 0 ? <div>Flags: {node.flags.join(', ')}</div> : null}
+                    </div>
+                  </Tooltip>
+                </Marker>
+              ))}
+              {strategy.nodes.map((node) => (
+                <Circle
+                  key={`${node.id}-radius`}
+                  center={[node.lat, node.lon]}
+                  radius={node.radius}
+                  pathOptions={{ color: '#2563eb', weight: 1, dashArray: '4 4' }}
+                />
+              ))}
+              {selectedNode ? (
+                <Circle
+                  key={`${selectedNode.id}-focus`}
+                  center={[selectedNode.lat, selectedNode.lon]}
+                  radius={selectedNode.radius}
+                  pathOptions={{
+                    color: '#facc15',
+                    weight: 3,
+                    dashArray: '2 6',
+                    opacity: 0.9,
+                  }}
+                />
+              ) : null}
+              {strategy.nodes
+                .filter((node) => node.arcWidth < 360 && node.orientation != null)
+                .map((node) => {
+                  const sector = createSectorPolygon(node);
+                  const profile = PROFILE_BY_ID.get(node.profileId);
+                  return sector.length > 0 ? (
+                    <Polygon
+                      key={`${node.id}-sector`}
+                      positions={sector}
+                      pathOptions={{
+                        color: profile?.color ?? '#f97316',
+                        weight: 1,
+                        fillOpacity: 0.15,
+                      }}
+                    />
+                  ) : null;
+                })}
+              {strategy.nodes
+                .filter((node) => node.orientation != null)
+                .map((node) => {
+                  const endPoint = projectInDirection(
+                    node.lat,
+                    node.lon,
+                    node.radius * 1.2,
+                    node.orientation!,
+                  );
+                  return (
+                    <Polyline
+                      key={`${node.id}-orientation`}
+                      positions={[[node.lat, node.lon], endPoint]}
+                      pathOptions={{ color: '#f97316', weight: 2 }}
+                    />
+                  );
+                })}
+            </MapContainer>
+          </div>
+          <div className="strategy-panels">
+            <div className={panelClass('plan')}>
+              <div className="form-section">
+                <label className="form-label" htmlFor={presetSelectId}>
+                  Scenario preset
+                </label>
+                <select
+                  id={presetSelectId}
+                  className="control-input"
+                  value={activePresetId}
+                  onChange={handlePresetChange}
+                >
+                  {STRATEGY_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_PRESET_ID}>Custom (manual adjustments)</option>
+                </select>
+                <p className="form-hint">
+                  Presets apply recommended radius, overlap, and offsets. Any manual change switches
+                  to the Custom profile.
+                </p>
+                {activePresetId !== CUSTOM_PRESET_ID ? (
+                  <p className="form-hint">
+                    {STRATEGY_PRESETS.find((preset) => preset.id === activePresetId)?.description}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="form-section">
+                <label className="form-label" htmlFor={profileSelectId}>
+                  Node profile
+                </label>
+                <select
+                  id={profileSelectId}
+                  className="control-input"
+                  value={profileId}
+                  onChange={handleProfileChange}
+                >
+                  {NODE_PROFILES.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="form-hint">{activeProfile.notes}</p>
+              </div>
+
+              <div className="form-section form-grid">
+                <div className="form-group">
+                  <label className="form-label" htmlFor={radiusInputId}>
+                    Coverage radius (m)
+                  </label>
+                  <input
+                    id={radiusInputId}
+                    className="control-input"
+                    type="number"
+                    min={1}
+                    value={radius}
+                    onChange={(event) => handleRadiusChange(Number(event.target.value))}
                   />
-                );
-              })}
-          </MapContainer>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor={overlapInputId}>
+                    Overlap (m)
+                  </label>
+                  <input
+                    id={overlapInputId}
+                    className="control-input"
+                    type="number"
+                    min={0}
+                    value={overlap}
+                    onChange={(event) => handleOverlapChange(Number(event.target.value))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor={offsetInputId}>
+                    Offset from boundary (m)
+                  </label>
+                  <input
+                    id={offsetInputId}
+                    className="control-input"
+                    type="number"
+                    value={offset}
+                    onChange={(event) => handleOffsetChange(Number(event.target.value))}
+                  />
+                  <p className="form-hint">
+                    Positive offsets push nodes outward; negative offsets pull nodes inward.
+                  </p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor={maxAnchorInputId}>
+                    Max backhaul distance (m)
+                  </label>
+                  <input
+                    id={maxAnchorInputId}
+                    className="control-input"
+                    type="number"
+                    min={0}
+                    value={maxAnchorDistance ?? ''}
+                    placeholder="Optional"
+                    onChange={(event) => {
+                      const parsed = event.target.value.trim();
+                      handleMaxAnchorChange(parsed === '' ? undefined : Number(parsed));
+                    }}
+                  />
+                  <p className="form-hint">
+                    Leave blank to ignore distance checks. Nodes beyond this distance are flagged.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className={panelClass('areas')}>
+              <div className="form-section">
+                <span className="form-label" id={geofenceCheckboxGroupId}>
+                  Geofences to include
+                </span>
+                <div
+                  className="geofence-checkboxes"
+                  role="group"
+                  aria-labelledby={geofenceCheckboxGroupId}
+                >
+                  {geofences.length === 0 ? (
+                    <p className="form-hint">
+                      No geofences available. Create one on the Geofences page.
+                    </p>
+                  ) : (
+                    geofences.map((geofence) => (
+                      <label key={geofence.id} className="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={selectedGeofenceIds.includes(geofence.id)}
+                          onChange={(event) =>
+                            handleGeofenceToggle(geofence.id, event.target.checked)
+                          }
+                        />
+                        <span>
+                          {geofence.name}{' '}
+                          <span className="muted">
+                            (
+                            {geofence.polygon
+                              ? `${geofence.polygon.length} vertices`
+                              : 'no polygon'}
+                            )
+                          </span>
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-label">Backhaul anchors</div>
+                <p className="form-hint">
+                  Anchors represent power or network drops. Nodes exceeding the max distance from
+                  the nearest anchor are flagged for review.
+                </p>
+                <form className="anchor-form" onSubmit={handleAnchorAdd}>
+                  <div className="anchor-grid">
+                    <label className="form-label" htmlFor={anchorNameId}>
+                      Name
+                    </label>
+                    <input
+                      id={anchorNameId}
+                      name="name"
+                      className="control-input"
+                      value={anchorDraft.name}
+                      onChange={handleAnchorDraftChange}
+                      placeholder="Roof drop, mast, etc."
+                    />
+                    <label className="form-label" htmlFor={anchorLatId}>
+                      Latitude
+                    </label>
+                    <input
+                      id={anchorLatId}
+                      name="lat"
+                      className="control-input"
+                      value={anchorDraft.lat}
+                      onChange={handleAnchorDraftChange}
+                      placeholder="e.g. 40.7128"
+                    />
+                    <label className="form-label" htmlFor={anchorLonId}>
+                      Longitude
+                    </label>
+                    <input
+                      id={anchorLonId}
+                      name="lon"
+                      className="control-input"
+                      value={anchorDraft.lon}
+                      onChange={handleAnchorDraftChange}
+                      placeholder="e.g. -74.0060"
+                    />
+                  </div>
+                  <div className="anchor-actions">
+                    <button type="submit" className="control-chip">
+                      Add anchor
+                    </button>
+                  </div>
+                </form>
+                {anchors.length > 0 ? (
+                  <ul className="strategy-anchor-list">
+                    {anchors.map((anchor) => (
+                      <li key={anchor.id}>
+                        <span>
+                          {anchor.name} - {anchor.lat.toFixed(5)}, {anchor.lon.toFixed(5)}
+                        </span>
+                        <button
+                          type="button"
+                          className="control-chip control-chip--danger"
+                          onClick={() => handleAnchorRemove(anchor.id)}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+
+              <div className="form-section">
+                <label className="form-label" htmlFor={obstacleInputId}>
+                  Obstruction GeoJSON (optional)
+                </label>
+                <input
+                  id={obstacleInputId}
+                  type="file"
+                  accept="application/geo+json,application/json"
+                  onChange={handleObstacleUpload}
+                />
+                {obstacleError ? (
+                  <p className="form-error">{obstacleError}</p>
+                ) : (
+                  <p className="form-hint">
+                    Upload polygons representing no-go areas (buildings, water, etc.). Nodes close
+                    to or within these areas are adjusted automatically.
+                  </p>
+                )}
+                {avoidancePolygons.length > 0 ? (
+                  <div className="strategy-obstacles__actions">
+                    <span className="muted">
+                      {avoidancePolygons.length} exclusion zone(s) active.
+                    </span>
+                    <button type="button" className="control-chip" onClick={handleObstacleClear}>
+                      Clear exclusions
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className={panelClass('summary')}>
+              <div className="strategy-summary">
+                <dl>
+                  <div>
+                    <dt>Perimeter</dt>
+                    <dd>{strategy.perimeter.toFixed(1)} m</dd>
+                  </div>
+                  <div>
+                    <dt>Nodes</dt>
+                    <dd>{strategy.nodes.length}</dd>
+                  </div>
+                  <div>
+                    <dt>Avg spacing</dt>
+                    <dd>{strategy.spacing.toFixed(1)} m</dd>
+                  </div>
+                </dl>
+                <p className="form-hint">
+                  Use the export controls above to share the plan or load it into other tooling.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
       {selectedNode ? (
         <aside
           className="strategy-node-inspector"

@@ -499,6 +499,8 @@ model FirewallConfig {
   geoMode            FirewallGeoMode @default(DISABLED)
   allowedCountries   String[]        @default([])
   blockedCountries   String[]        @default([])
+  ipAllowList        String[]        @default([])
+  ipBlockList        String[]        @default([])
   failThreshold      Int             @default(5)
   failWindowSeconds  Int             @default(900)
   banDurationSeconds Int             @default(3600)

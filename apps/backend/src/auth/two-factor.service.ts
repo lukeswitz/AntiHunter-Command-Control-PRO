@@ -67,7 +67,7 @@ export class TwoFactorService {
     }
 
     const normalizedCode = this.normaliseCode(code);
-    const isValid = authenticator.check(normalizedCode, user.twoFactorTempSecret);
+    const isValid = this.isTotpValid(user.twoFactorTempSecret, normalizedCode);
     if (!isValid) {
       throw new BadRequestException('INVALID_TWO_FACTOR_CODE');
     }
@@ -202,7 +202,7 @@ export class TwoFactorService {
   ): Promise<VerificationKind | null> {
     const normalized = this.normaliseCode(code);
     const secret = this.decryptSecret(encryptedSecret);
-    if (authenticator.check(normalized, secret)) {
+    if (this.isTotpValid(secret, normalized)) {
       return 'totp';
     }
 
@@ -230,6 +230,21 @@ export class TwoFactorService {
     }
 
     return 'recovery';
+  }
+
+  private isTotpValid(secret: string, normalizedCode: string): boolean {
+    if (!secret || !normalizedCode) {
+      return false;
+    }
+    if (authenticator.check(normalizedCode, secret)) {
+      return true;
+    }
+    const relaxedWindow = Math.max(this.window, 1) + 1;
+    const originalOptions = authenticator.options;
+    authenticator.options = { ...originalOptions, window: relaxedWindow };
+    const result = authenticator.check(normalizedCode, secret);
+    authenticator.options = { ...originalOptions, window: this.window };
+    return result;
   }
 
   private async findMatchingRecoveryCodeIndex(hashes: string[], code: string): Promise<number> {

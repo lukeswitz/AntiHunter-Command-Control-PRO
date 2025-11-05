@@ -20,6 +20,7 @@ async function request<T>(input: RequestInfo | URL, options: RequestOptions = {}
   }
 
   const authToken = tokenOverride ?? (skipAuth ? null : getAuthToken());
+  const hasAuthToken = Boolean(authToken);
   if (authToken) {
     headers.Authorization = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
   }
@@ -36,7 +37,9 @@ async function request<T>(input: RequestInfo | URL, options: RequestOptions = {}
   });
 
   if (response.status === 401) {
-    forceLogout();
+    if (hasAuthToken) {
+      forceLogout();
+    }
     throw new Error('Unauthorized');
   }
 

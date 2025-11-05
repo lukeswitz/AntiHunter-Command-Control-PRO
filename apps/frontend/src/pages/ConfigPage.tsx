@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { apiClient } from '../api/client';
 import type {
@@ -16,6 +16,9 @@ import type {
   TakConfig,
   TakProtocol,
   RuntimeConfig,
+  FirewallOverview,
+  FirewallPolicy,
+  FirewallGeoMode,
 } from '../api/types';
 import { DEFAULT_ALERT_COLORS, extractAlertColors } from '../constants/alert-colors';
 import { useAlarm } from '../providers/alarm-provider';
@@ -114,6 +117,30 @@ const DEFAULT_ALARM_CONFIG: AlarmConfig = {
   backgroundAllowed: false,
 };
 
+interface FirewallFormState {
+  enabled: boolean;
+  defaultPolicy: FirewallPolicy;
+  geoMode: FirewallGeoMode;
+  allowedCountries: string;
+  blockedCountries: string;
+  ipAllowList: string;
+  ipBlockList: string;
+  failThreshold: string;
+  failWindowSeconds: string;
+  banDurationSeconds: string;
+}
+
+type FirewallUpdatePayload = Partial<{
+  enabled: boolean;
+  defaultPolicy: FirewallPolicy;
+  geoMode: FirewallGeoMode;
+  allowedCountries: string[];
+  blockedCountries: string[];
+  failThreshold: number;
+  failWindowSeconds: number;
+  banDurationSeconds: number;
+}>;
+
 type ConfigSectionId =
   | 'alarms'
   | 'mail'
@@ -125,13 +152,15 @@ type ConfigSectionId =
   | 'mqtt'
   | 'detection'
   | 'map'
-  | 'oui';
+  | 'oui'
+  | 'firewall';
 
 const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: string }> = [
   { id: 'alarms', label: 'Alarms', description: 'Audio profiles & cooldowns' },
   { id: 'mail', label: 'Mail Server', description: 'Outbound email delivery' },
   { id: 'security', label: 'Security Defaults', description: 'Authentication requirements' },
   { id: 'appearance', label: 'Alert Colors', description: 'Marker and alert styling' },
+  { id: 'firewall', label: 'Firewall', description: 'Geo/IP policies & lockouts' },
   { id: 'sites', label: 'Sites', description: 'Site names, regions, and colors' },
   { id: 'serial', label: 'Serial Connection', description: 'Device path and protocol' },
   { id: 'tak', label: 'TAK Bridge', description: 'Cursor-on-Target relay' },
@@ -190,6 +219,12 @@ export function ConfigPage() {
     staleTime: 60_000,
   });
 
+  const firewallOverviewQuery = useQuery({
+    queryKey: ['firewall', 'overview'],
+    queryFn: () => apiClient.get<FirewallOverview>('/config/firewall'),
+    staleTime: 60_000,
+  });
+
   const ouiStatsQuery = useQuery({
     queryKey: ['ouiStats'],
     queryFn: () => apiClient.get<{ total: number; lastUpdated?: string | null }>('/oui/stats'),
@@ -228,6 +263,10 @@ export function ConfigPage() {
     text: string;
   } | null>(null);
   const [takSendPayload, setTakSendPayload] = useState('');
+  const [firewallForm, setFirewallForm] = useState<FirewallFormState | null>(null);
+  const [firewallMessage, setFirewallMessage] = useState<string | null>(null);
+  const [firewallError, setFirewallError] = useState<string | null>(null);
+  const [firewallDirty, setFirewallDirty] = useState(false);
   const [activeSection, setActiveSection] = useState<ConfigSectionId>('alarms');
 
   const cardClass = (...sections: ConfigSectionId[]) =>
@@ -239,6 +278,9 @@ export function ConfigPage() {
     serialConfigQuery.data?.siteId ??
     null;
   const runtimeSiteLabel = runtimeSiteId ?? null;
+  const firewallStats = firewallOverviewQuery.data?.stats ?? null;
+  const firewallConfig = firewallOverviewQuery.data?.config ?? null;
+  const [firewallSaving, setFirewallSaving] = useState(false);
 
   useEffect(() => {
     if (alarmSettings?.config) {
@@ -315,6 +357,23 @@ export function ConfigPage() {
   }, [takConfigQuery.data]);
 
   useEffect(() => {
+    const config = firewallOverviewQuery.data?.config;
+    if (!config) {
+      if (!firewallOverviewQuery.isLoading) {
+        setFirewallForm(null);
+      }
+      return;
+    }
+    if (firewallDirty) {
+      return;
+    }
+    setFirewallForm(mapFirewallConfigToForm(config));
+    setFirewallMessage(null);
+    setFirewallError(null);
+    setFirewallDirty(false);
+  }, [firewallOverviewQuery.data?.config, firewallOverviewQuery.isLoading, firewallDirty]);
+
+  useEffect(() => {
     if (!configNotice) {
       return;
     }
@@ -387,6 +446,34 @@ export function ConfigPage() {
       const message =
         error instanceof Error ? error.message : 'Unable to update TAK configuration.';
       setTakNotice({ type: 'error', text: message });
+    },
+  });
+
+  const updateFirewallMutation = useMutation<
+    FirewallOverview['config'],
+    unknown,
+    FirewallUpdatePayload
+  >({
+    mutationFn: (payload) => apiClient.put<FirewallOverview['config']>('/config/firewall', payload),
+    onMutate: () => {
+      setFirewallError(null);
+      setFirewallMessage(null);
+      setFirewallSaving(true);
+    },
+    onSuccess: (config) => {
+      queryClient.setQueryData<FirewallOverview>(['firewall', 'overview'], (previous) =>
+        previous ? { ...previous, config } : previous,
+      );
+      setFirewallForm(mapFirewallConfigToForm(config));
+      setFirewallDirty(false);
+      setFirewallMessage('Firewall settings updated.');
+      setFirewallSaving(false);
+    },
+    onError: (error) => {
+      setFirewallError(
+        error instanceof Error ? error.message : 'Unable to update firewall settings.',
+      );
+      setFirewallSaving(false);
     },
   });
 
@@ -679,6 +766,64 @@ export function ConfigPage() {
         },
       },
     );
+  };
+
+  const handleFirewallFieldChange = <K extends keyof FirewallFormState>(
+    key: K,
+    value: FirewallFormState[K],
+  ) => {
+    setFirewallForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setFirewallDirty(true);
+    setFirewallMessage(null);
+    setFirewallError(null);
+  };
+
+  const handleFirewallSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!firewallForm) {
+      return;
+    }
+    const allowed = parseCountryList(firewallForm.allowedCountries);
+    const blocked = parseCountryList(firewallForm.blockedCountries);
+    const ipAllow = parseLineList(firewallForm.ipAllowList);
+    const ipBlock = parseLineList(firewallForm.ipBlockList);
+    const failThreshold = Number(firewallForm.failThreshold);
+    const failWindowSeconds = Number(firewallForm.failWindowSeconds);
+    const banDurationSeconds = Number(firewallForm.banDurationSeconds);
+
+    if (!Number.isFinite(failThreshold) || failThreshold < 1 || failThreshold > 100) {
+      setFirewallError('Fail threshold must be between 1 and 100 attempts.');
+      return;
+    }
+    if (
+      !Number.isFinite(failWindowSeconds) ||
+      failWindowSeconds < 30 ||
+      failWindowSeconds > 86_400
+    ) {
+      setFirewallError('Failure window must be between 30 and 86,400 seconds.');
+      return;
+    }
+    if (
+      !Number.isFinite(banDurationSeconds) ||
+      banDurationSeconds < 60 ||
+      banDurationSeconds > 604_800
+    ) {
+      setFirewallError('Ban duration must be between 60 and 604,800 seconds.');
+      return;
+    }
+
+    updateFirewallMutation.mutate({
+      enabled: firewallForm.enabled,
+      defaultPolicy: firewallForm.defaultPolicy,
+      geoMode: firewallForm.geoMode,
+      allowedCountries: allowed,
+      blockedCountries: blocked,
+      ipAllowList: ipAllow,
+      ipBlockList: ipBlock,
+      failThreshold: Math.round(failThreshold),
+      failWindowSeconds: Math.round(failWindowSeconds),
+      banDurationSeconds: Math.round(banDurationSeconds),
+    });
   };
 
   const updateSiteSetting = (siteId: string, patch: Partial<SiteSummary>) => {
@@ -1276,6 +1421,226 @@ export function ConfigPage() {
                     );
                   })}
                 </div>
+              </div>
+            </section>
+
+            <section className={cardClass('firewall')}>
+              <header>
+                <h2>Firewall</h2>
+                <p>Control geo filtering, login lockouts, and manual block rules.</p>
+              </header>
+              <div className="config-card__body">
+                {firewallOverviewQuery.isLoading && !firewallForm ? (
+                  <p className="form-hint">Loading firewall configuration…</p>
+                ) : firewallForm ? (
+                  <>
+                    <form className="config-form" onSubmit={handleFirewallSubmit}>
+                      <div className="config-row">
+                        <span className="config-label">Status</span>
+                        <label className="switch">
+                          <input
+                            type="checkbox"
+                            checked={firewallForm.enabled}
+                            onChange={(event) =>
+                              handleFirewallFieldChange('enabled', event.target.checked)
+                            }
+                          />
+                          <span>{firewallForm.enabled ? 'Enabled' : 'Disabled'}</span>
+                        </label>
+                        <span className="field-hint">
+                          When disabled, all firewall rules and geo checks are bypassed.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">Default policy</span>
+                        <select
+                          value={firewallForm.defaultPolicy}
+                          onChange={(event) =>
+                            handleFirewallFieldChange(
+                              'defaultPolicy',
+                              event.target.value as FirewallPolicy,
+                            )
+                          }
+                        >
+                          <option value="ALLOW">Allow</option>
+                          <option value="DENY">Deny</option>
+                        </select>
+                        <span className="field-hint">
+                          Deny blocks any request that does not match an allow rule.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">Geo policy</span>
+                        <select
+                          value={firewallForm.geoMode}
+                          onChange={(event) =>
+                            handleFirewallFieldChange(
+                              'geoMode',
+                              event.target.value as FirewallGeoMode,
+                            )
+                          }
+                        >
+                          <option value="DISABLED">Disabled</option>
+                          <option value="ALLOW_LIST">Allow list</option>
+                          <option value="BLOCK_LIST">Block list</option>
+                        </select>
+                        <span className="field-hint">
+                          Allow list admits only the specified countries. Block list denies matches.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">Allowed countries</span>
+                        <textarea
+                          rows={4}
+                          placeholder="US&#10;NO&#10;GB"
+                          value={firewallForm.allowedCountries}
+                          onChange={(event) =>
+                            handleFirewallFieldChange('allowedCountries', event.target.value)
+                          }
+                        />
+                        <span className="field-hint">
+                          ISO country codes separated by commas or new lines. Leave empty to allow
+                          all.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">Blocked countries</span>
+                        <textarea
+                          rows={4}
+                          placeholder="CN&#10;RU"
+                          value={firewallForm.blockedCountries}
+                          onChange={(event) =>
+                            handleFirewallFieldChange('blockedCountries', event.target.value)
+                          }
+                        />
+                        <span className="field-hint">
+                          ISO country codes to block when the geo policy is in block-list mode.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">IP allow list</span>
+                        <textarea
+                          rows={4}
+                          placeholder="192.0.2.10&#10;10.0.0.0/16"
+                          value={firewallForm.ipAllowList}
+                          onChange={(event) =>
+                            handleFirewallFieldChange('ipAllowList', event.target.value)
+                          }
+                        />
+                        <span className="field-hint">
+                          Optional. If populated, only addresses or CIDR ranges listed here may
+                          reach the backend.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">IP block list</span>
+                        <textarea
+                          rows={4}
+                          placeholder="203.0.113.5&#10;fd00::/8"
+                          value={firewallForm.ipBlockList}
+                          onChange={(event) =>
+                            handleFirewallFieldChange('ipBlockList', event.target.value)
+                          }
+                        />
+                        <span className="field-hint">
+                          Addresses or CIDR ranges that are always blocked, regardless of other
+                          rules.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">Failed attempts (count)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={firewallForm.failThreshold}
+                          onChange={(event) =>
+                            handleFirewallFieldChange('failThreshold', event.target.value)
+                          }
+                        />
+                        <span className="field-hint">
+                          Consecutive authentication failures before an IP is rate limited.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">Failure window (seconds)</span>
+                        <input
+                          type="number"
+                          min={30}
+                          max={86400}
+                          value={firewallForm.failWindowSeconds}
+                          onChange={(event) =>
+                            handleFirewallFieldChange('failWindowSeconds', event.target.value)
+                          }
+                        />
+                        <span className="field-hint">
+                          Rolling time window for counting failed authentication attempts.
+                        </span>
+                      </div>
+                      <div className="config-row">
+                        <span className="config-label">Ban duration (seconds)</span>
+                        <input
+                          type="number"
+                          min={60}
+                          max={604800}
+                          value={firewallForm.banDurationSeconds}
+                          onChange={(event) =>
+                            handleFirewallFieldChange('banDurationSeconds', event.target.value)
+                          }
+                        />
+                        <span className="field-hint">
+                          How long an offending IP remains blocked after exceeding the threshold.
+                        </span>
+                      </div>
+                      {firewallError ? <div className="form-error">{firewallError}</div> : null}
+                      {firewallMessage ? (
+                        <div className="form-feedback">{firewallMessage}</div>
+                      ) : null}
+                      <div className="controls-row">
+                        <button
+                          type="submit"
+                          className="submit-button"
+                          disabled={!firewallDirty || firewallSaving}
+                        >
+                          {firewallSaving
+                            ? 'Saving...'
+                            : firewallDirty
+                              ? 'Save firewall settings'
+                              : 'Firewall up to date'}
+                        </button>
+                      </div>
+                    </form>
+                    {firewallStats ? (
+                      <div className="firewall-stats">
+                        <div>
+                          <span className="muted">Rules</span>
+                          <strong>{firewallStats.totalRules}</strong>
+                        </div>
+                        <div>
+                          <span className="muted">Blocked rules</span>
+                          <strong>{firewallStats.totalBlockedRules}</strong>
+                        </div>
+                        <div>
+                          <span className="muted">Auth failures (24h)</span>
+                          <strong>{firewallStats.authFailuresLast24h}</strong>
+                        </div>
+                        <div>
+                          <span className="muted">Blocks (24h)</span>
+                          <strong>{firewallStats.blockedLast24h}</strong>
+                        </div>
+                      </div>
+                    ) : null}
+                    {firewallConfig ? (
+                      <p className="field-hint">
+                        Last updated {formatDateTime(firewallConfig.updatedAt)}
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="form-error">
+                    Unable to load firewall configuration. Check API connectivity.
+                  </p>
+                )}
               </div>
             </section>
 
@@ -2584,6 +2949,37 @@ export function ConfigPage() {
       </div>
     </section>
   );
+}
+
+function mapFirewallConfigToForm(config: FirewallOverview['config']): FirewallFormState {
+  return {
+    enabled: config.enabled,
+    defaultPolicy: config.defaultPolicy,
+    geoMode: config.geoMode,
+    allowedCountries: config.allowedCountries.join('\n'),
+    blockedCountries: config.blockedCountries.join('\n'),
+    ipAllowList: config.ipAllowList.join('\n'),
+    ipBlockList: config.ipBlockList.join('\n'),
+    failThreshold: String(config.failThreshold),
+    failWindowSeconds: String(config.failWindowSeconds),
+    banDurationSeconds: String(config.banDurationSeconds),
+  };
+}
+
+function parseCountryList(value: string): string[] {
+  const tokens = value
+    .split(/[\s,]+/)
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+  return Array.from(new Set(tokens));
+}
+
+function parseLineList(value: string): string[] {
+  const entries = value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return Array.from(new Set(entries));
 }
 
 function formatMqttStatusState(state: MqttStatusState): string {

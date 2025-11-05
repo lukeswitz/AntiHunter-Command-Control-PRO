@@ -1,0 +1,3 @@
+ALTER TABLE "FirewallConfig"
+ADD COLUMN "ipAllowList" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "ipBlockList" TEXT[] DEFAULT ARRAY[]::TEXT[];

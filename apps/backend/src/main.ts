@@ -4,11 +4,13 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { existsSync, readFileSync } from 'fs';
+import helmet from 'helmet';
 import { createServer } from 'http';
 import { Logger } from 'nestjs-pino';
 import { join } from 'path';
 
 import { AppModule } from './app.module';
+import { SanitizeInputPipe } from './utils/sanitize-input.pipe';
 
 function resolveHttpsOptions(): HttpsOptions | undefined {
   const enabled =
@@ -83,6 +85,23 @@ async function bootstrap(): Promise<void> {
     httpsOptions,
   });
 
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: ["'self'", 'ws:', 'wss:'],
+          fontSrc: ["'self'", 'data:'],
+          objectSrc: ["'none'"],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
+
   const logger = app.get(Logger);
   app.useLogger(logger);
 
@@ -93,6 +112,7 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
       transformOptions: { enableImplicitConversion: true },
     }),
+    new SanitizeInputPipe(),
   );
 
   const configService = app.get(ConfigService);

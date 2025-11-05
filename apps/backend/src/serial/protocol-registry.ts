@@ -1,7 +1,12 @@
-import { MeshtasticLikeParser } from './protocols/meshtastic-like.parser';
+import {
+  MeshtasticLikeParser,
+  ensureMeshtasticProtobufs,
+} from './protocols/meshtastic-like.parser';
 import { SerialProtocolParser } from './serial.types';
 
 export type ProtocolKey = 'meshtastic-like' | 'raw-lines' | 'nmea-like';
+
+export { ensureMeshtasticProtobufs };
 
 export function createParser(protocol: ProtocolKey): SerialProtocolParser {
   switch (protocol) {

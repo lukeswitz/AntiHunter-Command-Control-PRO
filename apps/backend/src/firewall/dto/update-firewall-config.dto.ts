@@ -59,4 +59,18 @@ export class UpdateFirewallConfigDto {
   @Min(60)
   @Max(604800)
   banDurationSeconds?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  ipAllowList?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  ipBlockList?: string[];
 }

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+﻿import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   FirewallConfig,
@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { Request } from 'express';
 import * as geoip from 'geoip-lite';
+import * as ipaddr from 'ipaddr.js';
 
 import { BlockFirewallLogDto } from './dto/block-firewall-log.dto';
 import { CreateFirewallRuleDto } from './dto/create-firewall-rule.dto';
@@ -55,15 +56,49 @@ export class FirewallService {
       return;
     }
 
+    const normalizedIp = this.normalizeIp(ip);
+    if (!normalizedIp) {
+      return;
+    }
+
     await this.cleanupExpiredRules();
 
-    const rule = await this.evaluateRules(ip);
+    const allowList = config.ipAllowList ?? [];
+    const isAllowedByList = allowList.length > 0 && this.isIpInList(normalizedIp, allowList);
+
+    if (allowList.length > 0 && !isAllowedByList) {
+      await this.logBlock({
+        ip: normalizedIp,
+        reason: 'IP not in allow list',
+        path: req.path,
+        method: req.method,
+        userAgent: req.headers['user-agent'] as string | undefined,
+      });
+      throw new FirewallBlockedException('Access denied by firewall (allow list)');
+    }
+
+    if (this.isIpInList(normalizedIp, config.ipBlockList ?? [])) {
+      await this.logBlock({
+        ip: normalizedIp,
+        reason: 'IP blocked by list',
+        path: req.path,
+        method: req.method,
+        userAgent: req.headers['user-agent'] as string | undefined,
+      });
+      throw new FirewallBlockedException('Access denied by firewall (IP block list)');
+    }
+
+    if (isAllowedByList) {
+      return;
+    }
+
+    const rule = await this.evaluateRules(normalizedIp);
     if (rule?.type === FirewallRuleType.ALLOW) {
       return;
     }
     if (rule) {
       await this.logBlock({
-        ip,
+        ip: normalizedIp,
         reason: rule.reason ?? 'IP blocked by rule',
         path: req.path,
         method: req.method,
@@ -73,10 +108,10 @@ export class FirewallService {
       throw new FirewallBlockedException('Access denied by firewall (rule)');
     }
 
-    const country = this.lookupCountry(ip);
+    const country = this.lookupCountry(normalizedIp);
     if (this.shouldBlockByGeo(config, country)) {
       await this.logBlock({
-        ip,
+        ip: normalizedIp,
         reason: 'Blocked by geo policy',
         path: req.path,
         method: req.method,
@@ -89,7 +124,7 @@ export class FirewallService {
 
     if (config.defaultPolicy === FirewallPolicy.DENY) {
       await this.logBlock({
-        ip,
+        ip: normalizedIp,
         reason: 'Default deny policy',
         path: req.path,
         method: req.method,
@@ -150,6 +185,12 @@ export class FirewallService {
     if (dto.blockedCountries !== undefined) {
       updateData.blockedCountries = this.normalizeCountryList(dto.blockedCountries);
     }
+    if (dto.ipAllowList !== undefined) {
+      updateData.ipAllowList = this.normalizeIpList(dto.ipAllowList);
+    }
+    if (dto.ipBlockList !== undefined) {
+      updateData.ipBlockList = this.normalizeIpList(dto.ipBlockList);
+    }
     if (dto.failThreshold !== undefined) {
       updateData.failThreshold = dto.failThreshold;
     }
@@ -169,6 +210,8 @@ export class FirewallService {
         geoMode: dto.geoMode ?? FirewallGeoMode.DISABLED,
         allowedCountries: this.normalizeCountryList(dto.allowedCountries),
         blockedCountries: this.normalizeCountryList(dto.blockedCountries),
+        ipAllowList: this.normalizeIpList(dto.ipAllowList),
+        ipBlockList: this.normalizeIpList(dto.ipBlockList),
         failThreshold: dto.failThreshold ?? 5,
         failWindowSeconds: dto.failWindowSeconds ?? 900,
         banDurationSeconds: dto.banDurationSeconds ?? 3600,
@@ -452,18 +495,92 @@ export class FirewallService {
     return normalized;
   }
 
+  private normalizeIpList(values?: string[] | null): string[] {
+    if (!values) {
+      return [];
+    }
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    values.forEach((value) => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return;
+      }
+      try {
+        let canonical: string;
+        if (trimmed.includes('/')) {
+          const [addr, prefix] = ipaddr.parseCIDR(trimmed);
+          const normalizedAddr = this.normalizeParsedAddress(addr);
+          canonical = `${this.addressToString(normalizedAddr)}/${prefix}`;
+        } else {
+          const addr = this.normalizeParsedAddress(ipaddr.parse(trimmed));
+          canonical = this.addressToString(addr);
+        }
+        if (!seen.has(canonical)) {
+          seen.add(canonical);
+          normalized.push(canonical);
+        }
+      } catch (error) {
+        this.logger.warn(`Ignoring invalid IP entry "${trimmed}": ${error}`);
+      }
+    });
+    return normalized;
+  }
+
+  private addressToString(addr: ipaddr.IPv4 | ipaddr.IPv6): string {
+    return addr.kind() === 'ipv6' ? addr.toNormalizedString() : addr.toString();
+  }
+
+  private normalizeParsedAddress(addr: ipaddr.IPv4 | ipaddr.IPv6): ipaddr.IPv4 | ipaddr.IPv6 {
+    if (addr.kind() === 'ipv6' && (addr as ipaddr.IPv6).isIPv4MappedAddress()) {
+      return (addr as ipaddr.IPv6).toIPv4Address();
+    }
+    return addr;
+  }
+
+  private isIpInList(ip: string, list: string[]): boolean {
+    if (!list || list.length === 0) {
+      return false;
+    }
+    try {
+      const parsedIp = this.normalizeParsedAddress(ipaddr.parse(ip));
+      const ipString = this.addressToString(parsedIp);
+      for (const raw of list) {
+        const entry = raw.trim();
+        if (!entry) {
+          continue;
+        }
+        if (entry.includes('/')) {
+          const [network, prefix] = ipaddr.parseCIDR(entry);
+          const normalizedNetwork = this.normalizeParsedAddress(network);
+          if (normalizedNetwork.kind() !== parsedIp.kind()) {
+            continue;
+          }
+          if (parsedIp.match([normalizedNetwork, prefix])) {
+            return true;
+          }
+        } else if (entry === ipString) {
+          return true;
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`Unable to evaluate IP list for ${ip}: ${error}`);
+    }
+    return false;
+  }
+
   private normalizeIp(ip: string | null | undefined): string | null {
     if (!ip) {
       return null;
     }
-    let normalized = ip.trim();
-    if (normalized.startsWith('::ffff:')) {
-      normalized = normalized.substring(7);
+    const trimmed = ip.trim();
+    try {
+      const parsed = this.normalizeParsedAddress(ipaddr.parse(trimmed));
+      return this.addressToString(parsed);
+    } catch (error) {
+      this.logger.warn(`Failed to normalize IP "${ip}": ${error}`);
+      return null;
     }
-    if (normalized === '::1') {
-      normalized = '127.0.0.1';
-    }
-    return normalized;
   }
 
   private async logBlock(details: {
@@ -544,6 +661,8 @@ export class FirewallService {
       geoMode: config.geoMode,
       allowedCountries: config.allowedCountries ?? [],
       blockedCountries: config.blockedCountries ?? [],
+      ipAllowList: config.ipAllowList ?? [],
+      ipBlockList: config.ipBlockList ?? [],
       failThreshold: config.failThreshold,
       failWindowSeconds: config.failWindowSeconds,
       banDurationSeconds: config.banDurationSeconds,
@@ -595,7 +714,6 @@ export class FirewallService {
     });
   }
 }
-
 export class FirewallBlockedException extends ForbiddenException {
   constructor(message: string) {
     super(message);

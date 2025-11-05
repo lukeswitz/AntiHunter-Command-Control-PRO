@@ -1,5 +1,3 @@
-import { Mesh, Portnums, Telemetry } from '@meshtastic/protobufs';
-
 import {
   SerialCommandAck,
   SerialNodeTelemetry,
@@ -7,6 +5,28 @@ import {
   SerialProtocolParser,
   SerialAlertEvent,
 } from '../serial.types';
+
+type MeshProtoModule = typeof import('@meshtastic/protobufs');
+
+let meshModulePromise: Promise<MeshProtoModule> | null = null;
+let cachedMeshModule: MeshProtoModule | null = null;
+
+export function ensureMeshtasticProtobufs(): Promise<MeshProtoModule> {
+  if (!meshModulePromise) {
+    meshModulePromise = import('@meshtastic/protobufs').then((mod) => {
+      cachedMeshModule = mod;
+      return mod;
+    });
+  }
+  return meshModulePromise;
+}
+
+function requireMeshModule(): MeshProtoModule {
+  if (!cachedMeshModule) {
+    throw new Error('Meshtastic protobuf module not loaded');
+  }
+  return cachedMeshModule;
+}
 
 type TriangulationBuffer = {
   lines: string[];
@@ -105,8 +125,10 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
     this.recentVibrationEvents.clear();
   }
   private parseBinary(raw: string): SerialParseResult[] {
+    const { Mesh, Portnums, Telemetry } = requireMeshModule();
     const events: SerialParseResult[] = [];
-    let packet: Mesh.MeshPacket | undefined;
+    type MeshPacket = ReturnType<typeof Mesh.MeshPacketSchema.fromBinary>;
+    let packet: MeshPacket | undefined;
     try {
       packet = Mesh.MeshPacketSchema.fromBinary(Buffer.from(raw, 'binary'));
     } catch {
