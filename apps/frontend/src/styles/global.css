@@ -3874,3 +3874,139 @@ body.theme-dark .strategy-table__row--selected {
     width: auto;
   }
 }
+.firewall-log-viewer {
+  margin-top: 1.5rem;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 0.75rem;
+  background: var(--color-panel);
+  box-shadow: 0 12px 24px var(--color-panel-shadow);
+}
+
+.firewall-log-viewer summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  font-weight: 600;
+}
+
+.firewall-log-viewer summary::-webkit-details-marker {
+  display: none;
+}
+
+.firewall-log-viewer[open] summary {
+  border-bottom: 1px solid var(--color-panel-border);
+}
+
+.firewall-log-viewer__summary-meta {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.firewall-log-viewer__body {
+  padding: 1rem 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.firewall-log-viewer__toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.firewall-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.firewall-log-entry {
+  border: 1px solid var(--color-panel-border);
+  border-radius: 0.75rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.firewall-log-entry__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.firewall-log-entry__ip {
+  font-weight: 600;
+  font-family: var(--font-mono, 'Fira Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+  font-size: 0.95rem;
+}
+
+.firewall-log-entry__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.firewall-log-entry__badge--blocked,
+.firewall-log-entry__badge--default_deny,
+.firewall-log-entry__badge--geo_block {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.firewall-log-entry__badge--auth_failure {
+  background: rgba(251, 191, 36, 0.18);
+  color: #f59e0b;
+}
+
+.firewall-log-entry__badge--auth_success,
+.firewall-log-entry__badge--allowed {
+  background: rgba(34, 197, 94, 0.18);
+  color: #16a34a;
+}
+
+.firewall-log-entry__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.firewall-log-entry__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem 1.25rem;
+}
+
+.firewall-log-entry__grid dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.firewall-log-entry__grid dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.firewall-log-entry__ua {
+  grid-column: 1 / -1;
+}

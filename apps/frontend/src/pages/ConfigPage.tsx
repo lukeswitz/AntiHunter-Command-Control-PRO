@@ -19,6 +19,7 @@ import type {
   FirewallOverview,
   FirewallPolicy,
   FirewallGeoMode,
+  FirewallLog,
 } from '../api/types';
 import { DEFAULT_ALERT_COLORS, extractAlertColors } from '../constants/alert-colors';
 import { useAlarm } from '../providers/alarm-provider';
@@ -283,6 +284,18 @@ export function ConfigPage() {
   const firewallStats = firewallOverviewQuery.data?.stats ?? null;
   const firewallConfig = firewallOverviewQuery.data?.config ?? null;
   const [firewallSaving, setFirewallSaving] = useState(false);
+  const [firewallLogsOpen, setFirewallLogsOpen] = useState(false);
+  const firewallLogsQuery = useQuery({
+    queryKey: ['firewall', 'logs', { limit: 100 }],
+    queryFn: () => apiClient.get<FirewallLog[]>('/config/firewall/logs?limit=100'),
+    enabled: firewallLogsOpen,
+    staleTime: 30_000,
+  });
+  const firewallLogs = firewallLogsQuery.data ?? [];
+  const firewallLogsError =
+    firewallLogsQuery.error instanceof Error
+      ? firewallLogsQuery.error.message
+      : 'Unable to load firewall logs.';
 
   useEffect(() => {
     if (alarmSettings?.config) {
@@ -1637,6 +1650,89 @@ export function ConfigPage() {
                         Last updated {formatDateTime(firewallConfig.updatedAt)}
                       </p>
                     ) : null}
+                    <details
+                      className="firewall-log-viewer"
+                      open={firewallLogsOpen}
+                      onToggle={(event) => setFirewallLogsOpen(event.currentTarget.open)}
+                    >
+                      <summary>
+                        Recent firewall activity
+                        <span className="firewall-log-viewer__summary-meta">
+                          {firewallLogsQuery.isFetching
+                            ? 'Refreshing…'
+                            : `${firewallLogs.length} entries`}
+                        </span>
+                      </summary>
+                      <div className="firewall-log-viewer__body">
+                        <div className="firewall-log-viewer__toolbar">
+                          <button
+                            type="button"
+                            className="control-chip control-chip--ghost"
+                            onClick={() => firewallLogsQuery.refetch()}
+                            disabled={firewallLogsQuery.isFetching}
+                          >
+                            {firewallLogsQuery.isFetching ? 'Loading…' : 'Refresh'}
+                          </button>
+                        </div>
+                        {firewallLogsQuery.isLoading ? (
+                          <p className="form-hint">Loading firewall logs…</p>
+                        ) : firewallLogsQuery.isError ? (
+                          <p className="form-error">{firewallLogsError}</p>
+                        ) : firewallLogs.length === 0 ? (
+                          <p className="form-hint">No firewall events recorded yet.</p>
+                        ) : (
+                          <ul className="firewall-log-list">
+                            {firewallLogs.map((log) => (
+                              <li key={log.id} className="firewall-log-entry">
+                                <div className="firewall-log-entry__header">
+                                  <span className="firewall-log-entry__ip">{log.ip}</span>
+                                  <span
+                                    className={`firewall-log-entry__badge firewall-log-entry__badge--${log.outcome.toLowerCase()}`}
+                                  >
+                                    {log.outcome.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                <div className="firewall-log-entry__meta">
+                                  <span>{formatDateTime(log.lastSeen)}</span>
+                                  <span>
+                                    {log.method.toUpperCase()} · {log.path}
+                                  </span>
+                                  {log.reason ? <span>{log.reason}</span> : null}
+                                </div>
+                                <dl className="firewall-log-entry__grid">
+                                  <div>
+                                    <dt>Attempts</dt>
+                                    <dd>{log.attempts}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Blocked</dt>
+                                    <dd>{log.blocked ? 'Yes' : 'No'}</dd>
+                                  </div>
+                                  {log.country ? (
+                                    <div>
+                                      <dt>Country</dt>
+                                      <dd>{log.country}</dd>
+                                    </div>
+                                  ) : null}
+                                  {log.userAgent ? (
+                                    <div className="firewall-log-entry__ua">
+                                      <dt>User Agent</dt>
+                                      <dd>{log.userAgent}</dd>
+                                    </div>
+                                  ) : null}
+                                  {log.ruleId ? (
+                                    <div>
+                                      <dt>Rule</dt>
+                                      <dd>{log.ruleId}</dd>
+                                    </div>
+                                  ) : null}
+                                </dl>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </details>
                   </>
                 ) : (
                   <p className="form-error">
