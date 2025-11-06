@@ -264,8 +264,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
   private buildDuplicateKey(event: SerialParseResult, siteId: string | null): string | null {
     switch (event.kind) {
       case 'alert': {
-        const dataTime =
-          typeof event.data?.time === 'string' ? event.data.time : (event.data as never)?.ts;
+        const dataTime = this.extractAlertTimestamp(event.data);
         return [
           'alert',
           siteId ?? 'local',
@@ -293,5 +292,19 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
       default:
         return null;
     }
+  }
+
+  private extractAlertTimestamp(data?: Record<string, unknown>): string | undefined {
+    if (!data) {
+      return undefined;
+    }
+    if (typeof data.time === 'string') {
+      return data.time;
+    }
+    const withTs = data as { ts?: unknown };
+    if (typeof withTs.ts === 'string') {
+      return withTs.ts;
+    }
+    return undefined;
   }
 }
