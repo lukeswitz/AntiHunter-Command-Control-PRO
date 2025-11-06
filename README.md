@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img src="TopREADMElogo.png" alt="AntiHunter Command Center Logo" width="320" />
 </p>
 
@@ -20,22 +20,23 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
 2. [Feature Highlights](#feature-highlights)
 3. [UI Modules at a Glance](#ui-modules-at-a-glance)
 4. [Architecture](#architecture)
-5. [Repository Layout](#repository-layout)
-6. [Prerequisites](#prerequisites)
-7. [Platform Setup](#platform-setup)
-8. [Installation](#installation)
-9. [Configuration](#configuration)
-10. [Database & Migrations](#database--migrations)
-11. [Running the Stack](#running-the-stack)
+5. [Security & Hardening](#security--hardening)
+6. [Repository Layout](#repository-layout)
+7. [Prerequisites](#prerequisites)
+8. [Platform Setup](#platform-setup)
+9. [Installation](#installation)
+10. [Configuration](#configuration)
+11. [Database & Migrations](#database--migrations)
+12. [Running the Stack](#running-the-stack)
     - [Updating an Existing Deployment](#updating-an-existing-deployment)
-12. [Running with Docker](#running-with-docker)
-13. [Building for Production](#building-for-production)
-14. [Production Deployment](#production-deployment)
-15. [Serial Hardware & Meshtastic Sniffer](#serial-hardware--meshtastic-sniffer)
-16. [Useful Scripts](#useful-scripts)
-17. [Operations & Maintenance](#operations--maintenance)
-18. [Troubleshooting](#troubleshooting)
-19. [Legal Disclaimer](#legal-disclaimer)
+13. [Running with Docker](#running-with-docker)
+14. [Building for Production](#building-for-production)
+15. [Production Deployment](#production-deployment)
+16. [Serial Hardware & Meshtastic Sniffer](#serial-hardware--meshtastic-sniffer)
+17. [Useful Scripts](#useful-scripts)
+18. [Operations & Maintenance](#operations--maintenance)
+19. [Troubleshooting](#troubleshooting)
+20. [Legal Disclaimer](#legal-disclaimer)
 
 ---
 
@@ -64,6 +65,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Geofence automation:** per-geofence alarms with enter/exit triggers, map focus highlights, and wizard-driven geometry authoring.
 
 - **Operations controls:** API and UI actions to clear nodes, manage coverage, and import/export settings.
+- **Security posture:** built-in rate limiting, honeypot+submit heuristics, MFA, and an adaptive firewall with geo/IP policies, auto-bans, and detailed auditing.
 
 ## UI Modules at a Glance
 
@@ -159,37 +161,6 @@ Each deployment runs its site-local C2 server and still functions if federation 
 
 Secrets such as MQTT credentials, TLS PEMs, TAK API keys, and SMTP passwords are encrypted at rest in the database. Environment variables (`SITE_ID`, `JWT_SECRET`, `HTTPS_CERT_PATH`, etc.) govern bootstrapping.
 
-#### Hardening Checklist
-
-Recent defensive additions already in this repo:
-
-- **Authentication throttling** – login, legal acceptance, and 2FA routes now run through a Redis-backed `RateLimitGuard` that enforces both burst and sustained limits, tripping firewall escalation for abusive clients.
-- **Bot heuristics on login** – UI forms include a honeypot field plus a minimum submit time (600 ms) so scripted attacks are rejected server-side without inconveniencing operators.
-- **Neutral firewall messaging** – when abuse is detected, the API surfaces generic responses while logging detailed context internally, preventing the login page from advertising firewall decisions.
-
-While the platform ships with secure defaults, production deployments should bake the following controls into their baseline:
-
-- Enforce HTTPS everywhere with modern TLS ciphers (consider terminating behind an ALB / nginx reverse proxy with OCSP stapling).
-- Rotate JWT signing secrets and database credentials regularly; store them in a vault or managed secret store.
-- Enable 2FA for all privileged users and keep recovery codes in offline storage.
-- Apply database row-level backups and point-in-time recovery; schedule regular restore drills.
-- Lock down the serial host: run the backend service under a dedicated system account with least privilege and disable unused TTY devices.
-- Review firewall policies and geo/IP blocking rules, auto-expire temporary bans, and forward logs to a SOC/SIEM.
-- Monitor MQTT broker access logs; require mutual TLS when traversing untrusted networks.
-- Harden Docker hosts (if used): disable root SSH login, keep the kernel patched, and enable auditd or similar for command tracking.
-
-#### Port Exposure Reference
-
-| Service / Flow                | Default Port | Notes & Hardening Steps                                                                               |
-|-------------------------------|--------------|-------------------------------------------------------------------------------------------------------|
-| HTTPS API + Socket.IO         | 443 (or 3000) | Reverse proxy with TLS termination; restrict to trusted operator ranges or VPN.                      |
-| Serial worker (local device)  | n/a (USB)     | Physical access only; ensure `/dev/tty*` or COM ports are root-owned and audit device plug events.   |
-| PostgreSQL / Prisma           | 5432          | Bind to localhost/VPC only; require SCRAM auth and TLS; rotate credentials.                          |
-| MQTT broker (federation)      | 1883 / 8883   | Prefer 8883 with mutual TLS; enforce client ID allowlists; rate-limit connection attempts.           |
-| TAK/CoT bridge                | 8087 / 8089   | Use TLS profiles when possible; generate per-client API keys; segregate on dedicated security group. |
-| Prometheus / Metrics scrape   | 9100+         | Keep behind VPN and IP allowlists; disable if metrics are collected by sidecars.                     |
-| SMTP relay                    | 587 / 465     | Require STARTTLS/SMTPS with credential auth; scope accounts to command notifications only.           |
-
 ### Resilience & Fallback Paths
 
 * **Local-first operation:** Each site keeps its own PostgreSQL instance and continues ingesting/commanding nodes if the broker or WAN link fails. Federation queues simply back off until the connection returns.
@@ -232,6 +203,96 @@ Set `SITE_ID` to the local site identifier (defaults to `default`). Each Command
 
 > **Tip:** Set `SITE_ID` (and optionally `SITE_NAME`) in the root `.env` **before** running `pnpm prisma db seed`. The seed script now creates the initial `Site`, `SerialConfig`, and `MqttConfig` rows with that identifier, so make sure it matches the value you expect the backend to advertise.
 
+## Security & Hardening
+
+AntiHunter ships with layered defenses—RBAC, MFA, rate limiting, and a programmable firewall. This section groups every capability and explains how to tune it.
+
+### Authentication & Session Controls
+
+- Roles (`ADMIN`, `OPERATOR`, `ANALYST`, `VIEWER`) gate every controller.
+- JWT sessions expire quickly and inherit whatever you set for `JWT_EXPIRY`.
+- Operators must accept the legal notice before accessing the console.
+- TOTP-based 2FA plus invitation/password reset expirations protect account lifecycle flows.
+
+| Setting / Env var | Default | Purpose |
+|-------------------|---------|---------|
+| `JWT_SECRET` | _required_ | Symmetric signing key for API + Socket.IO sessions. Rotate often. |
+| `JWT_EXPIRY` | `12h` | Lifetime of issued access tokens. |
+| `INVITE_EXPIRY_HOURS` | `48` | TTL for admin-generated invitation links. |
+| `PASSWORD_RESET_EXPIRY_HOURS` | `4` | TTL for password reset emails. |
+| `TWO_FACTOR_ISSUER` | `AntiHunter Command Center` | Friendly label displayed inside authenticator apps. |
+| `TWO_FACTOR_TOKEN_EXPIRY` | `10m` | Window during which submitted 2FA codes remain valid. |
+| `TWO_FACTOR_WINDOW` | `1` | Number of TOTP steps accepted on either side of the current window. |
+| `TWO_FACTOR_SECRET_KEY` | _(optional)_ | Seed used when bootstrapping TOTP secrets in offline environments. |
+
+### Abuse & Rate Limiting
+
+- `RateLimitGuard` protects every auth endpoint with both burst and sustained windows.
+- Login forms include a honeypot field plus a minimum submit timer (`AUTH_MIN_SUBMIT_MS`).
+- When a limit trips, the firewall’s auth-failure counter auto-bans the offending IP while returning a neutral message to the UI.
+
+| Rule / Env var | Default | Notes |
+|----------------|---------|-------|
+| `RATE_LIMIT_DEFAULT_LIMIT` / `RATE_LIMIT_DEFAULT_TTL` | `300` req / `60s` | Fallback when a controller does not define its own rule. |
+| `RATE_LIMIT_LOGIN_BURST_LIMIT` / `RATE_LIMIT_LOGIN_BURST_TTL` | `10` / `10s` | Short burst limiter on `/auth/login`. |
+| `RATE_LIMIT_LOGIN_LIMIT` / `RATE_LIMIT_LOGIN_TTL` | `30` / `60s` | Sustained login limiter that feeds the firewall. |
+| `RATE_LIMIT_LEGAL_LIMIT` / `RATE_LIMIT_LEGAL_TTL` | `20` / `300s` | Protects the legal acceptance endpoint from script abuse. |
+| `RATE_LIMIT_2FA_LIMIT` / `RATE_LIMIT_2FA_TTL` | `10` / `300s` | Caps TOTP verification attempts. |
+| `AUTH_MIN_SUBMIT_MS` | `600` ms | Minimum time between rendering the login form and submission; pairs with the honeypot field. |
+
+### Firewall & Network Controls
+
+The `/config/firewall` API (and Config UI) manages allow/deny policies, geo filtering, and auto-bans triggered by auth failures. Logs can be promoted directly into permanent rules.
+
+| Config field | Default behavior | Where to set |
+|--------------|-----------------|--------------|
+| `enabled` | `false` until an admin toggles it | `PUT /config/firewall` |
+| `defaultPolicy` | `ALLOW` | Switch to `DENY` for zero-trust sites. |
+| `geoMode` | `DISABLED` | Choose `ALLOW_ONLY` or `BLOCK_LIST` to enforce ISO country allow/block lists. |
+| `allowedCountries` / `blockedCountries` | `[]` | ISO 3166-1 alpha-2 codes applied based on `geoMode`. |
+| `ipAllowList` / `ipBlockList` | `[]` | CIDR strings or single IPs. Allow list takes precedence. |
+| `failThreshold` | `5` (DB default) | Number of auth failures before issuing an automatic ban. |
+| `failWindowSeconds` | `300` | Time window used when counting failures. |
+| `banDurationSeconds` | `3600` | Temporary ban length applied to abusive IPs. |
+
+### Transport & Secrets
+
+Keep certificates, mail credentials, and site identifiers in environment variables—never in source control. When terminating TLS inside NestJS, provide PEM paths via the variables below.
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `HTTPS_ENABLED` | auto | Forces the backend to expect TLS; otherwise inferred from cert paths. |
+| `HTTPS_KEY_PATH` / `HTTPS_CERT_PATH` / `HTTPS_CA_PATH` / `HTTPS_PASSPHRASE` | _(unset)_ | PEM bundle + optional passphrase for in-process TLS. |
+| `HTTP_PREFIX` | `api` | Namespace for REST routes (useful when reverse proxying). |
+| `HTTP_REDIRECT_PORT` | _(unset)_ | Enables HTTP→HTTPS redirects when running dual listeners. |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS. |
+| `SITE_ID` | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing. |
+
+### Hardening Checklist
+
+- **Authentication throttling** – login, legal acceptance, and 2FA routes now run through a Redis-backed `RateLimitGuard` that enforces both burst and sustained limits, tripping firewall escalation for abusive clients.
+- **Bot heuristics on login** – UI forms include a honeypot field plus a minimum submit time (600 ms) so scripted attacks are rejected server-side without inconveniencing operators.
+- **Neutral firewall messaging** – when abuse is detected, the API surfaces neutral responses while logging detailed context internally, preventing the login page from advertising firewall decisions.
+- Enforce HTTPS everywhere with modern TLS ciphers (consider terminating behind an ALB / nginx reverse proxy with OCSP stapling).
+- Rotate JWT signing secrets and database credentials regularly; store them in a vault or managed secret store.
+- Enable 2FA for all privileged users and keep recovery codes in offline storage.
+- Apply database row-level backups and point-in-time recovery; schedule regular restore drills.
+- Lock down the serial host: run the backend service under a dedicated system account with least privilege and disable unused TTY devices.
+- Review firewall policies and geo/IP blocking rules, auto-expire temporary bans, and forward logs to a SOC/SIEM.
+- Monitor MQTT broker access logs; require mutual TLS when traversing untrusted networks.
+- Harden Docker hosts (if used): disable root SSH login, keep the kernel patched, and enable auditd or similar for command tracking.
+
+### Port Exposure Reference
+
+| Service / Flow                | Default Port | Notes & Hardening Steps                                                                               |
+|------------------------------|--------------|--------------------------------------------------------------------------------------------------------|
+| HTTPS API + Socket.IO         | 443 (or 3000) | Reverse proxy with TLS termination; restrict to trusted operator ranges or VPN.                      |
+| Serial worker (local device)  | n/a (USB)     | Physical access only; ensure `/dev/tty*` or COM ports are root-owned and audit device plug events.   |
+| PostgreSQL / Prisma           | 5432          | Bind to localhost/VPC only; require SCRAM auth and TLS; rotate credentials.                          |
+| MQTT broker (federation)      | 1883 / 8883   | Prefer 8883 with mutual TLS; enforce client ID allowlists; rate-limit connection attempts.           |
+| TAK/CoT bridge                | 8087 / 8089   | Use TLS profiles when possible; generate per-client API keys; segregate on dedicated security group. |
+| Prometheus / Metrics scrape   | 9100+         | Keep behind VPN and IP allowlists; disable if metrics are collected by sidecars.                     |
+| SMTP relay                    | 587 / 465     | Require STARTTLS/SMTPS with credential auth; scope accounts to command notifications only.           |
 ## Repository Layout
 
 ```
@@ -987,6 +1048,8 @@ THE SOFTWARE IS PROVIDED AS IS AND AS AVAILABLE, WITHOUT WARRANTY OF ANY KIND, E
 You alone are responsible for ensuring your deployment complies with all applicable laws, regulations, licenses, permits, organizational policies, and third-party rights. No advice or information, whether oral or written, obtained from the project or through the Software, creates any warranty or obligation not expressly stated in this disclaimer. Continued use signifies your agreement to indemnify and hold harmless the authors, developers, maintainers, and contributors from claims arising out of or related to your activities with the Software.
 
 If you do not agree to these terms, **do not build, deploy, or run** AntiHunter Command & Control PRO.
+
+
 
 
 
