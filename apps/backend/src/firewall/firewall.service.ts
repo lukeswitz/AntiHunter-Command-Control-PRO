@@ -506,8 +506,11 @@ export class FirewallService {
     }
     const normalizedCountry = country?.toUpperCase();
     if (config.geoMode === FirewallGeoMode.ALLOW_LIST) {
+      if (!config.allowedCountries || config.allowedCountries.length === 0) {
+        return false;
+      }
       if (!normalizedCountry) {
-        return true;
+        return false;
       }
       return !config.allowedCountries.includes(normalizedCountry);
     }

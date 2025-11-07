@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import L, { latLngBounds } from 'leaflet';
+import L, { latLngBounds, type LatLngExpression } from 'leaflet';
 import { ChangeEvent, FormEvent, useEffect, useId, useMemo, useState } from 'react';
+import { MdCancel, MdCheckCircle, MdCropFree, MdUndo } from 'react-icons/md';
 import {
   Circle,
   MapContainer,
@@ -10,18 +11,21 @@ import {
   TileLayer,
   Tooltip,
   useMap,
+  useMapEvents,
 } from 'react-leaflet';
 
 import { apiClient } from '../api/client';
-import type { Geofence, GeofenceVertex, InventoryDevice } from '../api/types';
+import type { Geofence, GeofenceVertex, SiteSummary } from '../api/types';
 import { useGeofenceStore } from '../stores/geofence-store';
 
-const DEFAULT_RADIUS = 200;
+const DEFAULT_RADIUS = 100;
 const DEFAULT_OVERLAP = 0;
 const EARTH_RADIUS = 6_371_000;
 const CUSTOM_PRESET_ID = 'custom';
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
+const SLIDE_RANGE_METERS = 200;
+const LATERAL_RANGE_METERS = 120;
 
 type NodeDeploymentType = 'wifi' | 'radar' | 'rf';
 
@@ -78,6 +82,16 @@ const NODE_PROFILES: NodeProfile[] = [
     color: '#fb923c',
   },
   {
+    id: 'radar-needle',
+    label: 'RADAR 20-degree micro sector',
+    type: 'radar',
+    defaultRadius: 100,
+    defaultOverlap: 5,
+    arcWidth: 20,
+    notes: 'Tightly focused beam for long-distance cueing or needle sweeps.',
+    color: '#fcd34d',
+  },
+  {
     id: 'rf-longhaul',
     label: 'RF relay (360-degree)',
     type: 'rf',
@@ -97,6 +111,7 @@ const PROFILE_BY_ID = new Map<string, NodeProfile>(
 
 interface StrategyNode {
   id: string;
+  displayName?: string;
   lat: number;
   lon: number;
   radius: number;
@@ -108,6 +123,9 @@ interface StrategyNode {
   orientation?: number;
   anchorDistance?: number;
   flags: string[];
+  tangentBearing: number;
+  normalBearing: number;
+  path?: NodePathData;
 }
 
 interface StrategyResult {
@@ -197,21 +215,30 @@ interface StrategyOptions {
   maxAnchorDistance?: number;
 }
 
-interface InventoryRow {
-  type: string;
-  required: number;
-  available: number;
-}
-
 interface NodeOverride {
   radius?: number;
   orientation?: number;
   arcWidth?: number;
+  slideMeters?: number;
+  moveNorthMeters?: number;
+  moveEastMeters?: number;
+  name?: string;
+  profileId?: NodeProfileId;
+}
+
+interface NodePathData {
+  origin: GeofenceVertex;
+  projected: { x: number; y: number }[];
+  perimeter: number;
+  isCounterClockwise: boolean;
+  distanceAlong: number;
+  normalShift: number;
 }
 
 export function StrategyAdvisorPage() {
   const geofences = useGeofenceStore((state) => state.geofences);
   const loadGeofences = useGeofenceStore((state) => state.loadGeofences);
+  const addGeofence = useGeofenceStore((state) => state.addGeofence);
 
   const [selectedGeofenceIds, setSelectedGeofenceIds] = useState<string[]>([]);
   const [activePanel, setActivePanel] = useState<StrategyPanelId>('plan');
@@ -233,6 +260,10 @@ export function StrategyAdvisorPage() {
   const [obstacleError, setObstacleError] = useState<string | null>(null);
   const [nodeOverrides, setNodeOverrides] = useState<Record<string, NodeOverride>>({});
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>('');
+  const [drawingGeofence, setDrawingGeofence] = useState(false);
+  const [draftVertices, setDraftVertices] = useState<GeofenceVertex[]>([]);
+  const [hoverVertex, setHoverVertex] = useState<GeofenceVertex | null>(null);
 
   const idBase = useId();
   const presetSelectId = `${idBase}-preset`;
@@ -247,9 +278,14 @@ export function StrategyAdvisorPage() {
   const anchorLatId = `${idBase}-anchor-lat`;
   const anchorLonId = `${idBase}-anchor-lon`;
   const inspectorTitleId = `${idBase}-inspector-title`;
+  const inspectorNameInputId = `${idBase}-inspector-name`;
+  const inspectorProfileSelectId = `${idBase}-inspector-profile`;
   const inspectorRadiusInputId = `${idBase}-inspector-radius`;
   const inspectorOrientationInputId = `${idBase}-inspector-orientation`;
   const inspectorArcInputId = `${idBase}-inspector-arc`;
+  const inspectorSlideInputId = `${idBase}-inspector-slide`;
+  const inspectorNorthInputId = `${idBase}-inspector-north`;
+  const inspectorEastInputId = `${idBase}-inspector-east`;
 
   useEffect(() => {
     void loadGeofences();
@@ -345,20 +381,94 @@ export function StrategyAdvisorPage() {
     const nodes = baseStrategy.nodes.map((node) => {
       const override = nodeOverrides[node.id];
       if (!override) {
-        return node;
+        return { ...node, displayName: node.displayName ?? node.id };
       }
-      const nextOrientation =
-        override.orientation != null
-          ? ((override.orientation % 360) + 360) % 360
-          : node.orientation;
-      const nextArcWidth =
-        override.arcWidth != null ? Math.min(360, Math.max(10, override.arcWidth)) : node.arcWidth;
-      const nextRadius = override.radius != null ? Math.max(1, override.radius) : node.radius;
+
+      let lat = node.lat;
+      let lon = node.lon;
+      let radius = node.radius;
+      let arcWidth = node.arcWidth;
+      let orientation = node.orientation;
+      let profileId = node.profileId;
+      let type = node.type;
+      let tangentBearing = node.tangentBearing;
+      let normalBearing = node.normalBearing;
+      const displayName =
+        override.name && override.name.trim().length > 0
+          ? override.name.trim()
+          : (node.displayName ?? node.id);
+
+      if (override.profileId && PROFILE_BY_ID.has(override.profileId)) {
+        const profileOverride = PROFILE_BY_ID.get(override.profileId)!;
+        profileId = profileOverride.id;
+        type = profileOverride.type;
+        if (override.arcWidth == null) {
+          arcWidth = profileOverride.arcWidth;
+        }
+        if (profileOverride.arcWidth < 360) {
+          if (override.orientation == null) {
+            orientation = node.normalBearing;
+          }
+        } else if (override.orientation == null) {
+          orientation = undefined;
+        }
+      }
+
+      if (override.arcWidth != null) {
+        arcWidth = Math.min(360, Math.max(10, override.arcWidth));
+      }
+      if (override.radius != null) {
+        radius = Math.max(1, override.radius);
+      }
+      if (override.orientation != null) {
+        orientation = ((override.orientation % 360) + 360) % 360;
+      }
+
+      const path = node.path;
+      if (path) {
+        const slideMeters = override.slideMeters ?? 0;
+        const normalizedDistance =
+          (((path.distanceAlong + slideMeters) % path.perimeter) + path.perimeter) % path.perimeter;
+        const sample = samplePointAlong(path.projected, normalizedDistance);
+        const normalVec = computeNormal(sample.segmentDirection, path.isCounterClockwise);
+        const tangentVec = sample.segmentDirection;
+        const offsetPoint = {
+          x: sample.point.x + normalVec.x * path.normalShift,
+          y: sample.point.y + normalVec.y * path.normalShift,
+        };
+        const latLon = unproject(offsetPoint, path.origin);
+        lat = latLon.lat;
+        lon = latLon.lon;
+        tangentBearing = toBearingDegrees(tangentVec);
+        normalBearing = toBearingDegrees(normalVec);
+        if (override.orientation == null && arcWidth < 360) {
+          orientation = normalBearing;
+        }
+      }
+
+      const applyOffset = (meters: number | undefined, bearing: number) => {
+        if (meters == null || Number.isNaN(meters) || meters === 0) {
+          return;
+        }
+        const direction = meters >= 0 ? bearing : (bearing + 180) % 360;
+        [lat, lon] = projectInDirection(lat, lon, Math.abs(meters), direction);
+      };
+
+      applyOffset(override.moveNorthMeters, 0);
+      applyOffset(override.moveEastMeters, 90);
+
       return {
         ...node,
-        orientation: nextOrientation,
-        arcWidth: nextArcWidth,
-        radius: nextRadius,
+        lat,
+        lon,
+        radius,
+        arcWidth,
+        orientation,
+        profileId,
+        type,
+        displayName,
+        tangentBearing,
+        normalBearing,
       };
     });
     return { ...baseStrategy, nodes };
@@ -385,6 +495,13 @@ export function StrategyAdvisorPage() {
   const inspectorOrientationValue = selectedNode?.orientation ?? baseSelectedNode?.orientation ?? 0;
   const inspectorArcValue = selectedNode?.arcWidth ?? baseSelectedNode?.arcWidth ?? 360;
   const inspectorSupportsDirection = selectedNode ? selectedNode.arcWidth < 360 : false;
+  const inspectorNameValue = selectedNode
+    ? (selectedNodeOverride?.name ?? selectedNode.displayName ?? selectedNode.id)
+    : '';
+  const inspectorProfileValue = selectedNodeOverride?.profileId ?? '';
+  const inspectorSlideValue = selectedNodeOverride?.slideMeters ?? 0;
+  const inspectorNorthValue = selectedNodeOverride?.moveNorthMeters ?? 0;
+  const inspectorEastValue = selectedNodeOverride?.moveEastMeters ?? 0;
   const mapBounds = useMemo(() => {
     const points: Array<[number, number]> = [];
     selectedGeofences.forEach((geofence) => {
@@ -400,34 +517,22 @@ export function StrategyAdvisorPage() {
     return latLngBounds(points);
   }, [selectedGeofences, avoidancePolygons, strategy.nodes]);
 
-  const { data: inventoryData } = useQuery({
-    queryKey: ['inventory', 'strategy-advisor'],
-    queryFn: async () => apiClient.get<InventoryDevice[]>('/inventory'),
-    staleTime: 120_000,
-  });
-
-  const inventoryReport = useMemo<InventoryRow[]>(() => {
-    if (!inventoryData || inventoryData.length === 0 || strategy.nodes.length === 0) {
+  const drawingPositions = useMemo<LatLngExpression[]>(() => {
+    if (!drawingGeofence || draftVertices.length === 0) {
       return [];
     }
-    const available = new Map<string, number>();
-    inventoryData.forEach((device) => {
-      const key = (device.type ?? 'unknown').toLowerCase();
-      available.set(key, (available.get(key) ?? 0) + 1);
-    });
+    const base = draftVertices.map((vertex) => [vertex.lat, vertex.lon] as LatLngExpression);
+    if (hoverVertex) {
+      base.push([hoverVertex.lat, hoverVertex.lon]);
+    }
+    return base;
+  }, [drawingGeofence, draftVertices, hoverVertex]);
 
-    const required = new Map<string, number>();
-    strategy.nodes.forEach((node) => {
-      const key = node.type.toLowerCase();
-      required.set(key, (required.get(key) ?? 0) + 1);
-    });
-
-    return Array.from(required.entries()).map(([type, needed]) => ({
-      type,
-      required: needed,
-      available: available.get(type) ?? 0,
-    }));
-  }, [inventoryData, strategy.nodes]);
+  const { data: sitesQueryData } = useQuery({
+    queryKey: ['sites', 'strategy-advisor'],
+    queryFn: async () => apiClient.get<SiteSummary[]>('/sites'),
+    staleTime: 300_000,
+  });
 
   const planWarnings = useMemo(() => {
     const warnings = new Set<string>();
@@ -442,15 +547,8 @@ export function StrategyAdvisorPage() {
     if (strategy.nodes.some((node) => node.flags.includes('anchor-constraint'))) {
       warnings.add('Some nodes exceed the maximum backhaul distance from the nearest anchor.');
     }
-    inventoryReport.forEach((row) => {
-      if (row.required > row.available) {
-        warnings.add(
-          `Inventory shortage for ${row.type.toUpperCase()}: need ${row.required}, available ${row.available}.`,
-        );
-      }
-    });
     return Array.from(warnings);
-  }, [selectedGeofences.length, strategy.nodes, inventoryReport]);
+  }, [selectedGeofences.length, strategy.nodes]);
 
   const hasNodes = strategy.nodes.length > 0;
   const handlePresetChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -549,6 +647,13 @@ export function StrategyAdvisorPage() {
       const current = previous[nodeId] ?? {};
       const next: NodeOverride = { ...current };
 
+      const normalizeMeters = (value?: number) => {
+        if (value == null || Number.isNaN(value) || Math.abs(value) < 0.01) {
+          return undefined;
+        }
+        return Math.max(-1_000, Math.min(1_000, value));
+      };
+
       if (changes.radius !== undefined) {
         const normalized = Math.max(1, changes.radius);
         if (Number.isFinite(normalized)) {
@@ -574,6 +679,51 @@ export function StrategyAdvisorPage() {
         }
       }
 
+      if (changes.name !== undefined) {
+        const baseName = baseNode.displayName ?? baseNode.id;
+        const trimmed = (changes.name ?? '').trim();
+        if (!trimmed || trimmed === baseName) {
+          delete next.name;
+        } else {
+          next.name = trimmed;
+        }
+      }
+
+      if (changes.profileId !== undefined) {
+        if (!changes.profileId || changes.profileId === baseNode.profileId) {
+          delete next.profileId;
+        } else if (PROFILE_BY_ID.has(changes.profileId)) {
+          next.profileId = changes.profileId;
+        }
+      }
+
+      if (changes.slideMeters !== undefined) {
+        const normalized = normalizeMeters(changes.slideMeters);
+        if (normalized === undefined) {
+          delete next.slideMeters;
+        } else {
+          next.slideMeters = normalized;
+        }
+      }
+
+      if (changes.moveNorthMeters !== undefined) {
+        const normalized = normalizeMeters(changes.moveNorthMeters);
+        if (normalized === undefined) {
+          delete next.moveNorthMeters;
+        } else {
+          next.moveNorthMeters = normalized;
+        }
+      }
+
+      if (changes.moveEastMeters !== undefined) {
+        const normalized = normalizeMeters(changes.moveEastMeters);
+        if (normalized === undefined) {
+          delete next.moveEastMeters;
+        } else {
+          next.moveEastMeters = normalized;
+        }
+      }
+
       if (next.radius !== undefined && next.radius === baseNode.radius) {
         delete next.radius;
       }
@@ -582,6 +732,12 @@ export function StrategyAdvisorPage() {
       }
       if (next.arcWidth !== undefined && next.arcWidth === baseNode.arcWidth) {
         delete next.arcWidth;
+      }
+      if (next.profileId !== undefined && next.profileId === baseNode.profileId) {
+        delete next.profileId;
+      }
+      if (next.name !== undefined && next.name === (baseNode.displayName ?? baseNode.id)) {
+        delete next.name;
       }
 
       if (Object.keys(next).length === 0) {
@@ -669,6 +825,123 @@ export function StrategyAdvisorPage() {
     updateNodeOverride(selectedNodeId, { arcWidth: value });
   };
 
+  const handleInspectorNameChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!selectedNodeId) {
+      return;
+    }
+    updateNodeOverride(selectedNodeId, { name: event.target.value });
+  };
+
+  const handleInspectorProfileChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    if (!selectedNodeId) {
+      return;
+    }
+    const value = event.target.value as NodeProfileId | '';
+    updateNodeOverride(selectedNodeId, { profileId: value || undefined });
+  };
+
+  const handleInspectorSlideChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!selectedNodeId) {
+      return;
+    }
+    const value = Number(event.target.value);
+    if (Number.isNaN(value)) {
+      return;
+    }
+    updateNodeOverride(selectedNodeId, { slideMeters: value });
+  };
+
+  const handleInspectorNorthChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!selectedNodeId) {
+      return;
+    }
+    const value = Number(event.target.value);
+    if (Number.isNaN(value)) {
+      return;
+    }
+    updateNodeOverride(selectedNodeId, { moveNorthMeters: value });
+  };
+
+  const handleInspectorEastChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!selectedNodeId) {
+      return;
+    }
+    const value = Number(event.target.value);
+    if (Number.isNaN(value)) {
+      return;
+    }
+    updateNodeOverride(selectedNodeId, { moveEastMeters: value });
+  };
+
+  const handleStartGeofenceDrawing = () => {
+    setDrawingGeofence(true);
+    setDraftVertices([]);
+    setHoverVertex(null);
+  };
+
+  const handleCancelGeofenceDrawing = () => {
+    setDrawingGeofence(false);
+    setDraftVertices([]);
+    setHoverVertex(null);
+  };
+
+  const handleUndoGeofencePoint = () => {
+    setDraftVertices((prev) => prev.slice(0, -1));
+  };
+
+  const handleGeofencePoint = (vertex: GeofenceVertex) => {
+    if (!drawingGeofence) {
+      return;
+    }
+    setDraftVertices((prev) => [...prev, vertex]);
+  };
+
+  const handleGeofenceHover = (vertex: GeofenceVertex | null) => {
+    if (!drawingGeofence) {
+      return;
+    }
+    setHoverVertex(vertex);
+  };
+
+  const handleSaveGeofence = async () => {
+    if (draftVertices.length < 3) {
+      window.alert('Draw at least three points to create a geofence.');
+      return;
+    }
+    const defaultName = `Geofence ${geofences.length + 1}`;
+    const name = window.prompt('Geofence name', defaultName);
+    if (!name) {
+      return;
+    }
+    const message =
+      window.prompt(
+        'Custom alarm message (tokens: {entity}, {geofence}, {type}, {event})',
+        '{entity} entered geofence {geofence}',
+      ) ?? '{entity} entered geofence {geofence}';
+    const levelInput = window.prompt('Alarm level (INFO, NOTICE, ALERT, CRITICAL)', 'ALERT');
+    const alarmLevel = normalizeAlarmLevel(levelInput);
+
+    try {
+      const geofence = await addGeofence({
+        name,
+        description: null,
+        siteId: selectedSiteId || undefined,
+        polygon: draftVertices,
+        color: undefined,
+        alarm: {
+          enabled: true,
+          level: alarmLevel,
+          message,
+        },
+      });
+      setSelectedGeofenceIds((previous) => Array.from(new Set([...previous, geofence.id])));
+      handleCancelGeofenceDrawing();
+    } catch (error) {
+      console.error('Failed to save geofence', error);
+      window.alert('Unable to save geofence. Please try again.');
+    }
+  };
+
   const handleExportCsv = () => {
     if (!hasNodes) {
       return;
@@ -677,7 +950,7 @@ export function StrategyAdvisorPage() {
       'Name,Latitude,Longitude,Type,Profile,RadiusMeters,OverlapMeters,SpacingMeters,OrientationDegrees,ArcWidthDegrees,AnchorDistanceMeters,Flags',
       ...strategy.nodes.map((node) =>
         [
-          node.id,
+          node.displayName ?? node.id,
           node.lat.toFixed(6),
           node.lon.toFixed(6),
           node.type.toUpperCase(),
@@ -705,6 +978,7 @@ export function StrategyAdvisorPage() {
         type: 'Feature',
         properties: {
           id: node.id,
+          name: node.displayName ?? node.id,
           profileId: node.profileId,
           type: node.type,
           radius: node.radius,
@@ -760,7 +1034,7 @@ export function StrategyAdvisorPage() {
           node.orientation != null ? `<br/>Orientation: ${node.orientation.toFixed(1)}&#176;` : '';
         return `
     <Placemark>
-      <name>${node.id}</name>
+      <name>${escapeXml(node.displayName ?? node.id)}</name>
       <description><![CDATA[
         Profile: ${node.profileId}<br/>
         Type: ${node.type.toUpperCase()}<br/>
@@ -852,6 +1126,11 @@ ${nodesKml}
               preferCanvas
             >
               <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+              <StrategyDrawingHandler
+                enabled={drawingGeofence}
+                onPoint={handleGeofencePoint}
+                onHover={handleGeofenceHover}
+              />
               <MapBoundsUpdater bounds={mapBounds} enabled={selectedGeofences.length > 0} />
               <SelectedNodeFocus node={selectedNode} />
               {selectedGeofences.map((geofence) =>
@@ -899,7 +1178,7 @@ ${nodesKml}
                 >
                   <Tooltip direction="top" offset={[0, -18]} opacity={1} sticky>
                     <div>
-                      <strong>{node.id}</strong>
+                      <strong>{node.displayName ?? node.id}</strong>
                       <div>Profile: {node.profileId}</div>
                       <div>Type: {node.type.toUpperCase()}</div>
                       <div>Radius: {node.radius.toFixed(0)} m</div>
@@ -971,7 +1250,78 @@ ${nodesKml}
                     />
                   );
                 })}
+              {drawingGeofence && drawingPositions.length > 0 ? (
+                <>
+                  <Polyline
+                    positions={drawingPositions}
+                    pathOptions={{ color: '#f97316', dashArray: '6 4', weight: 2 }}
+                  />
+                  {drawingPositions.length >= 3 ? (
+                    <Polygon
+                      positions={drawingPositions}
+                      pathOptions={{
+                        color: '#f97316',
+                        weight: 1,
+                        fillOpacity: 0.1,
+                        dashArray: '8 6',
+                      }}
+                    />
+                  ) : null}
+                </>
+              ) : null}
             </MapContainer>
+            <div className="map-footer__actions strategy-map__actions">
+              <div className="geofence-site-select">
+                <label>
+                  Site
+                  <select
+                    className="control-input"
+                    value={selectedSiteId}
+                    onChange={(event) => setSelectedSiteId(event.target.value)}
+                  >
+                    <option value="">Local site</option>
+                    {sitesQueryData?.map((site) => (
+                      <option key={site.id} value={site.id}>
+                        {site.name ?? site.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <button
+                type="button"
+                className="submit-button"
+                onClick={handleStartGeofenceDrawing}
+                disabled={drawingGeofence}
+              >
+                <MdCropFree /> Create Geofence
+              </button>
+              {drawingGeofence ? (
+                <div className="geofence-drawing-controls">
+                  <span>{draftVertices.length} point(s) selected. Click the map to add more.</span>
+                  <div className="geofence-drawing-buttons">
+                    <button
+                      type="button"
+                      onClick={handleUndoGeofencePoint}
+                      disabled={draftVertices.length === 0}
+                    >
+                      <MdUndo /> Undo
+                    </button>
+                    <button type="button" onClick={handleCancelGeofenceDrawing}>
+                      <MdCancel /> Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="submit-button"
+                      onClick={handleSaveGeofence}
+                      disabled={draftVertices.length < 3}
+                    >
+                      <MdCheckCircle /> Save Geofence
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className="strategy-panels">
             <div className={panelClass('plan')}>
@@ -1099,7 +1449,7 @@ ${nodesKml}
                 >
                   {geofences.length === 0 ? (
                     <p className="form-hint">
-                      No geofences available. Create one on the Geofences page.
+                      No geofences available. Use the Create Geofence control above to draw one.
                     </p>
                   ) : (
                     geofences.map((geofence) => (
@@ -1259,7 +1609,7 @@ ${nodesKml}
         >
           <div className="strategy-node-inspector__header">
             <div>
-              <h2 id={inspectorTitleId}>{selectedNode.id}</h2>
+              <h2 id={inspectorTitleId}>{selectedNode.displayName ?? selectedNode.id}</h2>
               <p>
                 {selectedNode.type.toUpperCase()} - {selectedNode.profileId}
               </p>
@@ -1285,6 +1635,93 @@ ${nodesKml}
                 <div>{selectedNode.anchorDistance.toFixed(1)} m</div>
               </div>
             ) : null}
+            <label className="form-label" htmlFor={inspectorNameInputId}>
+              Node name
+            </label>
+            <input
+              id={inspectorNameInputId}
+              type="text"
+              className="control-input"
+              value={inspectorNameValue}
+              onChange={handleInspectorNameChange}
+            />
+            <label className="form-label" htmlFor={inspectorProfileSelectId}>
+              Node profile override
+            </label>
+            <select
+              id={inspectorProfileSelectId}
+              className="control-input"
+              value={inspectorProfileValue}
+              onChange={handleInspectorProfileChange}
+            >
+              <option value="">
+                Use plan profile ({baseSelectedNode?.profileId ?? selectedNode.profileId})
+              </option>
+              {NODE_PROFILES.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.label}
+                </option>
+              ))}
+            </select>
+            <p className="form-hint">Mix WiFi, RF, and radar hardware within the same perimeter.</p>
+            <div className="strategy-control strategy-control--stacked">
+              <label className="form-label" htmlFor={inspectorSlideInputId}>
+                Slide along perimeter (m)
+              </label>
+              <input
+                id={inspectorSlideInputId}
+                type="range"
+                min={-SLIDE_RANGE_METERS}
+                max={SLIDE_RANGE_METERS}
+                step={1}
+                value={inspectorSlideValue}
+                onChange={handleInspectorSlideChange}
+              />
+              <div className="muted">{inspectorSlideValue.toFixed(1)} m</div>
+              <p className="form-hint">
+                Positive values move the node forward along the fence line.
+              </p>
+            </div>
+            <div className="strategy-control strategy-control--stacked">
+              <label className="form-label" htmlFor={inspectorNorthInputId}>
+                Move north / south (m)
+              </label>
+              <input
+                id={inspectorNorthInputId}
+                type="range"
+                min={-LATERAL_RANGE_METERS}
+                max={LATERAL_RANGE_METERS}
+                step={1}
+                value={inspectorNorthValue}
+                onChange={handleInspectorNorthChange}
+              />
+              <div className="muted">
+                {inspectorNorthValue >= 0 ? '+' : ''}
+                {inspectorNorthValue.toFixed(1)} m
+              </div>
+              <p className="form-hint">
+                Positive values move the node north; negative values south.
+              </p>
+            </div>
+            <div className="strategy-control strategy-control--stacked">
+              <label className="form-label" htmlFor={inspectorEastInputId}>
+                Move east / west (m)
+              </label>
+              <input
+                id={inspectorEastInputId}
+                type="range"
+                min={-LATERAL_RANGE_METERS}
+                max={LATERAL_RANGE_METERS}
+                step={1}
+                value={inspectorEastValue}
+                onChange={handleInspectorEastChange}
+              />
+              <div className="muted">
+                {inspectorEastValue >= 0 ? '+' : ''}
+                {inspectorEastValue.toFixed(1)} m
+              </div>
+              <p className="form-hint">Positive values move the node east; negative values west.</p>
+            </div>
             <label className="form-label" htmlFor={inspectorRadiusInputId}>
               Detection distance (m)
             </label>
@@ -1305,19 +1742,21 @@ ${nodesKml}
             </p>
             {inspectorSupportsDirection ? (
               <>
-                <label className="form-label" htmlFor={inspectorOrientationInputId}>
-                  Orientation (degrees)
-                </label>
-                <input
-                  id={inspectorOrientationInputId}
-                  type="number"
-                  className="control-input"
-                  min={0}
-                  max={359}
-                  step={1}
-                  value={inspectorOrientationValue}
-                  onChange={handleInspectorOrientationChange}
-                />
+                <div className="strategy-control strategy-control--stacked">
+                  <label className="form-label" htmlFor={inspectorOrientationInputId}>
+                    Orientation (degrees)
+                  </label>
+                  <input
+                    id={inspectorOrientationInputId}
+                    type="range"
+                    min={0}
+                    max={359}
+                    step={1}
+                    value={inspectorOrientationValue}
+                    onChange={handleInspectorOrientationChange}
+                  />
+                  <div className="muted">{inspectorOrientationValue.toFixed(1)}&deg;</div>
+                </div>
                 <label className="form-label" htmlFor={inspectorArcInputId}>
                   Beam angle (degrees)
                 </label>
@@ -1370,37 +1809,6 @@ ${nodesKml}
         </section>
       ) : null}
 
-      {inventoryReport.length > 0 ? (
-        <section className="strategy-inventory">
-          <h2>Inventory check</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Required</th>
-                <th>Available</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inventoryReport.map((row) => (
-                <tr
-                  key={row.type}
-                  className={
-                    row.available < row.required ? 'strategy-inventory__row--warning' : undefined
-                  }
-                >
-                  <td>{row.type.toUpperCase()}</td>
-                  <td>{row.required}</td>
-                  <td>{row.available}</td>
-                  <td>{row.available >= row.required ? 'Ready' : 'Shortage'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
-
       <section className="strategy-table">
         <h2>Node placement plan</h2>
         {hasNodes ? (
@@ -1408,6 +1816,7 @@ ${nodesKml}
             <thead>
               <tr>
                 <th>#</th>
+                <th>Name</th>
                 <th>Latitude</th>
                 <th>Longitude</th>
                 <th>Profile</th>
@@ -1435,6 +1844,7 @@ ${nodesKml}
                 return (
                   <tr key={node.id} className={rowClassName}>
                     <td>{index + 1}</td>
+                    <td>{node.displayName ?? node.id}</td>
                     <td>{node.lat.toFixed(6)}</td>
                     <td>{node.lon.toFixed(6)}</td>
                     <td>{node.profileId}</td>
@@ -1541,10 +1951,25 @@ function buildStrategy(polygons: GeofenceVertex[][], options: StrategyOptions): 
         flags.push('anchor-constraint');
       }
 
-      const orientation = profile.arcWidth < 360 ? toBearingDegrees(normal) : undefined;
+      nodeCounter += 1;
+      const baseId = `Node ${nodeCounter}`;
+      const normalBearing = toBearingDegrees(normal);
+      const tangentBearing = toBearingDegrees(sample.segmentDirection);
+      const orientation = profile.arcWidth < 360 ? normalBearing : undefined;
+
+      const pathData: NodePathData = {
+        origin,
+        projected,
+        perimeter,
+        isCounterClockwise,
+        distanceAlong,
+        normalShift:
+          (offsetPoint.x - sample.point.x) * normal.x + (offsetPoint.y - sample.point.y) * normal.y,
+      };
 
       nodes.push({
-        id: `Node ${++nodeCounter}`,
+        id: baseId,
+        displayName: baseId,
         lat: latLon.lat,
         lon: latLon.lon,
         radius,
@@ -1556,6 +1981,9 @@ function buildStrategy(polygons: GeofenceVertex[][], options: StrategyOptions): 
         orientation,
         anchorDistance: anchorInfo.distance,
         flags,
+        tangentBearing,
+        normalBearing,
+        path: pathData,
       });
     }
   });
@@ -1846,6 +2274,19 @@ function downloadText(filename: string, mimeType: string, content: string) {
   window.URL.revokeObjectURL(url);
 }
 
+function normalizeAlarmLevel(value: string | null): string {
+  const normalized = (value ?? '').toUpperCase();
+  if (
+    normalized === 'INFO' ||
+    normalized === 'NOTICE' ||
+    normalized === 'ALERT' ||
+    normalized === 'CRITICAL'
+  ) {
+    return normalized;
+  }
+  return 'ALERT';
+}
+
 function escapeXml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -1866,10 +2307,9 @@ function toDeg(radians: number) {
 function buildStrategyIcon(node: StrategyNode) {
   const profile = PROFILE_BY_ID.get(node.profileId);
   const baseColor = profile?.color ?? '#2563eb';
+  const label = (node.displayName ?? node.id).split(' ').pop();
   return L.divIcon({
-    html: `<div class="strategy-node-marker" style="background:${baseColor}">${node.id
-      .split(' ')
-      .pop()}</div>`,
+    html: `<div class="strategy-node-marker" style="background:${baseColor}">${label}</div>`,
     className: 'strategy-node-wrapper',
     iconSize: [28, 28],
     iconAnchor: [14, 14],
@@ -1883,6 +2323,38 @@ function buildAnchorIcon() {
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
+}
+
+function StrategyDrawingHandler({
+  enabled,
+  onPoint,
+  onHover,
+}: {
+  enabled: boolean;
+  onPoint?: (vertex: GeofenceVertex) => void;
+  onHover?: (vertex: GeofenceVertex | null) => void;
+}) {
+  useMapEvents({
+    click(event) {
+      if (!enabled || !onPoint) {
+        return;
+      }
+      onPoint({ lat: event.latlng.lat, lon: event.latlng.lng });
+    },
+    mousemove(event) {
+      if (!enabled || !onHover) {
+        return;
+      }
+      onHover({ lat: event.latlng.lat, lon: event.latlng.lng });
+    },
+    mouseout() {
+      if (!enabled || !onHover) {
+        return;
+      }
+      onHover(null);
+    },
+  });
+  return null;
 }
 
 function MapBoundsUpdater({ bounds, enabled }: { bounds: L.LatLngBounds; enabled: boolean }) {
