@@ -68,7 +68,7 @@ const GPS_SIMPLE_REGEX =
 const NODE_HEARTBEAT_REGEX =
   /^\[NODE_HB\]\s*(?<node>[A-Za-z0-9_-]+).*?GPS[=:](?<lat>-?\d+\.\d+),\s*(?<lon>-?\d+\.\d+)/i;
 const STATUS_REGEX =
-  /^(?<node>[A-Za-z0-9_-]+)\s*:?\s*STATUS:\s*Mode:(?<mode>[A-Za-z0-9+]+)\s+Scan:(?<scan>[A-Za-z]+)\s+Hits:(?<hits>\d+)\s+Unique:(?<unique>\d+)\s+Temp:\s*(?<tempC>[0-9.]+).?C\s*\/\s*(?<tempF>[0-9.]+).?F\s+Up:(?<uptime>[0-9:]+)(?:\s+Targets:(?<targets>\d+))?/i;
+  /^(?<node>[A-Za-z0-9_-]+)\s*:?\s*STATUS:\s*Mode:(?<mode>[A-Za-z0-9+]+)\s+Scan:(?<scan>[A-Za-z]+)\s+Hits:(?<hits>\d+)\s+Unique:(?<unique>\d+)\s+Temp:\s*(?<tempC>[0-9.]+).?C\s*\/\s*(?<tempF>[0-9.]+).?F\s+Up:(?<uptime>[0-9:]+)(?:\s+Targets:(?<targets>\d+))?(?:\s+GPS[:=](?<gpsLat>-?\d+(?:\.\d+)?),\s*(?<gpsLon>-?\d+(?:\.\d+)?))?/i;
 const CONFIG_ACK_REGEX = /^(?<node>[A-Za-z0-9_-]+):\s*CONFIG_ACK:(?<type>[A-Z_]+):(?<value>.+)$/i;
 
 const OP_ACK_REGEX =
@@ -456,13 +456,34 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
       if (statusMatch.groups.targets) {
         data.targets = toNumber(statusMatch.groups.targets);
       }
-      this.pendingStatuses.set(nodeId, {
+      const lat = toNumber(statusMatch.groups.gpsLat);
+      const lon = toNumber(statusMatch.groups.gpsLon);
+      const hasInlineGps = lat != null && lon != null;
+      const pendingStatus: PendingStatus = {
         nodeId,
         message,
         data,
         rawLines: [line],
         createdAt: Date.now(),
-      });
+      };
+      if (hasInlineGps) {
+        const formattedLat = formatCoordinate(lat, true);
+        const formattedLon = formatCoordinate(lon, false);
+        if (!this.isDuplicateGps(nodeId, lat, lon)) {
+          this.recordGps(nodeId, lat, lon);
+          results.push(this.toTelemetry(nodeId, lat, lon, line, 'Status GPS'));
+        }
+        results.push(
+          this.buildStatusAlert(pendingStatus, {
+            lat,
+            lon,
+            formattedLat,
+            formattedLon,
+          }),
+        );
+        return this.deliverOrRaw(results, line);
+      }
+      this.pendingStatuses.set(nodeId, pendingStatus);
       return this.deliverOrRaw(results, line);
     }
     const scanDoneMatch = SCAN_DONE_REGEX.exec(line);
