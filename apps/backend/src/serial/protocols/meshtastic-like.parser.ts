@@ -207,27 +207,6 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
     const routerMatch = ROUTER_TEXT_MSG_REGEX.exec(line);
     if (routerMatch?.[1]) {
       const embeddedMsg = routerMatch[1].trim().replace(/#$/, '');
-      const embeddedResults = this.parseText(embeddedMsg);
-      if (embeddedResults && embeddedResults.length > 0) {
-        return embeddedResults.map((event) => ({ ...event, raw: line }));
-      }
-
-      const genericMatch = GENERIC_NODE_LINE_REGEX.exec(embeddedMsg);
-      if (genericMatch?.groups) {
-        const normalizedNode = this.normalizeNodeId(genericMatch.groups.node);
-        const message = `[${genericMatch.groups.node}] ${genericMatch.groups.body}`;
-        return [
-          {
-            kind: 'alert',
-            level: 'INFO',
-            category: 'text',
-            nodeId: normalizedNode,
-            message,
-            raw: line,
-          },
-        ];
-      }
-
       return [
         {
           kind: 'alert',

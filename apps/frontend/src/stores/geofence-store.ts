@@ -57,6 +57,7 @@ interface GeofenceStoreState {
 }
 
 const PATCH_DEBOUNCE_MS = 400;
+const PROCESS_NODE_POSITIONS = false;
 const pendingPatches = new Map<string, UpdateGeofenceRequest>();
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -211,6 +212,9 @@ export const useGeofenceStore = create<GeofenceStoreState>()((set, get) => {
       get().updateGeofence(id, { alarm: { enabled } });
     },
     processNodePosition: (node) => {
+      if (!PROCESS_NODE_POSITIONS) {
+        return [];
+      }
       const events: GeofenceEvent[] = [];
       const { geofences } = get();
 
