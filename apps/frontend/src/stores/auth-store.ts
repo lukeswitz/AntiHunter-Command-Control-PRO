@@ -138,6 +138,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           disclaimer: DEFAULT_DISCLAIMER,
           isSubmitting: false,
           error: undefined,
+          postLoginNotice: response.postLoginNotice ?? null,
         });
         storeAuthToken(null);
         return;
@@ -152,7 +153,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           pendingToken: null,
           twoFactorToken: null,
           twoFactorRecoveryUsed: false,
-          postLoginNotice: null,
+          postLoginNotice: response.postLoginNotice ?? null,
           disclaimer: DEFAULT_DISCLAIMER,
           isSubmitting: false,
         });
@@ -164,6 +165,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           twoFactorToken: null,
           twoFactorRecoveryUsed: false,
           token: null,
+          postLoginNotice: response.postLoginNotice ?? null,
           disclaimer: response.disclaimer ?? DEFAULT_DISCLAIMER,
           isSubmitting: false,
         });
@@ -196,6 +198,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           twoFactorRecoveryUsed: false,
           disclaimer: DEFAULT_DISCLAIMER,
           isSubmitting: false,
+          postLoginNotice: response.postLoginNotice ?? null,
         });
         storeAuthToken(null);
         return;
@@ -208,7 +211,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         pendingToken: null,
         twoFactorToken: null,
         twoFactorRecoveryUsed: false,
-        postLoginNotice: null,
+        postLoginNotice: response.postLoginNotice ?? null,
         disclaimer: DEFAULT_DISCLAIMER,
         isSubmitting: false,
       });

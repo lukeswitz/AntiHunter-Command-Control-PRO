@@ -13,7 +13,15 @@ export class CommandsController {
   @Post('send')
   @Roles(Role.ADMIN, Role.OPERATOR)
   async send(@Req() req: Request, @Body() dto: SendCommandDto) {
-    return this.commandsService.sendCommand(dto, req.auth?.sub);
+    const meta = {
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+      userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+      fingerprint:
+        (req.headers['x-client-fingerprint'] as string | undefined) ??
+        (req.headers['x-request-id'] as string | undefined) ??
+        null,
+    };
+    return this.commandsService.sendCommand(dto, req.auth?.sub, meta);
   }
 
   @Get(':id')

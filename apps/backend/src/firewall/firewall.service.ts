@@ -168,7 +168,11 @@ export class FirewallService {
     };
   }
 
-  async updateConfig(dto: UpdateFirewallConfigDto): Promise<FirewallConfigResponse> {
+  async updateConfig(
+    dto: UpdateFirewallConfigDto,
+    actorId?: string,
+  ): Promise<FirewallConfigResponse> {
+    const existing = await this.prisma.firewallConfig.findUnique({ where: { id: 1 } });
     const updateData: Prisma.FirewallConfigUpdateInput = {};
     if (dto.enabled !== undefined) {
       updateData.enabled = dto.enabled;
@@ -217,6 +221,17 @@ export class FirewallService {
         banDurationSeconds: dto.banDurationSeconds ?? 3600,
       },
       update: updateData,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId ?? null,
+        action: 'FIREWALL_CONFIG_UPDATE',
+        entity: 'FirewallConfig',
+        entityId: '1',
+        before: existing ? this.toFirewallAuditSnapshot(existing) : Prisma.JsonNull,
+        after: this.toFirewallAuditSnapshot(config),
+      },
     });
 
     return this.mapConfig(config);
@@ -469,7 +484,7 @@ export class FirewallService {
     return false;
   }
 
-  private lookupCountry(ip: string): string | undefined {
+  lookupCountry(ip: string): string | undefined {
     try {
       const lookup = geoip.lookup(ip);
       return lookup?.country?.toUpperCase();
@@ -698,6 +713,21 @@ export class FirewallService {
       blocked: log.blocked,
       reason: log.reason ?? null,
       userAgent: log.userAgent ?? null,
+    };
+  }
+
+  private toFirewallAuditSnapshot(config: FirewallConfig) {
+    return {
+      enabled: config.enabled,
+      defaultPolicy: config.defaultPolicy,
+      geoMode: config.geoMode,
+      allowedCountries: config.allowedCountries ?? [],
+      blockedCountries: config.blockedCountries ?? [],
+      ipAllowList: config.ipAllowList ?? [],
+      ipBlockList: config.ipBlockList ?? [],
+      failThreshold: config.failThreshold,
+      failWindowSeconds: config.failWindowSeconds,
+      banDurationSeconds: config.banDurationSeconds,
     };
   }
 

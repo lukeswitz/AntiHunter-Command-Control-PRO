@@ -58,6 +58,16 @@ export interface UserDto {
   jobTitle?: string | null;
   isActive: boolean;
   legalAccepted: boolean;
+  failedLoginAttempts: number;
+  lastFailedLoginAt?: Date | null;
+  lockedAt?: Date | null;
+  lockedUntil?: Date | null;
+  lockedReason?: string | null;
+  lastLoginAt?: Date | null;
+  lastLoginIp?: string | null;
+  lastLoginCountry?: string | null;
+  lastLoginUserAgent?: string | null;
+  anomalyFlag: boolean;
   createdAt: Date;
   updatedAt: Date;
   preferences: PreferenceDto;
@@ -377,6 +387,40 @@ export class UsersService {
     return this.mapUser(user);
   }
 
+  async unlockUser(id: string, actorId?: string): Promise<UserDto> {
+    const existing = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        preferences: true,
+        permissions: true,
+        siteAccess: { include: { site: true } },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('User not found');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        lockedAt: null,
+        lockedUntil: null,
+        lockedReason: null,
+        lockedBy: actorId ?? null,
+        failedLoginAttempts: 0,
+        anomalyFlag: false,
+      },
+      include: {
+        preferences: true,
+        permissions: true,
+        siteAccess: { include: { site: true } },
+      },
+    });
+
+    await this.writeAudit(actorId, 'USER_UNLOCK', id, existing, updated);
+    return this.mapUser(updated);
+  }
+
   async disableUser(id: string, actorId: string): Promise<UserDto> {
     if (id === actorId) {
       throw new ForbiddenException('You cannot deactivate your own account');
@@ -608,6 +652,16 @@ export class UsersService {
       jobTitle: user.jobTitle,
       isActive: user.isActive,
       legalAccepted: user.legalAcceptedAt != null,
+      failedLoginAttempts: user.failedLoginAttempts ?? 0,
+      lastFailedLoginAt: user.lastFailedLoginAt ?? undefined,
+      lockedAt: user.lockedAt ?? undefined,
+      lockedUntil: user.lockedUntil ?? undefined,
+      lockedReason: user.lockedReason ?? undefined,
+      lastLoginAt: user.lastLoginAt ?? undefined,
+      lastLoginIp: user.lastLoginIp ?? undefined,
+      lastLoginCountry: user.lastLoginCountry ?? undefined,
+      lastLoginUserAgent: user.lastLoginUserAgent ?? undefined,
+      anomalyFlag: user.anomalyFlag ?? false,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       preferences: {

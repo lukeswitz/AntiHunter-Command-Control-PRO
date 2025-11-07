@@ -240,6 +240,22 @@ AntiHunter ships with layered defenses—RBAC, MFA, rate limiting, and a program
 | `RATE_LIMIT_2FA_LIMIT` / `RATE_LIMIT_2FA_TTL` | `10` / `300s` | Caps TOTP verification attempts. |
 | `AUTH_MIN_SUBMIT_MS` | `600` ms | Minimum time between rendering the login form and submission; pairs with the honeypot field. |
 
+### Account Lockout & Login Alerts
+
+- Password failures accrue per-user counters; once the threshold is crossed the account is locked and security contacts are alerted.
+- Suspicious logins (new country/IP) raise security alerts, notify operators, and reset trusted device metadata.
+- Admins can unlock accounts via `POST /users/:id/unlock`.
+
+| Setting / Env var | Default | Notes |
+|-------------------|---------|-------|
+| `AUTH_LOCKOUT_ENABLED` | `true` | Disable only for lab environments. |
+| `AUTH_LOCKOUT_THRESHOLD` | `5` attempts | Number of consecutive password failures before locking the account. |
+| `AUTH_LOCKOUT_DURATION_MINUTES` | `0` | Minutes until automatic unlock. `0` = manual unlock required. |
+| `AUTH_LOCKOUT_NOTIFY` | _(inherits `SECURITY_ALERT_RECIPIENTS`)_ | Comma-separated list of emails that receive lockout notices. |
+| `AUTH_ANOMALY_REQUIRE_2FA` | `true` | Forces a fresh MFA challenge for anomaly-detected logins (in addition to the normal flow). |
+| `AUTH_ANOMALY_NOTIFY` | _(inherits `SECURITY_ALERT_RECIPIENTS`)_ | Email recipients for anomaly login alerts. |
+| `SECURITY_ALERT_RECIPIENTS` | _(unset)_ | Global fallback email list for any security notification. |
+
 ### Firewall & Network Controls
 
 The `/config/firewall` API (and Config UI) manages allow/deny policies, geo filtering, and auto-bans triggered by auth failures. Logs can be promoted directly into permanent rules.
@@ -267,6 +283,14 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | `HTTP_REDIRECT_PORT` | _(unset)_ | Enables HTTP→HTTPS redirects when running dual listeners. |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS. |
 | `SITE_ID` | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing. |
+
+- Helmet now enforces CSP, referrer policy, frameguard, cross-origin resource policy, and HSTS (when HTTPS is enabled) for every response.
+
+### Command Audit & Attestation
+
+- Every `CommandLog` row stores the originating IP, user-agent, and optional client fingerprint for “who sent this command?” investigations.
+- REST and WebSocket command paths automatically pass metadata; remote MQTT fan-out preserves origin site IDs for cross-site attestations.
+- Config updates (App + Firewall) are persisted in `AuditLog` with before/after snapshots to provide tamper-evident history.
 
 ### Hardening Checklist
 

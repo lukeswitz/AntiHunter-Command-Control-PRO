@@ -8,7 +8,9 @@ import * as jwt from 'jsonwebtoken';
 import { AuthTokenPayload } from './auth.types';
 import { LoginDto } from './dto/login.dto';
 import { LEGAL_DISCLAIMER } from './legal-disclaimer';
+import { CommandCenterEvent, EventBusService } from '../events/event-bus.service';
 import { FirewallService } from '../firewall/firewall.service';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DEFAULT_FEATURES_BY_ROLE } from '../users/user-permissions.constants';
 
@@ -39,6 +41,16 @@ interface UserResponse {
   phone?: string | null;
   jobTitle?: string | null;
   isActive: boolean;
+  failedLoginAttempts: number;
+  lastFailedLoginAt?: Date | null;
+  lockedAt?: Date | null;
+  lockedUntil?: Date | null;
+  lockedReason?: string | null;
+  lastLoginAt?: Date | null;
+  lastLoginIp?: string | null;
+  lastLoginCountry?: string | null;
+  lastLoginUserAgent?: string | null;
+  anomalyFlag: boolean;
   createdAt: Date;
   updatedAt: Date;
   preferences: PreferencesResponse;
@@ -52,7 +64,16 @@ interface LoginResult {
   legalAccepted: boolean;
   disclaimer?: string;
   twoFactorRequired?: boolean;
+  postLoginNotice?: string;
 }
+
+type UserWithRelations = Prisma.UserGetPayload<{
+  include: {
+    preferences: true;
+    permissions: true;
+    siteAccess: { include: { site: true } };
+  };
+}>;
 
 @Injectable()
 export class AuthService {
@@ -60,14 +81,51 @@ export class AuthService {
   private readonly tokenTtl = process.env.JWT_EXPIRY ?? '12h';
   private readonly twoFactorTokenTtl = process.env.TWO_FACTOR_TOKEN_EXPIRY ?? '10m';
   private readonly loginMinSubmitMs: number;
+  private readonly lockoutEnabled: boolean;
+  private readonly lockoutThreshold: number;
+  private readonly lockoutDurationMinutes: number;
+  private readonly lockoutRecipients: string[];
+  private readonly anomalyRecipients: string[];
+  private readonly requireAnomalyTwoFactor: boolean;
+  private readonly securityAlertRecipients: string[];
+  private readonly baseUserInclude = {
+    preferences: true,
+    permissions: true,
+    siteAccess: { include: { site: true } },
+  } as const;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly firewallService: FirewallService,
+    private readonly eventBus: EventBusService,
+    private readonly mailService: MailService,
     configService: ConfigService,
   ) {
     const configValue = configService.get<number>('rateLimit.form.loginMinSubmitMs', 600);
     this.loginMinSubmitMs = Number.isFinite(configValue) ? Math.max(0, configValue) : 600;
+    const lockoutConfig = configService.get<{
+      enabled?: boolean;
+      threshold?: number;
+      durationMinutes?: number;
+      notify?: string[];
+    }>('auth.lockout');
+    const anomalyConfig = configService.get<{
+      requireTwoFactor?: boolean;
+      notify?: string[];
+    }>('auth.anomaly');
+    const securityRecipients = configService.get<string[]>('security.alertRecipients') ?? [];
+
+    this.lockoutEnabled = lockoutConfig?.enabled !== false;
+    this.lockoutThreshold = Math.max(1, lockoutConfig?.threshold ?? 5);
+    this.lockoutDurationMinutes = Math.max(0, lockoutConfig?.durationMinutes ?? 0);
+    this.lockoutRecipients = lockoutConfig?.notify?.length
+      ? lockoutConfig.notify
+      : securityRecipients;
+    this.anomalyRecipients = anomalyConfig?.notify?.length
+      ? anomalyConfig.notify
+      : securityRecipients;
+    this.requireAnomalyTwoFactor = anomalyConfig?.requireTwoFactor !== false;
+    this.securityAlertRecipients = securityRecipients;
   }
 
   async login(dto: LoginDto, req?: Request): Promise<LoginResult> {
@@ -76,6 +134,7 @@ export class AuthService {
     const path = req?.path ?? '/auth/login';
     const email = dto.email;
     const password = dto.password;
+    const country = ip ? this.firewallService.lookupCountry(ip) : undefined;
 
     const normalizedHoneypot = dto.honeypot?.trim();
     if (normalizedHoneypot) {
@@ -103,13 +162,9 @@ export class AuthService {
       }
     }
 
-    const user = await this.prisma.user.findUnique({
+    let user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
-      include: {
-        preferences: true,
-        permissions: true,
-        siteAccess: { include: { site: true } },
-      },
+      include: this.baseUserInclude,
     });
     if (!user) {
       if (ip) {
@@ -120,6 +175,19 @@ export class AuthService {
         });
       }
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    user = await this.refreshLockedState(user);
+
+    if (user.lockedAt) {
+      if (ip) {
+        await this.firewallService.registerAuthFailure(ip, {
+          reason: 'ACCOUNT_LOCKED',
+          path,
+          userAgent,
+        });
+      }
+      throw new UnauthorizedException('Account is temporarily locked. Contact an administrator.');
     }
 
     if (!user.isActive) {
@@ -135,52 +203,76 @@ export class AuthService {
 
     const valid = await argon2.verify(user.passwordHash, password);
     if (!valid) {
-      if (ip) {
-        await this.firewallService.registerAuthFailure(ip, {
-          reason: 'INVALID_PASSWORD',
-          path,
-          userAgent,
-        });
-      }
+      await this.handleFailedLogin(user, ip, path, userAgent);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     if (ip) {
-      await this.firewallService.registerAuthSuccess(ip, { path, userAgent });
+      await this.firewallService.registerAuthSuccess(ip, { path, userAgent, country });
     }
 
-    const legalAccepted = !!user.legalAcceptedAt;
+    const anomalyDetected = this.detectAnomaly(user, ip, country);
+    const updatedUser = await this.handleSuccessfulLogin(user, {
+      ip,
+      country,
+      userAgent,
+      anomalyDetected,
+    });
+
+    let postLoginNotice: string | undefined;
+    if (anomalyDetected) {
+      postLoginNotice = this.buildAnomalyNotice(user, ip, country);
+      await this.emitSecurityAlert(
+        `Anomalous login detected for ${updatedUser.email}`,
+        'ALERT',
+        {
+          userId: updatedUser.id,
+          ip,
+          country,
+        },
+        this.anomalyRecipients,
+      );
+      if (this.requireAnomalyTwoFactor && !updatedUser.twoFactorEnabled) {
+        postLoginNotice =
+          postLoginNotice ??
+          'Unusual login detected. Enable two-factor authentication to avoid account lockouts.';
+      }
+    }
+
+    const userResponse = this.toUserResponse(updatedUser);
+    const legalAccepted = !!updatedUser.legalAcceptedAt;
 
     if (!legalAccepted) {
-      const token = this.createToken(user.id, user.email, user.role, false);
+      const token = this.createToken(updatedUser.id, updatedUser.email, updatedUser.role, false);
       return {
         token,
-        user: this.toUserResponse(user),
+        user: userResponse,
         legalAccepted: false,
         disclaimer: LEGAL_DISCLAIMER,
+        postLoginNotice,
       };
     }
 
-    if (user.twoFactorEnabled && user.twoFactorSecret) {
-      const token = this.createToken(user.id, user.email, user.role, true, {
+    if (updatedUser.twoFactorEnabled && updatedUser.twoFactorSecret) {
+      const token = this.createToken(updatedUser.id, updatedUser.email, updatedUser.role, true, {
         twoFactorPending: true,
         expiresIn: this.twoFactorTokenTtl,
       });
       return {
         token,
-        user: this.toUserResponse(user),
+        user: userResponse,
         legalAccepted: true,
         twoFactorRequired: true,
+        postLoginNotice,
       };
     }
 
-    const token = this.createToken(user.id, user.email, user.role, legalAccepted);
-
+    const token = this.createToken(updatedUser.id, updatedUser.email, updatedUser.role, true);
     return {
       token,
-      user: this.toUserResponse(user),
-      legalAccepted,
-      disclaimer: legalAccepted ? undefined : LEGAL_DISCLAIMER,
+      user: userResponse,
+      legalAccepted: true,
+      postLoginNotice,
     };
   }
 
@@ -268,6 +360,237 @@ export class AuthService {
     });
   }
 
+  private async refreshLockedState(user: UserWithRelations): Promise<UserWithRelations> {
+    if (!user.lockedAt) {
+      return user;
+    }
+    if (user.lockedUntil && user.lockedUntil <= new Date()) {
+      return this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          lockedAt: null,
+          lockedUntil: null,
+          lockedReason: null,
+          lockedBy: null,
+          failedLoginAttempts: 0,
+        },
+        include: this.baseUserInclude,
+      });
+    }
+    return user;
+  }
+
+  private async handleFailedLogin(
+    user: UserWithRelations,
+    ip?: string | null,
+    path?: string,
+    userAgent?: string,
+  ): Promise<void> {
+    const nextAttempts = (user.failedLoginAttempts ?? 0) + 1;
+    const data: Prisma.UserUpdateInput = {
+      failedLoginAttempts: nextAttempts,
+      lastFailedLoginAt: new Date(),
+    };
+    let locked = false;
+    if (this.lockoutEnabled && nextAttempts >= this.lockoutThreshold) {
+      locked = true;
+      data.failedLoginAttempts = 0;
+      data.lockedAt = new Date();
+      data.lockedBy = null;
+      data.lockedReason = 'TOO_MANY_FAILURES';
+      data.lockedUntil =
+        this.lockoutDurationMinutes > 0
+          ? new Date(Date.now() + this.lockoutDurationMinutes * 60_000)
+          : null;
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data,
+    });
+
+    if (ip) {
+      await this.firewallService.registerAuthFailure(ip, {
+        reason: locked ? 'ACCOUNT_LOCKED' : 'INVALID_PASSWORD',
+        path,
+        userAgent,
+      });
+    }
+
+    if (locked) {
+      await this.emitSecurityAlert(
+        `Account locked after repeated failures: ${user.email}`,
+        'ALERT',
+        {
+          userId: user.id,
+          ip,
+        },
+        this.lockoutRecipients.length ? this.lockoutRecipients : undefined,
+        [user.email],
+      );
+      await this.writeSecurityAudit('ACCOUNT_LOCK', user.id, null, {
+        reason: 'TOO_MANY_FAILURES',
+        lockedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  private detectAnomaly(user: UserWithRelations, ip?: string | null, country?: string): boolean {
+    if (!ip && !country) {
+      return false;
+    }
+    const ipChanged = user.lastLoginIp && ip && user.lastLoginIp !== ip;
+    const countryChanged = user.lastLoginCountry && country && user.lastLoginCountry !== country;
+    return Boolean(ipChanged || countryChanged);
+  }
+  private async handleSuccessfulLogin(
+    user: UserWithRelations,
+    context: {
+      ip?: string | null;
+      country?: string;
+      userAgent?: string;
+      anomalyDetected?: boolean;
+    },
+  ): Promise<Prisma.UserGetPayload<{ include: typeof this.baseUserInclude }>> {
+    return this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: 0,
+        lastFailedLoginAt: null,
+        lockedAt: null,
+        lockedUntil: null,
+        lockedReason: null,
+        lockedBy: null,
+        anomalyFlag: context.anomalyDetected ?? false,
+        lastLoginAt: new Date(),
+        lastLoginIp: context.ip ?? null,
+        lastLoginCountry: context.country ?? null,
+        lastLoginUserAgent: context.userAgent ?? null,
+      },
+      include: this.baseUserInclude,
+    });
+  }
+
+  private buildAnomalyNotice(
+    previous: UserWithRelations,
+    ip?: string | null,
+    country?: string,
+  ): string {
+    const previousCountry = previous.lastLoginCountry ?? 'an unknown location';
+    const newCountry = country ?? 'an unknown location';
+    if (previousCountry === newCountry && previous.lastLoginIp === ip) {
+      return 'We detected an unusual login on your account.';
+    }
+    if (previousCountry !== newCountry) {
+      return `We detected a login from ${newCountry}. Your last session originated from ${previousCountry}.`;
+    }
+    if (previous.lastLoginIp && ip && previous.lastLoginIp !== ip) {
+      return `We detected a login from a new network (${ip}). Previously you signed in from ${previous.lastLoginIp}.`;
+    }
+    return 'We detected an unusual login on your account.';
+  }
+
+  private async emitSecurityAlert(
+    message: string,
+    level: 'NOTICE' | 'ALERT',
+    data?: Record<string, unknown>,
+    recipients?: string[],
+    additionalRecipients?: string[],
+  ): Promise<void> {
+    const payload: CommandCenterEvent = {
+      type: 'event.alert',
+      level,
+      category: 'security',
+      message,
+      timestamp: new Date().toISOString(),
+      data,
+    };
+    this.eventBus.publish(payload);
+
+    const targets = this.normalizeRecipientList(
+      recipients?.length ? recipients : this.securityAlertRecipients,
+      additionalRecipients,
+    );
+    if (targets.length === 0) {
+      return;
+    }
+
+    const body = `${message}${
+      data ? `\n\nDetails: ${JSON.stringify(data, null, 2)}` : ''
+    }\n\nThis notification was generated automatically by AntiHunter Command Center.`;
+    await this.notifyRecipients(targets, `[AHCC] Security Alert`, body);
+  }
+
+  private normalizeRecipientList(...lists: (string[] | undefined)[]): string[] {
+    const merged = new Set<string>();
+    lists
+      .flatMap((list) => list ?? [])
+      .forEach((entry) => {
+        const trimmed = entry.trim();
+        if (trimmed) {
+          merged.add(trimmed.toLowerCase());
+        }
+      });
+    return Array.from(merged);
+  }
+
+  private async notifyRecipients(recipients: string[], subject: string, text: string) {
+    await Promise.all(
+      recipients.map((to) =>
+        this.mailService
+          .sendMail({
+            to,
+            subject,
+            text,
+          })
+          .catch((error) => {
+            // do not block login if email fails
+            console.warn(`Failed to send security email to ${to}: ${(error as Error).message}`);
+          }),
+      ),
+    );
+  }
+
+  private async writeSecurityAudit(
+    action: string,
+    entityId: string,
+    before: unknown,
+    after: unknown,
+  ): Promise<void> {
+    await this.prisma.auditLog.create({
+      data: {
+        action,
+        entity: 'Security',
+        entityId,
+        before: this.toJsonValue(before),
+        after: this.toJsonValue(after),
+      },
+    });
+  }
+
+  private toJsonValue(value: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+    if (value === undefined || value === null) {
+      return Prisma.JsonNull;
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (Array.isArray(value)) {
+      return value.map((entry) => this.toJsonValue(entry)) as Prisma.InputJsonValue;
+    }
+    if (typeof value === 'object') {
+      const mapped = Object.entries(value as Record<string, unknown>).reduce(
+        (acc, [key, val]) => {
+          acc[key] = this.toJsonValue(val);
+          return acc;
+        },
+        {} as Record<string, Prisma.InputJsonValue>,
+      );
+      return mapped as Prisma.InputJsonValue;
+    }
+    return value as Prisma.InputJsonValue;
+  }
+
   private toUserResponse(
     user: Prisma.UserGetPayload<{
       include: {
@@ -290,6 +613,16 @@ export class AuthService {
       phone: user.phone,
       jobTitle: user.jobTitle,
       isActive: user.isActive,
+      failedLoginAttempts: user.failedLoginAttempts ?? 0,
+      lastFailedLoginAt: user.lastFailedLoginAt ?? undefined,
+      lockedAt: user.lockedAt ?? undefined,
+      lockedUntil: user.lockedUntil ?? undefined,
+      lockedReason: user.lockedReason ?? undefined,
+      lastLoginAt: user.lastLoginAt ?? undefined,
+      lastLoginIp: user.lastLoginIp ?? undefined,
+      lastLoginCountry: user.lastLoginCountry ?? undefined,
+      lastLoginUserAgent: user.lastLoginUserAgent ?? undefined,
+      anomalyFlag: user.anomalyFlag ?? false,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       preferences: {

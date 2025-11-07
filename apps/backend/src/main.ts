@@ -93,12 +93,28 @@ async function bootstrap(): Promise<void> {
           scriptSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", 'data:', 'https:'],
-          connectSrc: ["'self'", 'ws:', 'wss:', 'https://tile.openstreetmap.org'],
+          connectSrc: ["'self'", 'blob:', 'ws:', 'wss:', 'https://tile.openstreetmap.org'],
           fontSrc: ["'self'", 'data:'],
           objectSrc: ["'none'"],
         },
       },
+      referrerPolicy: { policy: 'no-referrer' },
+      crossOriginResourcePolicy: { policy: 'same-site' },
       crossOriginEmbedderPolicy: false,
+      frameguard: { action: 'deny' },
+      hsts: httpsOptions
+        ? {
+            maxAge: 31536000,
+            includeSubDomains: true,
+          }
+        : false,
+      permissionsPolicy: {
+        features: {
+          geolocation: ["'none'"],
+          microphone: ["'none'"],
+          camera: ["'none'"],
+        },
+      },
     }),
   );
 

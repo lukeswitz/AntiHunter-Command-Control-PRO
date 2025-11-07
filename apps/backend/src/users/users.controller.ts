@@ -56,6 +56,13 @@ export class UsersController {
     return this.usersService.updateUser(id, dto, actorId!);
   }
 
+  @Post(':id/unlock')
+  @Roles(Role.ADMIN)
+  unlockUser(@Param('id') id: string, @Req() req: Request) {
+    const actorId = req.auth?.sub;
+    return this.usersService.unlockUser(id, actorId ?? undefined);
+  }
+
   @Get(':id')
   @Roles(Role.ADMIN)
   getUserDetails(@Param('id') id: string) {

@@ -404,6 +404,16 @@ export interface AuthUser {
   legalAcceptedAt?: string | null;
   twoFactorEnabled: boolean;
   twoFactorEnabledAt?: string | null;
+  failedLoginAttempts: number;
+  lastFailedLoginAt?: string | null;
+  lockedAt?: string | null;
+  lockedUntil?: string | null;
+  lockedReason?: string | null;
+  lastLoginAt?: string | null;
+  lastLoginIp?: string | null;
+  lastLoginCountry?: string | null;
+  lastLoginUserAgent?: string | null;
+  anomalyFlag: boolean;
   createdAt: string;
   updatedAt: string;
   preferences: UserPreferences;
@@ -417,6 +427,7 @@ export interface LoginResponse {
   legalAccepted: boolean;
   disclaimer?: string;
   twoFactorRequired?: boolean;
+  postLoginNotice?: string | null;
 }
 
 export interface MeResponse {

@@ -19,8 +19,8 @@ export class AppConfigService {
     return this.toResponse(config);
   }
 
-  async updateSettings(dto: UpdateAppSettingsDto): Promise<AppConfigResponse> {
-    await this.ensureExists();
+  async updateSettings(dto: UpdateAppSettingsDto, actorId?: string): Promise<AppConfigResponse> {
+    const existing = await this.ensureExists();
     const {
       mailPassword,
       alertColorIdle,
@@ -85,6 +85,17 @@ export class AppConfigService {
       data,
     });
 
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId ?? null,
+        action: 'APP_CONFIG_UPDATE',
+        entity: 'AppConfig',
+        entityId: String(APP_CONFIG_ID),
+        before: this.toAuditSnapshot(existing),
+        after: this.toAuditSnapshot(updated),
+      },
+    });
+
     return this.toResponse(updated);
   }
 
@@ -97,6 +108,14 @@ export class AppConfigService {
   }
 
   private toResponse(config: AppConfig): AppConfigResponse {
+    const { mailPassword, ...rest } = config;
+    return {
+      ...rest,
+      mailPasswordSet: !!mailPassword,
+    };
+  }
+
+  private toAuditSnapshot(config: AppConfig) {
     const { mailPassword, ...rest } = config;
     return {
       ...rest,

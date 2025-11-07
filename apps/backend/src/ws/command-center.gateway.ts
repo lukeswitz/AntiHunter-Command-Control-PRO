@@ -156,7 +156,12 @@ export class CommandCenterGateway
   @UsePipes(new ValidationPipe({ transform: true }))
   async handleSendCommand(@ConnectedSocket() client: Socket, @MessageBody() dto: SendCommandDto) {
     try {
-      const state = await this.commandsService.sendCommand(dto, client.data?.userId);
+      const meta = {
+        ip: (client.handshake.address as string | undefined) ?? null,
+        userAgent: (client.handshake.headers['user-agent'] as string | undefined) ?? null,
+        fingerprint: client.id,
+      };
+      const state = await this.commandsService.sendCommand(dto, client.data?.userId, meta);
       return { event: 'command.queued', data: state };
     } catch (error) {
       throw new WsException(error instanceof Error ? error.message : 'Unknown error');

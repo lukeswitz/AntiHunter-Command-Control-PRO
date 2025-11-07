@@ -20,8 +20,8 @@ export class FirewallController {
   }
 
   @Put()
-  updateConfig(@Body() dto: UpdateFirewallConfigDto) {
-    return this.firewallService.updateConfig(dto);
+  updateConfig(@Req() req: Request, @Body() dto: UpdateFirewallConfigDto) {
+    return this.firewallService.updateConfig(dto, req.auth?.sub);
   }
 
   @Get('rules')

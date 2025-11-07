@@ -24,6 +24,17 @@ model User {
   twoFactorTempSecret String?
   twoFactorRecoveryCodes String[] @default([])
   twoFactorEnabledAt DateTime?
+  failedLoginAttempts Int    @default(0)
+  lastFailedLoginAt   DateTime?
+  lockedAt            DateTime?
+  lockedUntil         DateTime?
+  lockedBy            String?
+  lockedReason        String?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  lastLoginCountry    String?
+  lastLoginUserAgent  String?
+  anomalyFlag         Boolean @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -249,6 +260,9 @@ model CommandLog {
   resultText      String?
   errorText       String?
   idempotencyKey  String?       @unique
+  requestIp       String?
+  userAgent       String?
+  clientFingerprint String?
 
   site            Site?         @relation(fields: [siteId], references: [id])
   originSite      Site?         @relation("CommandOriginSite", fields: [originSiteId], references: [id])

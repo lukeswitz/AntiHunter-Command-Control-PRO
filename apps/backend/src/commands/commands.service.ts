@@ -41,6 +41,9 @@ export interface CommandState {
   ackNode?: string | null;
   resultText?: string | null;
   errorText?: string | null;
+  requestIp?: string | null;
+  userAgent?: string | null;
+  clientFingerprint?: string | null;
 }
 
 export interface RemoteCommandRequest {
@@ -73,6 +76,12 @@ export interface ExternalCommandEventInput {
   finishedAt?: string | Date | null;
 }
 
+export interface CommandInvocationMeta {
+  ip?: string | null;
+  userAgent?: string | null;
+  fingerprint?: string | null;
+}
+
 @Injectable()
 export class CommandsService {
   private readonly logger = new Logger(CommandsService.name);
@@ -96,7 +105,11 @@ export class CommandsService {
     return this.remoteRequests$.asObservable();
   }
 
-  async sendCommand(dto: SendCommandDto, userId?: string): Promise<CommandState> {
+  async sendCommand(
+    dto: SendCommandDto,
+    userId?: string,
+    meta?: CommandInvocationMeta,
+  ): Promise<CommandState> {
     const commandId = randomUUID();
     const targetSiteId =
       dto.siteId && dto.siteId.trim().length > 0 ? dto.siteId.trim() : this.localSiteId;
@@ -119,6 +132,9 @@ export class CommandsService {
         name: built.name,
         params: built.params,
         status: 'PENDING',
+        requestIp: meta?.ip ?? null,
+        userAgent: meta?.userAgent ?? null,
+        clientFingerprint: meta?.fingerprint ?? null,
       },
     });
 
@@ -445,6 +461,9 @@ export class CommandsService {
       ackNode: command.ackNode ?? undefined,
       resultText: command.resultText ?? undefined,
       errorText: command.errorText ?? undefined,
+      requestIp: command.requestIp ?? undefined,
+      userAgent: command.userAgent ?? undefined,
+      clientFingerprint: command.clientFingerprint ?? undefined,
     };
   }
 

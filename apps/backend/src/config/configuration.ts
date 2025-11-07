@@ -1,6 +1,14 @@
 const parseNumberEnv = (value: string | undefined, fallback: number): number =>
   value !== undefined && value !== '' ? Number(value) : fallback;
 
+const parseListEnv = (value: string | undefined): string[] =>
+  value
+    ? value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+    : [];
+
 export default () => ({
   env: process.env.NODE_ENV ?? 'development',
   site: {
@@ -104,6 +112,7 @@ export default () => ({
       ? Number(process.env.PASSWORD_RESET_EXPIRY_HOURS)
       : 4,
     appUrl: process.env.APP_URL ?? 'http://localhost:5173',
+    alertRecipients: parseListEnv(process.env.SECURITY_ALERT_RECIPIENTS),
   },
   auth: {
     jwtSecret: process.env.JWT_SECRET,
@@ -113,6 +122,20 @@ export default () => ({
       tokenExpiry: process.env.TWO_FACTOR_TOKEN_EXPIRY ?? '10m',
       window: Number(process.env.TWO_FACTOR_WINDOW ?? 1),
       secretKeyConfigured: Boolean(process.env.TWO_FACTOR_SECRET_KEY),
+    },
+    lockout: {
+      enabled: process.env.AUTH_LOCKOUT_ENABLED !== 'false',
+      threshold: parseNumberEnv(process.env.AUTH_LOCKOUT_THRESHOLD, 5),
+      durationMinutes: parseNumberEnv(process.env.AUTH_LOCKOUT_DURATION_MINUTES, 0),
+      notify: parseListEnv(
+        process.env.AUTH_LOCKOUT_NOTIFY ?? process.env.SECURITY_ALERT_RECIPIENTS,
+      ),
+    },
+    anomaly: {
+      requireTwoFactor: process.env.AUTH_ANOMALY_REQUIRE_2FA !== 'false',
+      notify: parseListEnv(
+        process.env.AUTH_ANOMALY_NOTIFY ?? process.env.SECURITY_ALERT_RECIPIENTS,
+      ),
     },
   },
   tak: {
