@@ -67,13 +67,13 @@ interface LoginResult {
   postLoginNotice?: string;
 }
 
-type UserWithRelations = Prisma.UserGetPayload<{
-  include: {
-    preferences: true;
-    permissions: true;
-    siteAccess: { include: { site: true } };
-  };
-}>;
+const USER_RELATIONS = {
+  preferences: true,
+  permissions: true,
+  siteAccess: { include: { site: true } },
+} satisfies Prisma.UserInclude;
+
+type UserWithRelations = Prisma.UserGetPayload<{ include: typeof USER_RELATIONS }>;
 
 @Injectable()
 export class AuthService {
@@ -88,12 +88,6 @@ export class AuthService {
   private readonly anomalyRecipients: string[];
   private readonly requireAnomalyTwoFactor: boolean;
   private readonly securityAlertRecipients: string[];
-  private readonly baseUserInclude: Prisma.UserInclude = {
-    preferences: true,
-    permissions: true,
-    siteAccess: { include: { site: true } },
-  };
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly firewallService: FirewallService,
@@ -162,11 +156,11 @@ export class AuthService {
       }
     }
 
-    let user = await this.prisma.user.findUnique({
+    const fetchedUser = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
-      include: this.baseUserInclude,
+      include: USER_RELATIONS,
     });
-    if (!user) {
+    if (!fetchedUser) {
       if (ip) {
         await this.firewallService.registerAuthFailure(ip, {
           reason: 'UNKNOWN_ACCOUNT',
@@ -176,8 +170,7 @@ export class AuthService {
       }
       throw new UnauthorizedException('Invalid credentials');
     }
-
-    user = await this.refreshLockedState(user);
+    const user = await this.refreshLockedState(fetchedUser);
 
     if (user.lockedAt) {
       if (ip) {
@@ -280,11 +273,7 @@ export class AuthService {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { legalAcceptedAt: new Date() },
-      include: {
-        preferences: true,
-        permissions: true,
-        siteAccess: { include: { site: true } },
-      },
+      include: USER_RELATIONS,
     });
 
     if (user.twoFactorEnabled && user.twoFactorSecret) {
@@ -312,11 +301,7 @@ export class AuthService {
   async getUserById(userId: string): Promise<UserResponse> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        preferences: true,
-        permissions: true,
-        siteAccess: { include: { site: true } },
-      },
+      include: USER_RELATIONS,
     });
     if (!user) {
       throw new UnauthorizedException('Account no longer exists');
@@ -374,7 +359,7 @@ export class AuthService {
           lockedBy: null,
           failedLoginAttempts: 0,
         },
-        include: this.baseUserInclude,
+        include: USER_RELATIONS,
       });
     }
     return user;
@@ -467,7 +452,7 @@ export class AuthService {
         lastLoginCountry: context.country ?? null,
         lastLoginUserAgent: context.userAgent ?? null,
       },
-      include: this.baseUserInclude,
+      include: USER_RELATIONS,
     });
   }
 
@@ -562,16 +547,20 @@ export class AuthService {
         action,
         entity: 'Security',
         entityId,
-        before: this.toJsonValue(before),
-        after: this.toJsonValue(after),
+        before: this.toAuditJsonValue(before),
+        after: this.toAuditJsonValue(after),
       },
     });
   }
 
-  private toJsonValue(value: unknown): Prisma.InputJsonValue {
+  private toAuditJsonValue(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
     if (value === undefined || value === null) {
       return Prisma.JsonNull;
     }
+    return this.toJsonValue(value);
+  }
+
+  private toJsonValue(value: unknown): Prisma.InputJsonValue {
     if (value instanceof Date) {
       return value.toISOString();
     }
@@ -591,15 +580,7 @@ export class AuthService {
     return value as Prisma.InputJsonValue;
   }
 
-  private toUserResponse(
-    user: Prisma.UserGetPayload<{
-      include: {
-        preferences: true;
-        permissions: true;
-        siteAccess: { include: { site: true } };
-      };
-    }>,
-  ): UserResponse {
+  private toUserResponse(user: UserWithRelations): UserResponse {
     return {
       id: user.id,
       email: user.email,
