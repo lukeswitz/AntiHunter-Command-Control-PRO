@@ -206,16 +206,7 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
     // Normalize router forwarded text frames (credit: @lukeswitz)
     const routerMatch = ROUTER_TEXT_MSG_REGEX.exec(line);
     if (routerMatch?.[1]) {
-      const embeddedMsg = routerMatch[1].trim().replace(/#$/, '');
-      return [
-        {
-          kind: 'alert',
-          level: 'INFO',
-          category: 'text',
-          message: embeddedMsg,
-          raw: line,
-        },
-      ];
+      return [];
     }
 
     this.flushExpiredStatuses(results);
