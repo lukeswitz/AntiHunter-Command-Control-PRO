@@ -10,6 +10,7 @@ import {
   MdEventNote,
   MdOutlineAreaChart,
   MdPerson,
+  MdHub,
 } from 'react-icons/md';
 import { NavLink } from 'react-router-dom';
 
@@ -25,7 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/inventory', label: 'Inventory', icon: MdWifiTethering },
   { to: '/targets', label: 'Targets', icon: MdMyLocation },
   { to: '/geofences', label: 'Geofences', icon: MdOutlineAreaChart },
-  { to: '/strategy', label: 'Strategy Advisor', icon: MdOutlineAreaChart },
+  { to: '/strategy', label: 'Strategy Advisor', icon: MdHub },
   { to: '/nodes', label: 'Nodes', icon: MdSensors },
   { to: '/scheduler', label: 'Scheduler', icon: MdEventNote },
   { to: '/config', label: 'Config', icon: MdSettings },

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { apiClient } from '../api/client';
 import { InventoryDevice } from '../api/types';
@@ -21,6 +21,7 @@ type InventorySortKey =
 
 export function InventoryPage() {
   const [search, setSearch] = useState('');
+  const [autoRefreshMs, setAutoRefreshMs] = useState(2000);
   const [sortKey, setSortKey] = useState<InventorySortKey>('lastSeen');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const queryClient = useQueryClient();
@@ -35,7 +36,15 @@ export function InventoryPage() {
       const params = search ? `?search=${encodeURIComponent(search)}` : '';
       return apiClient.get<InventoryDevice[]>(`/inventory${params}`);
     },
+    refetchInterval: autoRefreshMs,
+    refetchIntervalInBackground: true,
+    keepPreviousData: true,
   });
+
+  useEffect(() => {
+    const nextInterval = !data || data.length === 0 ? 2000 : 10000;
+    setAutoRefreshMs((current) => (current === nextInterval ? current : nextInterval));
+  }, [data]);
 
   const promoteMutation = useMutation({
     mutationFn: async (device: InventoryDevice) =>
