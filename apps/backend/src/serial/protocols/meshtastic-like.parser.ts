@@ -93,7 +93,6 @@ const GENERIC_NODE_LINE_REGEX =
 const FORWARDED_PREFIX_REGEX = /^(?<prefix>[0-9a-f]{2,8}):\s+(?<rest>.+)$/i;
 const ROUTER_TEXT_MSG_REGEX = /\[Router\]\s+Received text msg.*?msg=(#?[\s\S]+)$/i;
 const NODE_FORWARD_WRAPPER_REGEX = /^NODE_[A-Za-z0-9]+[:\s]+(?<body>AH[0-9A-Za-z:_\s,.-]+.*)$/i;
-const NODE_PREFIX_ONLY_REGEX = /^NODE_[A-Za-z0-9]+\s+AH[0-9A-Za-z_-]+/i;
 const DEVICE_FALLBACK_REGEX = /^[A-Za-z0-9_-]+\s+DEVICE:?$/i;
 const STATUS_DEDUP_MS = 60_000;
 const COMMAND_STATUS_SUPPRESS_MS = 4_000;
@@ -122,17 +121,18 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
     if (!trimmed) {
       return [];
     }
-    if (NODE_PREFIX_ONLY_REGEX.test(trimmed)) {
+    const normalized = trimmed.replace(/^NODE_[A-Za-z0-9]+[:\s]+(?=AH)/i, '');
+    if (!normalized) {
       return [];
     }
-    if (looksBinary(trimmed)) {
-      return this.parseBinary(trimmed);
+    if (looksBinary(normalized)) {
+      return this.parseBinary(normalized);
     }
-    const textResults = this.parseText(trimmed);
+    const textResults = this.parseText(normalized);
     if (textResults) {
       return textResults;
     }
-    return [{ kind: 'raw', raw: trimmed }];
+    return [{ kind: 'raw', raw: normalized }];
   }
   reset(): void {
     this.triangulationBuffers.clear();
