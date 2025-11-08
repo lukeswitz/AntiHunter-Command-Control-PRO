@@ -297,10 +297,16 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
       const nodeId = this.normalizeNodeId(vibrationMatch.groups.node);
       const lat = toNumber(vibrationMatch.groups.lat);
       const lon = toNumber(vibrationMatch.groups.lon);
-      if (this.isDuplicateVibration(nodeId, line)) {
+      const signatureParts = [
+        vibrationMatch.groups.time ?? '',
+        lat != null ? lat.toFixed(6) : 'lat?',
+        lon != null ? lon.toFixed(6) : 'lon?',
+      ];
+      const signature = signatureParts.join('|');
+      if (this.isDuplicateVibration(nodeId, signature)) {
         return [];
       }
-      this.recordVibration(nodeId, line);
+      this.recordVibration(nodeId, signature);
       const alertData: Record<string, unknown> = { time: vibrationMatch.groups.time };
       if (lat != null && lon != null) {
         alertData.lat = lat;
@@ -745,18 +751,18 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
   private recordGps(nodeId: string, lat: number, lon: number): void {
     this.recentGpsEvents.set(nodeId, { lat, lon, timestamp: Date.now() });
   }
-  private isDuplicateVibration(nodeId: string, raw: string): boolean {
+  private isDuplicateVibration(nodeId: string, signature: string): boolean {
     const previous = this.recentVibrationEvents.get(nodeId);
     if (!previous) {
       return false;
     }
-    if (previous.hash !== raw.trim()) {
+    if (previous.hash !== signature) {
       return false;
     }
     return Date.now() - previous.timestamp < MeshtasticLikeParser.VIBRATION_DUPLICATE_WINDOW_MS;
   }
-  private recordVibration(nodeId: string, raw: string): void {
-    this.recentVibrationEvents.set(nodeId, { hash: raw.trim(), timestamp: Date.now() });
+  private recordVibration(nodeId: string, signature: string): void {
+    this.recentVibrationEvents.set(nodeId, { hash: signature, timestamp: Date.now() });
   }
   private deliverOrRaw(results: SerialParseResult[], line: string): SerialParseResult[] {
     if (!results.length) {
