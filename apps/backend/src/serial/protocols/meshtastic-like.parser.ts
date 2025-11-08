@@ -84,10 +84,8 @@ const BASELINE_STATUS_REGEX =
 const ERASE_ACK_REGEX =
   /^(?<node>[A-Za-z0-9_-]+):\s*ERASE_ACK:(?<status>STARTED|COMPLETE|CANCELLED|FAILED)/i;
 const SCAN_DONE_REGEX = /^(?<node>[A-Za-z0-9_-]+)\s+SCAN_DONE:\s*(?<details>.+)$/i;
-const LIST_SCAN_DONE_REGEX =
-  /^(?<node>[A-Za-z0-9_-]+)\s+LIST_SCAN_DONE:\s*(?<details>.+)$/i;
-const BASELINE_DONE_REGEX =
-  /^(?<node>[A-Za-z0-9_-]+):\s*BASELINE_DONE:\s*(?<details>.+)$/i;
+const LIST_SCAN_DONE_REGEX = /^(?<node>[A-Za-z0-9_-]+)\s+LIST_SCAN_DONE:\s*(?<details>.+)$/i;
+const BASELINE_DONE_REGEX = /^(?<node>[A-Za-z0-9_-]+):\s*BASELINE_DONE:\s*(?<details>.+)$/i;
 const STARTUP_REGEX = /^(?<node>[A-Za-z0-9_-]+):\s*STARTUP:\s*(?<details>.+)$/i;
 const OK_STATUS_REGEX = /^(?<node>[A-Za-z0-9_-]+)\s+OK\s+Status:(?<status>[A-Z]+)#?$/i;
 const GENERIC_NODE_LINE_REGEX =
