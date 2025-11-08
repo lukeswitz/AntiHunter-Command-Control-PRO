@@ -1,7 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import L, { latLngBounds, type LatLngExpression } from 'leaflet';
-import { ChangeEvent, FormEvent, useEffect, useId, useMemo, useState } from 'react';
-import { MdCancel, MdCheckCircle, MdCropFree, MdUndo } from 'react-icons/md';
+import {
+  ChangeEvent,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  MdBookmarkAdd,
+  MdCancel,
+  MdCheckCircle,
+  MdClose,
+  MdCropFree,
+  MdUndo,
+} from 'react-icons/md';
 import {
   Circle,
   MapContainer,
@@ -17,6 +33,7 @@ import {
 import { apiClient } from '../api/client';
 import type { AlarmLevel, Geofence, GeofenceVertex, SiteSummary } from '../api/types';
 import { useGeofenceStore } from '../stores/geofence-store';
+import { type SavedMapView, useMapViewsStore } from '../stores/map-views-store';
 
 const DEFAULT_RADIUS = 100;
 const DEFAULT_OVERLAP = 0;
@@ -26,6 +43,7 @@ const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
 const SLIDE_RANGE_METERS = 200;
 const LATERAL_RANGE_METERS = 120;
+const METERS_PER_DEGREE_LAT = 111_320;
 
 type NodeDeploymentType = 'wifi' | 'radar' | 'rf';
 
@@ -45,7 +63,7 @@ const NODE_PROFILES: NodeProfile[] = [
     id: 'wifi-standard',
     label: 'WiFi / BLE perimeter',
     type: 'wifi',
-    defaultRadius: 240,
+    defaultRadius: 50,
     defaultOverlap: 50,
     arcWidth: 360,
     notes: 'Balanced omni coverage hugging the fence line.',
@@ -151,7 +169,7 @@ const STRATEGY_PRESETS: StrategyPreset[] = [
     label: 'Perimeter patrol (balanced)',
     description: 'Omni WiFi nodes hugging the fence line with mild overlap.',
     profileId: 'wifi-standard',
-    radius: 240,
+    radius: 50,
     overlap: 50,
     offset: -5,
     maxAnchorDistance: 60,
@@ -265,7 +283,14 @@ export function StrategyAdvisorPage() {
   const [drawingGeofence, setDrawingGeofence] = useState(false);
   const [draftVertices, setDraftVertices] = useState<GeofenceVertex[]>([]);
   const [hoverVertex, setHoverVertex] = useState<GeofenceVertex | null>(null);
-
+  const mapRef = useRef<L.Map | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [newViewName, setNewViewName] = useState('');
+  const savedViews = useMapViewsStore((state) => state.views);
+  const addView = useMapViewsStore((state) => state.addView);
+  const removeView = useMapViewsStore((state) => state.removeView);
+  const [fitEnabled, setFitEnabled] = useState(true);
+  const [inspectorVisible, setInspectorVisible] = useState(true);
   const idBase = useId();
   const presetSelectId = `${idBase}-preset`;
   const profileSelectId = `${idBase}-profile`;
@@ -797,6 +822,17 @@ export function StrategyAdvisorPage() {
     return latLngBounds(points);
   }, [selectedGeofences, avoidancePolygons, strategy.nodes]);
 
+  const performFit = useCallback(() => {
+    if (!mapRef.current) {
+      return false;
+    }
+    if (!mapBounds.isValid()) {
+      return false;
+    }
+    mapRef.current.fitBounds(mapBounds, { padding: [32, 32] });
+    return true;
+  }, [mapBounds]);
+
   const drawingPositions = useMemo<LatLngExpression[]>(() => {
     if (!drawingGeofence || draftVertices.length === 0) {
       return [];
@@ -807,6 +843,13 @@ export function StrategyAdvisorPage() {
     }
     return base;
   }, [drawingGeofence, draftVertices, hoverVertex]);
+
+  useEffect(() => {
+    if (!fitEnabled || !mapReady) {
+      return;
+    }
+    performFit();
+  }, [fitEnabled, mapReady, performFit]);
 
   const { data: sitesQueryData } = useQuery({
     queryKey: ['sites', 'strategy-advisor'],
@@ -1105,10 +1148,16 @@ export function StrategyAdvisorPage() {
 
   const handleSelectNode = (nodeId: string) => {
     setSelectedNodeId(nodeId);
+    setInspectorVisible(true);
   };
+
+  const handleShowInspector = useCallback(() => {
+    setInspectorVisible(true);
+  }, []);
 
   const handleCloseInspector = () => {
     setSelectedNodeId(null);
+    setInspectorVisible(false);
   };
 
   const handleInspectorRadiusChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1207,6 +1256,61 @@ export function StrategyAdvisorPage() {
   const handleUndoGeofencePoint = () => {
     setDraftVertices((prev) => prev.slice(0, -1));
   };
+
+  const handleSaveView = () => {
+    if (!mapRef.current) {
+      return;
+    }
+    const center = mapRef.current.getCenter();
+    const zoom = mapRef.current.getZoom();
+    const trimmed = newViewName.trim();
+    addView({
+      name: trimmed.length > 0 ? trimmed : undefined,
+      lat: center.lat,
+      lon: center.lng,
+      zoom,
+    });
+    setNewViewName('');
+  };
+
+  const handleApplyView = useCallback((view: SavedMapView) => {
+    if (!mapRef.current) {
+      return;
+    }
+    setFitEnabled(false);
+    mapRef.current.flyTo([view.lat, view.lon], view.zoom, { duration: 1.1 });
+  }, []);
+  const handleMapReady = useCallback((map: L.Map) => {
+    mapRef.current = map;
+    setMapReady(true);
+  }, []);
+  const handleFitClick = () => {
+    if (fitEnabled) {
+      setFitEnabled(false);
+      return;
+    }
+    const fitted = performFit();
+    if (fitted) {
+      setFitEnabled(true);
+    }
+  };
+
+  const handleMarkerDragEnd = useCallback(
+    (node: StrategyNode, lat: number, lon: number) => {
+      const { north, east } = computeDeltaMeters(node.lat, node.lon, lat, lon);
+      if (Math.abs(north) < 0.01 && Math.abs(east) < 0.01) {
+        return;
+      }
+      const existingNorth = nodeOverrides[node.id]?.moveNorthMeters ?? 0;
+      const existingEast = nodeOverrides[node.id]?.moveEastMeters ?? 0;
+      updateNodeOverride(node.id, {
+        moveNorthMeters: existingNorth + north,
+        moveEastMeters: existingEast + east,
+      });
+      setActivePresetId(CUSTOM_PRESET_ID);
+    },
+    [nodeOverrides, setActivePresetId, updateNodeOverride],
+  );
 
   const handleGeofencePoint = (vertex: GeofenceVertex) => {
     if (!drawingGeofence) {
@@ -1382,7 +1486,7 @@ ${nodesKml}
     <section className="panel">
       <header className="panel__header">
         <div>
-          <h1 className="panel__title">Strategy Advisor</h1>
+          <h1 className="panel__title">Strategy Advisor (Experimental)</h1>
           <p className="panel__subtitle">
             Generate deployment recommendations, account for obstructions, and validate hardware
             availability before heading on site.
@@ -1420,13 +1524,17 @@ ${nodesKml}
           <nav className="strategy-menu" aria-label="Strategy advisor sections">
             {STRATEGY_PANELS.map((panel) => {
               const isActive = panel.id === activePanel;
+              const handleClick = () => {
+                setActivePanel(panel.id);
+                handleShowInspector();
+              };
               return (
                 <button
                   key={panel.id}
                   type="button"
                   className={`strategy-menu__item${isActive ? ' is-active' : ''}`}
                   aria-pressed={isActive}
-                  onClick={() => setActivePanel(panel.id)}
+                  onClick={handleClick}
                 >
                   <span className="strategy-menu__label">{panel.label}</span>
                   <span className="strategy-menu__hint">{panel.description}</span>
@@ -1445,12 +1553,12 @@ ${nodesKml}
               preferCanvas
             >
               <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+              <StrategyMapInitializer onReady={handleMapReady} />
               <StrategyDrawingHandler
                 enabled={drawingGeofence}
                 onPoint={handleGeofencePoint}
                 onHover={handleGeofenceHover}
               />
-              <MapBoundsUpdater bounds={mapBounds} enabled={selectedGeofences.length > 0} />
               <SelectedNodeFocus node={selectedNode} />
               {selectedGeofences.map((geofence) =>
                 geofence.polygon && geofence.polygon.length > 0 ? (
@@ -1491,8 +1599,14 @@ ${nodesKml}
                   key={node.id}
                   position={[node.lat, node.lon]}
                   icon={buildStrategyIcon(node)}
+                  draggable
                   eventHandlers={{
                     click: () => handleSelectNode(node.id),
+                    dragend: (event) => {
+                      const marker = event.target as L.Marker;
+                      const latLng = marker.getLatLng();
+                      handleMarkerDragEnd(node, latLng.lat, latLng.lng);
+                    },
                   }}
                 >
                   <Tooltip direction="top" offset={[0, -18]} opacity={1} sticky>
@@ -1589,24 +1703,75 @@ ${nodesKml}
                 </>
               ) : null}
             </MapContainer>
-            <div className="map-footer__actions strategy-map__actions">
-              <div className="geofence-site-select">
-                <label>
-                  Site
-                  <select
-                    className="control-input"
-                    value={selectedSiteId}
-                    onChange={(event) => setSelectedSiteId(event.target.value)}
-                  >
-                    <option value="">Local site</option>
-                    {sitesQueryData?.map((site) => (
-                      <option key={site.id} value={site.id}>
-                        {site.name ?? site.id}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <section className="map-footer__views strategy-map__views">
+              <div className="map-footer__views-controls">
+                <input
+                  type="text"
+                  placeholder="View name"
+                  value={newViewName}
+                  className="control-input"
+                  onChange={(event) => setNewViewName(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="control-chip"
+                  onClick={handleSaveView}
+                  disabled={!mapReady || !mapRef.current}
+                >
+                  <MdBookmarkAdd /> Save View
+                </button>
               </div>
+              {savedViews.length > 0 ? (
+                <div className="map-footer__views-list">
+                  {savedViews.map((view) => (
+                    <div key={view.id} className="map-footer__view-item">
+                      <button
+                        type="button"
+                        className="control-chip"
+                        onClick={() => handleApplyView(view)}
+                      >
+                        {view.name}
+                      </button>
+                      <button
+                        type="button"
+                        className="control-chip control-chip--danger"
+                        onClick={() => removeView(view.id)}
+                        aria-label={`Remove ${view.name}`}
+                      >
+                        <MdClose />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">Save map views for quick navigation.</p>
+              )}
+            </section>
+            <div className="map-footer__actions strategy-map__actions">
+              <label className="geofence-site-select">
+                <span className="geofence-site-select__label">Site</span>
+                <select
+                  className="control-input"
+                  value={selectedSiteId}
+                  onChange={(event) => setSelectedSiteId(event.target.value)}
+                  aria-label="Site"
+                >
+                  <option value="">Local site</option>
+                  {sitesQueryData?.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name ?? site.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className={`control-chip${fitEnabled ? '' : ' control-chip--ghost'}`}
+                onClick={handleFitClick}
+                disabled={!mapReady || !mapRef.current}
+              >
+                {fitEnabled ? 'Lock View' : 'Fit Geofences'}
+              </button>
               <button
                 type="button"
                 className="submit-button"
@@ -1642,212 +1807,222 @@ ${nodesKml}
               ) : null}
             </div>
           </div>
-          <aside
-            className="strategy-node-inspector"
-            role={selectedNode ? 'dialog' : 'complementary'}
-            aria-modal={selectedNode ? 'false' : undefined}
-            aria-labelledby={selectedNode ? inspectorTitleId : panelTitleId}
-          >
-            {selectedNode ? (
-              <>
-                <div className="strategy-node-inspector__header">
-                  <div>
-                    <h2 id={inspectorTitleId}>{selectedNode.displayName ?? selectedNode.id}</h2>
-                    <p>
-                      {selectedNode.type.toUpperCase()} - {selectedNode.profileId}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="control-chip control-chip--ghost"
-                    onClick={handleCloseInspector}
-                  >
-                    Close
-                  </button>
-                </div>
-                <div className="strategy-node-inspector__body">
-                  <div>
-                    <span className="muted">Coordinates</span>
+          {inspectorVisible ? (
+            <aside
+              className="strategy-node-inspector"
+              role={selectedNode ? 'dialog' : 'complementary'}
+              aria-modal={selectedNode ? 'false' : undefined}
+              aria-labelledby={selectedNode ? inspectorTitleId : panelTitleId}
+            >
+              {selectedNode ? (
+                <>
+                  <div className="strategy-node-inspector__header">
                     <div>
-                      {selectedNode.lat.toFixed(5)}, {selectedNode.lon.toFixed(5)}
+                      <h2 id={inspectorTitleId}>{selectedNode.displayName ?? selectedNode.id}</h2>
+                      <p>
+                        {selectedNode.type.toUpperCase()} - {selectedNode.profileId}
+                      </p>
                     </div>
-                  </div>
-                  {selectedNode.anchorDistance != null ? (
-                    <div>
-                      <span className="muted">Anchor distance</span>
-                      <div>{selectedNode.anchorDistance.toFixed(1)} m</div>
-                    </div>
-                  ) : null}
-                  <label className="form-label" htmlFor={inspectorNameInputId}>
-                    Node name
-                  </label>
-                  <input
-                    id={inspectorNameInputId}
-                    type="text"
-                    className="control-input"
-                    value={inspectorNameValue}
-                    onChange={handleInspectorNameChange}
-                  />
-                  <label className="form-label" htmlFor={inspectorProfileSelectId}>
-                    Node profile override
-                  </label>
-                  <select
-                    id={inspectorProfileSelectId}
-                    className="control-input"
-                    value={inspectorProfileValue}
-                    onChange={handleInspectorProfileChange}
-                  >
-                    <option value="">
-                      Use plan profile ({baseSelectedNode?.profileId ?? selectedNode.profileId})
-                    </option>
-                    {NODE_PROFILES.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="form-hint">
-                    Mix WiFi, RF, and radar hardware within the same perimeter.
-                  </p>
-                  <div className="strategy-control strategy-control--stacked">
-                    <label className="form-label" htmlFor={inspectorSlideInputId}>
-                      Slide along perimeter (m)
-                    </label>
-                    <input
-                      id={inspectorSlideInputId}
-                      type="range"
-                      min={-SLIDE_RANGE_METERS}
-                      max={SLIDE_RANGE_METERS}
-                      step={1}
-                      value={inspectorSlideValue}
-                      onChange={handleInspectorSlideChange}
-                    />
-                    <div className="muted">{inspectorSlideValue.toFixed(1)} m</div>
-                    <p className="form-hint">
-                      Positive values move the node forward along the fence line.
-                    </p>
-                  </div>
-                  <div className="strategy-control strategy-control--stacked">
-                    <label className="form-label" htmlFor={inspectorNorthInputId}>
-                      Move north / south (m)
-                    </label>
-                    <input
-                      id={inspectorNorthInputId}
-                      type="range"
-                      min={-LATERAL_RANGE_METERS}
-                      max={LATERAL_RANGE_METERS}
-                      step={1}
-                      value={inspectorNorthValue}
-                      onChange={handleInspectorNorthChange}
-                    />
-                    <div className="muted">
-                      {inspectorNorthValue >= 0 ? '+' : ''}
-                      {inspectorNorthValue.toFixed(1)} m
-                    </div>
-                    <p className="form-hint">
-                      Positive values move the node north; negative values south.
-                    </p>
-                  </div>
-                  <div className="strategy-control strategy-control--stacked">
-                    <label className="form-label" htmlFor={inspectorEastInputId}>
-                      Move east / west (m)
-                    </label>
-                    <input
-                      id={inspectorEastInputId}
-                      type="range"
-                      min={-LATERAL_RANGE_METERS}
-                      max={LATERAL_RANGE_METERS}
-                      step={1}
-                      value={inspectorEastValue}
-                      onChange={handleInspectorEastChange}
-                    />
-                    <div className="muted">
-                      {inspectorEastValue >= 0 ? '+' : ''}
-                      {inspectorEastValue.toFixed(1)} m
-                    </div>
-                    <p className="form-hint">
-                      Positive values move the node east; negative values west.
-                    </p>
-                  </div>
-                  <label className="form-label" htmlFor={inspectorRadiusInputId}>
-                    Detection distance (m)
-                  </label>
-                  <input
-                    id={inspectorRadiusInputId}
-                    type="number"
-                    className="control-input"
-                    min={10}
-                    max={5000}
-                    value={selectedNodeOverride?.radius ?? inspectorRadiusValue}
-                    onChange={handleInspectorRadiusChange}
-                  />
-                  {inspectorSupportsDirection ? (
-                    <>
-                      <label className="form-label" htmlFor={inspectorOrientationInputId}>
-                        Orientation (deg)
-                      </label>
-                      <input
-                        id={inspectorOrientationInputId}
-                        type="range"
-                        min={0}
-                        max={360}
-                        step={1}
-                        value={selectedNodeOverride?.orientation ?? inspectorOrientationValue}
-                        onChange={handleInspectorOrientationChange}
-                      />
-                      <label className="form-label" htmlFor={inspectorArcInputId}>
-                        Sector width (deg)
-                      </label>
-                      <input
-                        id={inspectorArcInputId}
-                        type="range"
-                        min={20}
-                        max={360}
-                        step={5}
-                        value={selectedNodeOverride?.arcWidth ?? inspectorArcValue}
-                        onChange={handleInspectorArcChange}
-                      />
-                    </>
-                  ) : null}
-                </div>
-                <div className="strategy-node-inspector__footer">
-                  <button
-                    type="button"
-                    className="control-chip"
-                    onClick={() => handleBookmarkNode(selectedNode)}
-                  >
-                    Bookmark
-                  </button>
-                  {inspectorHasOverride ? (
                     <button
                       type="button"
                       className="control-chip control-chip--ghost"
-                      onClick={handleInspectorReset}
+                      onClick={handleCloseInspector}
                     >
-                      Reset node overrides
+                      Close
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="control-chip control-chip--danger"
-                    onClick={() => handleDeleteNode(selectedNode.id)}
-                  >
-                    Delete node
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="strategy-node-inspector__header">
-                  <div>
-                    <h2 id={panelTitleId}>{activePanelDefinition.label}</h2>
-                    <p>{activePanelDefinition.description}</p>
                   </div>
-                </div>
-                <div className="strategy-node-inspector__body">{renderActivePanelContent()}</div>
-              </>
-            )}
-          </aside>
+                  <div className="strategy-node-inspector__body">
+                    <div>
+                      <span className="muted">Coordinates</span>
+                      <div>
+                        {selectedNode.lat.toFixed(5)}, {selectedNode.lon.toFixed(5)}
+                      </div>
+                    </div>
+                    {selectedNode.anchorDistance != null ? (
+                      <div>
+                        <span className="muted">Anchor distance</span>
+                        <div>{selectedNode.anchorDistance.toFixed(1)} m</div>
+                      </div>
+                    ) : null}
+                    <label className="form-label" htmlFor={inspectorNameInputId}>
+                      Node name
+                    </label>
+                    <input
+                      id={inspectorNameInputId}
+                      type="text"
+                      className="control-input"
+                      value={inspectorNameValue}
+                      onChange={handleInspectorNameChange}
+                    />
+                    <label className="form-label" htmlFor={inspectorProfileSelectId}>
+                      Node profile override
+                    </label>
+                    <select
+                      id={inspectorProfileSelectId}
+                      className="control-input"
+                      value={inspectorProfileValue}
+                      onChange={handleInspectorProfileChange}
+                    >
+                      <option value="">
+                        Use plan profile ({baseSelectedNode?.profileId ?? selectedNode.profileId})
+                      </option>
+                      {NODE_PROFILES.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="form-hint">
+                      Mix WiFi, RF, and radar hardware within the same perimeter.
+                    </p>
+                    <div className="strategy-control strategy-control--stacked">
+                      <label className="form-label" htmlFor={inspectorSlideInputId}>
+                        Slide along perimeter (m)
+                      </label>
+                      <input
+                        id={inspectorSlideInputId}
+                        type="range"
+                        min={-SLIDE_RANGE_METERS}
+                        max={SLIDE_RANGE_METERS}
+                        step={1}
+                        value={inspectorSlideValue}
+                        onChange={handleInspectorSlideChange}
+                      />
+                      <div className="muted">{inspectorSlideValue.toFixed(1)} m</div>
+                      <p className="form-hint">
+                        Positive values move the node forward along the fence line.
+                      </p>
+                    </div>
+                    <div className="strategy-control strategy-control--stacked">
+                      <label className="form-label" htmlFor={inspectorNorthInputId}>
+                        Move north / south (m)
+                      </label>
+                      <input
+                        id={inspectorNorthInputId}
+                        type="range"
+                        min={-LATERAL_RANGE_METERS}
+                        max={LATERAL_RANGE_METERS}
+                        step={1}
+                        value={inspectorNorthValue}
+                        onChange={handleInspectorNorthChange}
+                      />
+                      <div className="muted">
+                        {inspectorNorthValue >= 0 ? '+' : ''}
+                        {inspectorNorthValue.toFixed(1)} m
+                      </div>
+                      <p className="form-hint">
+                        Positive values move the node north; negative values south.
+                      </p>
+                    </div>
+                    <div className="strategy-control strategy-control--stacked">
+                      <label className="form-label" htmlFor={inspectorEastInputId}>
+                        Move east / west (m)
+                      </label>
+                      <input
+                        id={inspectorEastInputId}
+                        type="range"
+                        min={-LATERAL_RANGE_METERS}
+                        max={LATERAL_RANGE_METERS}
+                        step={1}
+                        value={inspectorEastValue}
+                        onChange={handleInspectorEastChange}
+                      />
+                      <div className="muted">
+                        {inspectorEastValue >= 0 ? '+' : ''}
+                        {inspectorEastValue.toFixed(1)} m
+                      </div>
+                      <p className="form-hint">
+                        Positive values move the node east; negative values west.
+                      </p>
+                    </div>
+                    <label className="form-label" htmlFor={inspectorRadiusInputId}>
+                      Detection distance (m)
+                    </label>
+                    <input
+                      id={inspectorRadiusInputId}
+                      type="number"
+                      className="control-input"
+                      min={10}
+                      max={5000}
+                      value={selectedNodeOverride?.radius ?? inspectorRadiusValue}
+                      onChange={handleInspectorRadiusChange}
+                    />
+                    {inspectorSupportsDirection ? (
+                      <>
+                        <label className="form-label" htmlFor={inspectorOrientationInputId}>
+                          Orientation (deg)
+                        </label>
+                        <input
+                          id={inspectorOrientationInputId}
+                          type="range"
+                          min={0}
+                          max={360}
+                          step={1}
+                          value={selectedNodeOverride?.orientation ?? inspectorOrientationValue}
+                          onChange={handleInspectorOrientationChange}
+                        />
+                        <label className="form-label" htmlFor={inspectorArcInputId}>
+                          Sector width (deg)
+                        </label>
+                        <input
+                          id={inspectorArcInputId}
+                          type="range"
+                          min={20}
+                          max={360}
+                          step={5}
+                          value={selectedNodeOverride?.arcWidth ?? inspectorArcValue}
+                          onChange={handleInspectorArcChange}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                  <div className="strategy-node-inspector__footer">
+                    <button
+                      type="button"
+                      className="control-chip"
+                      onClick={() => handleBookmarkNode(selectedNode)}
+                    >
+                      Bookmark
+                    </button>
+                    {inspectorHasOverride ? (
+                      <button
+                        type="button"
+                        className="control-chip control-chip--ghost"
+                        onClick={handleInspectorReset}
+                      >
+                        Reset node overrides
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="control-chip control-chip--danger"
+                      onClick={() => handleDeleteNode(selectedNode.id)}
+                    >
+                      Delete node
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="strategy-node-inspector__header">
+                    <div>
+                      <h2 id={panelTitleId}>{activePanelDefinition.label}</h2>
+                      <p>{activePanelDefinition.description}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="control-chip control-chip--ghost"
+                      onClick={handleCloseInspector}
+                      aria-label="Close side panel"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="strategy-node-inspector__body">{renderActivePanelContent()}</div>
+                </>
+              )}
+            </aside>
+          ) : null}
         </div>
       </div>
       {/* end strategy-layout */}
@@ -2379,6 +2554,30 @@ function buildAnchorIcon() {
   });
 }
 
+function metersPerDegreeLon(latDegrees: number) {
+  return METERS_PER_DEGREE_LAT * Math.cos((latDegrees * Math.PI) / 180);
+}
+
+function computeDeltaMeters(
+  fromLat: number,
+  fromLon: number,
+  toLat: number,
+  toLon: number,
+): { north: number; east: number } {
+  const north = (toLat - fromLat) * METERS_PER_DEGREE_LAT;
+  const meanLat = (fromLat + toLat) / 2;
+  const east = (toLon - fromLon) * metersPerDegreeLon(meanLat);
+  return { north, east };
+}
+
+function StrategyMapInitializer({ onReady }: { onReady: (map: L.Map) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    onReady(map);
+  }, [map, onReady]);
+  return null;
+}
+
 function StrategyDrawingHandler({
   enabled,
   onPoint,
@@ -2408,19 +2607,6 @@ function StrategyDrawingHandler({
       onHover(null);
     },
   });
-  return null;
-}
-
-function MapBoundsUpdater({ bounds, enabled }: { bounds: L.LatLngBounds; enabled: boolean }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!enabled || !bounds.isValid()) {
-      return;
-    }
-    map.fitBounds(bounds, { padding: [32, 32] });
-  }, [map, bounds, enabled]);
-
   return null;
 }
 

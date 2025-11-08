@@ -623,6 +623,22 @@ body.theme-dark .control-chip[disabled] {
   flex-wrap: wrap;
 }
 
+.geofence-site-select {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 0.4rem;
+
+  font-size: 0.9rem;
+
+  font-weight: 500;
+}
+
+.geofence-site-select__label {
+  color: var(--color-text-muted, #cbd5f5);
+}
+
 .geofence-drawing-controls {
   display: flex;
 

@@ -210,7 +210,7 @@ export function TargetsPage() {
     <section className="panel">
       <header className="panel__header">
         <div>
-          <h1 className="panel__title">Targets</h1>
+          <h1 className="panel__title">Targets (Experimental)</h1>
           <p className="panel__subtitle">
             Promoted detections, triangulation, and tracking orchestration.
           </p>

@@ -513,23 +513,22 @@ export function MapPage() {
           )}
         </section>
         <div className="map-footer__actions">
-          <div className="geofence-site-select">
-            <label>
-              Site
-              <select
-                className="control-input"
-                value={selectedSiteId}
-                onChange={(event) => setSelectedSiteId(event.target.value)}
-              >
-                <option value="">Local site</option>
-                {sitesQuery.data?.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name ?? site.id}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="geofence-site-select">
+            <span className="geofence-site-select__label">Site</span>
+            <select
+              className="control-input"
+              value={selectedSiteId}
+              onChange={(event) => setSelectedSiteId(event.target.value)}
+              aria-label="Site"
+            >
+              <option value="">Local site</option>
+              {sitesQuery.data?.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name ?? site.id}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             className="submit-button"
