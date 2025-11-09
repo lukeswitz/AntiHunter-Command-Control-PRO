@@ -1723,6 +1723,21 @@ body.theme-dark .control-chip[disabled] {
   flex-direction: column;
   gap: 0.75rem;
 }
+.serial-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.serial-device-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+}
+.serial-device-picker select,
+.serial-device-picker input {
+  width: 100%;
+}
 .config-row span {
   font-size: 0.88rem;
   color: var(--color-text);

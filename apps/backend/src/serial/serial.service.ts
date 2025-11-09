@@ -14,7 +14,7 @@ import { SerialPortStream } from '@serialport/stream';
 import { Observable, Subject } from 'rxjs';
 
 import { createParser, ensureMeshtasticProtobufs, ProtocolKey } from './protocol-registry';
-import { DEFAULT_SERIAL_SITE_ID, SerialConfigService } from './serial-config.service';
+import { SerialConfigService } from './serial-config.service';
 import { SERIAL_DELIMITER_CANDIDATES } from './serial.config.defaults';
 import { SerialParseResult, SerialProtocolParser } from './serial.types';
 import { buildCommandPayload } from '../commands/command-builder';
@@ -236,7 +236,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private readonly globalRateLimit: number;
   private readonly perTargetRateLimit: number;
   private readonly rateWindowMs = 60_000;
-  private siteId = DEFAULT_SERIAL_SITE_ID;
+  private siteId: string;
   private packetIdCounter = Math.floor(Math.random() * 0xffff);
   private readonly broadcastNum = 0xffffffff;
 
@@ -244,15 +244,14 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly serialConfigService: SerialConfigService,
   ) {
-    this.siteId = this.configService.get<string>('site.id', DEFAULT_SERIAL_SITE_ID);
+    this.siteId = this.configService.get<string>('site.id', 'default');
     this.globalRateLimit = this.configService.get<number>('serial.globalRate', 30);
     this.perTargetRateLimit = this.configService.get<number>('serial.perTargetRate', 8);
   }
 
   async onModuleInit(): Promise<void> {
     try {
-      const storedConfig = await this.serialConfigService.getConfig(this.siteId);
-      this.siteId = storedConfig.siteId ?? DEFAULT_SERIAL_SITE_ID;
+      const storedConfig = await this.serialConfigService.getConfig();
 
       if (storedConfig.enabled === false) {
         this.logger.log('Serial auto-connect disabled via configuration');
@@ -357,7 +356,6 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           rawDelimiter: delimiterToken,
         };
         await this.serialConfigService.updateConfig({
-          siteId: this.siteId,
           devicePath: candidatePath,
           baud: baudRate,
           delimiter: delimiterToken,

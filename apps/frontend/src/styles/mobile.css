@@ -293,6 +293,21 @@
     width: 100%;
   }
 
+  .serial-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .serial-actions > .control-chip {
+    width: 100%;
+  }
+
+  .serial-device-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
   .admin-panel .admin-user-layout {
     flex-direction: column;
     gap: 1rem;

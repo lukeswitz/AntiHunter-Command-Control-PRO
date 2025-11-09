@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdateSerialConfigDto } from './dto/update-serial-config.dto';
 import { DEFAULT_SERIAL_DELIMITER } from './serial.config.defaults';
 
-export const DEFAULT_SERIAL_SITE_ID = 'default';
+const SERIAL_CONFIG_ID = 'serial';
 
 @Injectable()
 export class SerialConfigService {
@@ -15,52 +15,42 @@ export class SerialConfigService {
     private readonly configService: ConfigService,
   ) {}
 
-  async getConfig(siteId: string = DEFAULT_SERIAL_SITE_ID) {
-    await this.ensureSite(siteId);
+  async getConfig() {
     const config = await this.prisma.serialConfig.upsert({
-      where: { siteId },
+      where: { id: SERIAL_CONFIG_ID },
       update: {},
-      create: this.buildCreatePayload(siteId),
+      create: this.buildCreatePayload(),
     });
     return this.hydrateConfig(config);
   }
 
   async updateConfig(dto: UpdateSerialConfigDto) {
-    const siteId = dto.siteId ?? DEFAULT_SERIAL_SITE_ID;
-    await this.ensureSite(siteId);
     await this.prisma.serialConfig.upsert({
-      where: { siteId },
+      where: { id: SERIAL_CONFIG_ID },
       update: {},
-      create: this.buildCreatePayload(siteId),
+      create: this.buildCreatePayload(),
     });
 
-    const { siteId: _siteId, ...data } = dto;
     const updated = await this.prisma.serialConfig.update({
-      where: { siteId },
-      data,
+      where: { id: SERIAL_CONFIG_ID },
+      data: dto,
     });
 
     return this.hydrateConfig(updated);
   }
 
-  private async ensureSite(id: string) {
-    await this.prisma.site.upsert({
-      where: { id },
-      update: {},
-      create: {
-        id,
-        name: id === DEFAULT_SERIAL_SITE_ID ? 'Default Site' : id,
-        color: '#2563EB',
-      },
+  async resetConfig() {
+    await this.prisma.serialConfig.deleteMany({});
+    const created = await this.prisma.serialConfig.create({
+      data: this.buildCreatePayload(),
     });
+    return this.hydrateConfig(created);
   }
 
-  private buildCreatePayload(siteId: string): Prisma.SerialConfigCreateInput {
+  private buildCreatePayload(): Prisma.SerialConfigCreateInput {
     const defaults = this.getEnvSerialDefaults();
     const payload: Prisma.SerialConfigCreateInput = {
-      site: {
-        connect: { id: siteId },
-      },
+      id: SERIAL_CONFIG_ID,
     };
 
     if (defaults.devicePath != null) {

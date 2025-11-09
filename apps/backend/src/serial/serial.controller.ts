@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put } from '@nestjs/common';
 
 import { ConnectSerialDto } from './dto/connect-serial.dto';
 import { UpdateSerialConfigDto } from './dto/update-serial-config.dto';
@@ -32,15 +32,18 @@ export class SerialController {
   }
 
   @Get('config')
-  getConfig(@Query('siteId') siteId?: string) {
-    const targetSiteId = siteId ?? this.serialService.getSiteId();
-    return this.serialConfigService.getConfig(targetSiteId);
+  getConfig() {
+    return this.serialConfigService.getConfig();
   }
 
   @Put('config')
   updateConfig(@Body() dto: UpdateSerialConfigDto) {
-    const targetSiteId = dto.siteId ?? this.serialService.getSiteId();
-    return this.serialConfigService.updateConfig({ ...dto, siteId: targetSiteId });
+    return this.serialConfigService.updateConfig(dto);
+  }
+
+  @Post('config/reset')
+  resetConfig() {
+    return this.serialConfigService.resetConfig();
   }
 
   @Post('connect')

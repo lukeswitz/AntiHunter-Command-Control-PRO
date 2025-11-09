@@ -3,10 +3,6 @@ import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'clas
 export class UpdateSerialConfigDto {
   @IsOptional()
   @IsString()
-  siteId?: string;
-
-  @IsOptional()
-  @IsString()
   devicePath?: string | null;
 
   @IsOptional()

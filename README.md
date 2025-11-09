@@ -58,7 +58,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 
 - **Integrations:** TAK/CoT bridge with per-stream controls, MQTT federation, and SMTP hooks for alerting/administration.
 
-- **Multi-site aware:** each site can have bespoke serial/MQTT configuration, coverage overrides, and admin assignments.
+- **Multi-site aware:** each site can have bespoke MQTT configuration, coverage overrides, and admin assignments, while the local serial link is managed once per Command Center instance.
 
 - **User management:** profile updates, admin console for user creation/role management, per-user preferences (theme, density, time format).
 
@@ -137,37 +137,37 @@ Manage your profile, theme preferences, and admin-level user management tasks.
 
 ### System Overview
 
-| Layer        | Technology stack                                       | Role in the platform                                                                                 |
-| ------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| **Detection**| AntiHunter mesh nodes (LoRa / Meshtastic payloads)     | Collects RF/BLE telemetry, vibration alerts, experimental RADAR/SIGINT streams                       |
-| **Edge C2**  | NestJS workers + Serial service + Gateway bridge       | Parses frames, normalises events, persists data, and originates outbound commands                    |
-| **Core C2**  | NestJS REST/WS API, Socket.IO, Prisma on PostgreSQL    | Surfaces APIs, websockets, scheduler, alarms, audit logging, command lifecycle tracking              |
-| **Federation**| MQTT v3.1+ broker (QoS 1) & TAK/CoT bridge            | Shares node/device/command deltas across sites and publishes CoT feeds to TAK clients                |
-| **Frontend** | React (Vite), React Query, Zustand, Leaflet, Tailwind  | SPA with map, console, inventory, targets, configuration, scheduling, and admin consoles             |
-| **Tooling**  | pnpm workspaces, TypeScript strict mode, ESLint, Prettier | Developer experience, linting, formatting, and shared config across apps                           |
+| Layer          | Technology stack                                          | Role in the platform                                                                     |
+| -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Detection**  | AntiHunter mesh nodes (LoRa / Meshtastic payloads)        | Collects RF/BLE telemetry, vibration alerts, experimental RADAR/SIGINT streams           |
+| **Edge C2**    | NestJS workers + Serial service + Gateway bridge          | Parses frames, normalises events, persists data, and originates outbound commands        |
+| **Core C2**    | NestJS REST/WS API, Socket.IO, Prisma on PostgreSQL       | Surfaces APIs, websockets, scheduler, alarms, audit logging, command lifecycle tracking  |
+| **Federation** | MQTT v3.1+ broker (QoS 1) & TAK/CoT bridge                | Shares node/device/command deltas across sites and publishes CoT feeds to TAK clients    |
+| **Frontend**   | React (Vite), React Query, Zustand, Leaflet, Tailwind     | SPA with map, console, inventory, targets, configuration, scheduling, and admin consoles |
+| **Tooling**    | pnpm workspaces, TypeScript strict mode, ESLint, Prettier | Developer experience, linting, formatting, and shared config across apps                 |
 
 Each deployment runs its site-local C2 server and still functions if federation links are unavailable. The backend persists node, target, inventory, alarm, and audit records via Prisma/PostgreSQL. Socket.IO pushes live updates into Zustand stores so React screens stay real-time.
 
 ### Security & Protocols
 
-| Surface              | Protocols & safeguards                                                                                                                |
-|----------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| **Device ingest**    | Serial (USB/UART) ? Meshtastic JSON/CBOR frames; optional signed frame validation; port selection locked behind RBAC.                 |
-| **C2 API**           | HTTPS (configurable TLS certificates) + JWT auth; REST/WS share the same bearer token; role-aware guards on every controller.         |
-| **Federation**       | MQTT (mqtt://... mqtts://, ws://... wss://) with per-site client IDs, QoS 1, optional mutual TLS (CA/cert/key). Topics namespaced `ahcc/`.|
-| **Operator UI**      | HTTPS SPA; per-user preferences (theme, time format) stored server-side; alarm sounds served via signed URLs.                         |
-| **TAK Integration**  | Cursor-on-Target over TCP/UDP/HTTPS; selectable streams (nodes, alerts, targets, command ACKs); optional TLS and username/password.   |
-| **Auditing**         | Every command, config change, and RBAC update persisted in the `AuditLog`; paired with per-command `CommandLog` lifecycle.            |
+| Surface             | Protocols & safeguards                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Device ingest**   | Serial (USB/UART) ? Meshtastic JSON/CBOR frames; optional signed frame validation; port selection locked behind RBAC.                      |
+| **C2 API**          | HTTPS (configurable TLS certificates) + JWT auth; REST/WS share the same bearer token; role-aware guards on every controller.              |
+| **Federation**      | MQTT (mqtt://... mqtts://, ws://... wss://) with per-site client IDs, QoS 1, optional mutual TLS (CA/cert/key). Topics namespaced `ahcc/`. |
+| **Operator UI**     | HTTPS SPA; per-user preferences (theme, time format) stored server-side; alarm sounds served via signed URLs.                              |
+| **TAK Integration** | Cursor-on-Target over TCP/UDP/HTTPS; selectable streams (nodes, alerts, targets, command ACKs); optional TLS and username/password.        |
+| **Auditing**        | Every command, config change, and RBAC update persisted in the `AuditLog`; paired with per-command `CommandLog` lifecycle.                 |
 
 Secrets such as MQTT credentials, TLS PEMs, TAK API keys, and SMTP passwords are encrypted at rest in the database. Environment variables (`SITE_ID`, `JWT_SECRET`, `HTTPS_CERT_PATH`, etc.) govern bootstrapping.
 
 ### Resilience & Fallback Paths
 
-* **Local-first operation:** Each site keeps its own PostgreSQL instance and continues ingesting/commanding nodes if the broker or WAN link fails. Federation queues simply back off until the connection returns.
-* **Command retry windows:** Serial sends use bounded retries with jittered backoff; failed ACKs surface as `ACK_TIMEOUT`/`RESULT_TIMEOUT` while the log entry persists for post-mortem review.
-* **Alarm durability:** Alerts are recorded and replayed on reconnect, so socket re-subscriptions restitch event history.
-* **Scheduler safeguard:** Work orders are stored in DB; missed executions (e.g., server restart) are re-evaluated on boot.
-* **Data exports:** Inventory, targets, and command logs can be exported (CSV/JSON/GeoJSON) to seed a fresh node if a site must be rebuilt.
+- **Local-first operation:** Each site keeps its own PostgreSQL instance and continues ingesting/commanding nodes if the broker or WAN link fails. Federation queues simply back off until the connection returns.
+- **Command retry windows:** Serial sends use bounded retries with jittered backoff; failed ACKs surface as `ACK_TIMEOUT`/`RESULT_TIMEOUT` while the log entry persists for post-mortem review.
+- **Alarm durability:** Alerts are recorded and replayed on reconnect, so socket re-subscriptions restitch event history.
+- **Scheduler safeguard:** Work orders are stored in DB; missed executions (e.g., server restart) are re-evaluated on boot.
+- **Data exports:** Inventory, targets, and command logs can be exported (CSV/JSON/GeoJSON) to seed a fresh node if a site must be rebuilt.
 
 ### MQTT Topic Topology
 
@@ -189,14 +189,14 @@ All topics use QoS 1 by default (configurable per site). Publishers short-circui
 
 Configure federation per site in **Config ? MQTT** (or directly via the `MqttConfig` table). Key fields:
 
-| Field                                      | Purpose                                                       | Notes                                                                                                 |
-| ------------------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `brokerUrl`                                | Broker endpoint (`mqtt://..., `mqtts://`, `ws://..., or `wss://`) | Example: `mqtt://...roker:1883`. WebSocket brokers often use `ws://...ost:port/mqtt`.                     |
-| `clientId`                                 | Unique MQTT client identifier                                 | Defaults to `command-center-<siteId>`; must be unique on shared brokers.                              |
-| `username` / `password`                    | Credentials for authenticated brokers                         | Leave blank for anonymous brokers. Combine with TLS settings when required.                           |
-| `tlsEnabled`, `caPem`, `certPem`, `keyPem` | TLS configuration                                             | Only needed for `mqtts://`/`wss://` brokers that require mutual TLS. PEM values are stored encrypted. |
-| `qosEvents` / `qosCommands`                | Default QoS for publish/subscribe (`0`, `1`, or `2`)          | Defaults to `1`. Adjust when the broker or network profile demands otherwise.                         |
-| `enabled`                                  | Toggle federation for the site                                | Disable to keep a site local-only while preserving its saved connection details.                      |
+| Field                                      | Purpose                                                           | Notes                                                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `brokerUrl`                                | Broker endpoint (`mqtt://..., `mqtts://`, `ws://..., or `wss://`) | Example: `mqtt://...roker:1883`. WebSocket brokers often use `ws://...ost:port/mqtt`.                 |
+| `clientId`                                 | Unique MQTT client identifier                                     | Defaults to `command-center-<siteId>`; must be unique on shared brokers.                              |
+| `username` / `password`                    | Credentials for authenticated brokers                             | Leave blank for anonymous brokers. Combine with TLS settings when required.                           |
+| `tlsEnabled`, `caPem`, `certPem`, `keyPem` | TLS configuration                                                 | Only needed for `mqtts://`/`wss://` brokers that require mutual TLS. PEM values are stored encrypted. |
+| `qosEvents` / `qosCommands`                | Default QoS for publish/subscribe (`0`, `1`, or `2`)              | Defaults to `1`. Adjust when the broker or network profile demands otherwise.                         |
+| `enabled`                                  | Toggle federation for the site                                    | Disable to keep a site local-only while preserving its saved connection details.                      |
 
 **Environment defaults:**  
 Set `SITE_ID` to the local site identifier (defaults to `default`). Each Command Center deployment **must use a unique `SITE_ID`** so MQTT replication distinguishes the origin site (e.g., `SITE_ID=alpha`, `SITE_ID=bravo`). Restart the backend after changing it. Optional flags like `MQTT_ENABLED`, `MQTT_COMMANDS_ENABLED`, and `MQTT_NAMESPACE` seed runtime config before any database records exist.
@@ -214,16 +214,16 @@ AntiHunter ships with layered defenses—RBAC, MFA, rate limiting, and a program
 - Operators must accept the legal notice before accessing the console.
 - TOTP-based 2FA plus invitation/password reset expirations protect account lifecycle flows.
 
-| Setting / Env var | Default | Purpose |
-|-------------------|---------|---------|
-| `JWT_SECRET` | _required_ | Symmetric signing key for API + Socket.IO sessions. Rotate often. |
-| `JWT_EXPIRY` | `12h` | Lifetime of issued access tokens. |
-| `INVITE_EXPIRY_HOURS` | `48` | TTL for admin-generated invitation links. |
-| `PASSWORD_RESET_EXPIRY_HOURS` | `4` | TTL for password reset emails. |
-| `TWO_FACTOR_ISSUER` | `AntiHunter Command Center` | Friendly label displayed inside authenticator apps. |
-| `TWO_FACTOR_TOKEN_EXPIRY` | `10m` | Window during which submitted 2FA codes remain valid. |
-| `TWO_FACTOR_WINDOW` | `1` | Number of TOTP steps accepted on either side of the current window. |
-| `TWO_FACTOR_SECRET_KEY` | _(optional)_ | Seed used when bootstrapping TOTP secrets in offline environments. |
+| Setting / Env var             | Default                     | Purpose                                                             |
+| ----------------------------- | --------------------------- | ------------------------------------------------------------------- |
+| `JWT_SECRET`                  | _required_                  | Symmetric signing key for API + Socket.IO sessions. Rotate often.   |
+| `JWT_EXPIRY`                  | `12h`                       | Lifetime of issued access tokens.                                   |
+| `INVITE_EXPIRY_HOURS`         | `48`                        | TTL for admin-generated invitation links.                           |
+| `PASSWORD_RESET_EXPIRY_HOURS` | `4`                         | TTL for password reset emails.                                      |
+| `TWO_FACTOR_ISSUER`           | `AntiHunter Command Center` | Friendly label displayed inside authenticator apps.                 |
+| `TWO_FACTOR_TOKEN_EXPIRY`     | `10m`                       | Window during which submitted 2FA codes remain valid.               |
+| `TWO_FACTOR_WINDOW`           | `1`                         | Number of TOTP steps accepted on either side of the current window. |
+| `TWO_FACTOR_SECRET_KEY`       | _(optional)_                | Seed used when bootstrapping TOTP secrets in offline environments.  |
 
 ### Abuse & Rate Limiting
 
@@ -231,14 +231,14 @@ AntiHunter ships with layered defenses—RBAC, MFA, rate limiting, and a program
 - Login forms include a honeypot field plus a minimum submit timer (`AUTH_MIN_SUBMIT_MS`).
 - When a limit trips, the firewall’s auth-failure counter auto-bans the offending IP while returning a neutral message to the UI.
 
-| Rule / Env var | Default | Notes |
-|----------------|---------|-------|
-| `RATE_LIMIT_DEFAULT_LIMIT` / `RATE_LIMIT_DEFAULT_TTL` | `300` req / `60s` | Fallback when a controller does not define its own rule. |
-| `RATE_LIMIT_LOGIN_BURST_LIMIT` / `RATE_LIMIT_LOGIN_BURST_TTL` | `10` / `10s` | Short burst limiter on `/auth/login`. |
-| `RATE_LIMIT_LOGIN_LIMIT` / `RATE_LIMIT_LOGIN_TTL` | `30` / `60s` | Sustained login limiter that feeds the firewall. |
-| `RATE_LIMIT_LEGAL_LIMIT` / `RATE_LIMIT_LEGAL_TTL` | `20` / `300s` | Protects the legal acceptance endpoint from script abuse. |
-| `RATE_LIMIT_2FA_LIMIT` / `RATE_LIMIT_2FA_TTL` | `10` / `300s` | Caps TOTP verification attempts. |
-| `AUTH_MIN_SUBMIT_MS` | `600` ms | Minimum time between rendering the login form and submission; pairs with the honeypot field. |
+| Rule / Env var                                                | Default           | Notes                                                                                        |
+| ------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------- |
+| `RATE_LIMIT_DEFAULT_LIMIT` / `RATE_LIMIT_DEFAULT_TTL`         | `300` req / `60s` | Fallback when a controller does not define its own rule.                                     |
+| `RATE_LIMIT_LOGIN_BURST_LIMIT` / `RATE_LIMIT_LOGIN_BURST_TTL` | `10` / `10s`      | Short burst limiter on `/auth/login`.                                                        |
+| `RATE_LIMIT_LOGIN_LIMIT` / `RATE_LIMIT_LOGIN_TTL`             | `30` / `60s`      | Sustained login limiter that feeds the firewall.                                             |
+| `RATE_LIMIT_LEGAL_LIMIT` / `RATE_LIMIT_LEGAL_TTL`             | `20` / `300s`     | Protects the legal acceptance endpoint from script abuse.                                    |
+| `RATE_LIMIT_2FA_LIMIT` / `RATE_LIMIT_2FA_TTL`                 | `10` / `300s`     | Caps TOTP verification attempts.                                                             |
+| `AUTH_MIN_SUBMIT_MS`                                          | `600` ms          | Minimum time between rendering the login form and submission; pairs with the honeypot field. |
 
 ### Account Lockout & Login Alerts
 
@@ -246,43 +246,43 @@ AntiHunter ships with layered defenses—RBAC, MFA, rate limiting, and a program
 - Suspicious logins (new country/IP) raise security alerts, notify operators, and reset trusted device metadata.
 - Admins can unlock accounts via `POST /users/:id/unlock`.
 
-| Setting / Env var | Default | Notes |
-|-------------------|---------|-------|
-| `AUTH_LOCKOUT_ENABLED` | `true` | Disable only for lab environments. |
-| `AUTH_LOCKOUT_THRESHOLD` | `5` attempts | Number of consecutive password failures before locking the account. |
-| `AUTH_LOCKOUT_DURATION_MINUTES` | `0` | Minutes until automatic unlock. `0` = manual unlock required. |
-| `AUTH_LOCKOUT_NOTIFY` | _(inherits `SECURITY_ALERT_RECIPIENTS`)_ | Comma-separated list of emails that receive lockout notices. |
-| `AUTH_ANOMALY_REQUIRE_2FA` | `true` | Forces a fresh MFA challenge for anomaly-detected logins (in addition to the normal flow). |
-| `AUTH_ANOMALY_NOTIFY` | _(inherits `SECURITY_ALERT_RECIPIENTS`)_ | Email recipients for anomaly login alerts. |
-| `SECURITY_ALERT_RECIPIENTS` | _(unset)_ | Global fallback email list for any security notification. |
+| Setting / Env var               | Default                                  | Notes                                                                                      |
+| ------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `AUTH_LOCKOUT_ENABLED`          | `true`                                   | Disable only for lab environments.                                                         |
+| `AUTH_LOCKOUT_THRESHOLD`        | `5` attempts                             | Number of consecutive password failures before locking the account.                        |
+| `AUTH_LOCKOUT_DURATION_MINUTES` | `0`                                      | Minutes until automatic unlock. `0` = manual unlock required.                              |
+| `AUTH_LOCKOUT_NOTIFY`           | _(inherits `SECURITY_ALERT_RECIPIENTS`)_ | Comma-separated list of emails that receive lockout notices.                               |
+| `AUTH_ANOMALY_REQUIRE_2FA`      | `true`                                   | Forces a fresh MFA challenge for anomaly-detected logins (in addition to the normal flow). |
+| `AUTH_ANOMALY_NOTIFY`           | _(inherits `SECURITY_ALERT_RECIPIENTS`)_ | Email recipients for anomaly login alerts.                                                 |
+| `SECURITY_ALERT_RECIPIENTS`     | _(unset)_                                | Global fallback email list for any security notification.                                  |
 
 ### Firewall & Network Controls
 
 The `/config/firewall` API (and Config UI) manages allow/deny policies, geo filtering, and auto-bans triggered by auth failures. Logs can be promoted directly into permanent rules.
 
-| Config field | Default behavior | Where to set |
-|--------------|-----------------|--------------|
-| `enabled` | `false` until an admin toggles it | `PUT /config/firewall` |
-| `defaultPolicy` | `ALLOW` | Switch to `DENY` for zero-trust sites. |
-| `geoMode` | `DISABLED` | Choose `ALLOW_ONLY` or `BLOCK_LIST` to enforce ISO country allow/block lists. |
-| `allowedCountries` / `blockedCountries` | `[]` | ISO 3166-1 alpha-2 codes applied based on `geoMode`. |
-| `ipAllowList` / `ipBlockList` | `[]` | CIDR strings or single IPs. Allow list takes precedence. |
-| `failThreshold` | `5` (DB default) | Number of auth failures before issuing an automatic ban. |
-| `failWindowSeconds` | `300` | Time window used when counting failures. |
-| `banDurationSeconds` | `3600` | Temporary ban length applied to abusive IPs. |
+| Config field                            | Default behavior                  | Where to set                                                                  |
+| --------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
+| `enabled`                               | `false` until an admin toggles it | `PUT /config/firewall`                                                        |
+| `defaultPolicy`                         | `ALLOW`                           | Switch to `DENY` for zero-trust sites.                                        |
+| `geoMode`                               | `DISABLED`                        | Choose `ALLOW_ONLY` or `BLOCK_LIST` to enforce ISO country allow/block lists. |
+| `allowedCountries` / `blockedCountries` | `[]`                              | ISO 3166-1 alpha-2 codes applied based on `geoMode`.                          |
+| `ipAllowList` / `ipBlockList`           | `[]`                              | CIDR strings or single IPs. Allow list takes precedence.                      |
+| `failThreshold`                         | `5` (DB default)                  | Number of auth failures before issuing an automatic ban.                      |
+| `failWindowSeconds`                     | `300`                             | Time window used when counting failures.                                      |
+| `banDurationSeconds`                    | `3600`                            | Temporary ban length applied to abusive IPs.                                  |
 
 ### Transport & Secrets
 
 Keep certificates, mail credentials, and site identifiers in environment variables—never in source control. When terminating TLS inside NestJS, provide PEM paths via the variables below.
 
-| Setting | Default | Notes |
-|---------|---------|-------|
-| `HTTPS_ENABLED` | auto | Forces the backend to expect TLS; otherwise inferred from cert paths. |
-| `HTTPS_KEY_PATH` / `HTTPS_CERT_PATH` / `HTTPS_CA_PATH` / `HTTPS_PASSPHRASE` | _(unset)_ | PEM bundle + optional passphrase for in-process TLS. |
-| `HTTP_PREFIX` | `api` | Namespace for REST routes (useful when reverse proxying). |
-| `HTTP_REDIRECT_PORT` | _(unset)_ | Enables HTTP→HTTPS redirects when running dual listeners. |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS. |
-| `SITE_ID` | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing. |
+| Setting                                                                        | Default   | Notes                                                                 |
+| ------------------------------------------------------------------------------ | --------- | --------------------------------------------------------------------- |
+| `HTTPS_ENABLED`                                                                | auto      | Forces the backend to expect TLS; otherwise inferred from cert paths. |
+| `HTTPS_KEY_PATH` / `HTTPS_CERT_PATH` / `HTTPS_CA_PATH` / `HTTPS_PASSPHRASE`    | _(unset)_ | PEM bundle + optional passphrase for in-process TLS.                  |
+| `HTTP_PREFIX`                                                                  | `api`     | Namespace for REST routes (useful when reverse proxying).             |
+| `HTTP_REDIRECT_PORT`                                                           | _(unset)_ | Enables HTTP→HTTPS redirects when running dual listeners.             |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS.        |
+| `SITE_ID`                                                                      | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing.    |
 
 - Helmet now enforces CSP, referrer policy, frameguard, cross-origin resource policy, and HSTS (when HTTPS is enabled) for every response.
 
@@ -308,15 +308,16 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 
 ### Port Exposure Reference
 
-| Service / Flow                | Default Port | Notes & Hardening Steps                                                                               |
-|------------------------------|--------------|--------------------------------------------------------------------------------------------------------|
-| HTTPS API + Socket.IO         | 443 (or 3000) | Reverse proxy with TLS termination; restrict to trusted operator ranges or VPN.                      |
-| Serial worker (local device)  | n/a (USB)     | Physical access only; ensure `/dev/tty*` or COM ports are root-owned and audit device plug events.   |
-| PostgreSQL / Prisma           | 5432          | Bind to localhost/VPC only; require SCRAM auth and TLS; rotate credentials.                          |
-| MQTT broker (federation)      | 1883 / 8883   | Prefer 8883 with mutual TLS; enforce client ID allowlists; rate-limit connection attempts.           |
-| TAK/CoT bridge                | 8087 / 8089   | Use TLS profiles when possible; generate per-client API keys; segregate on dedicated security group. |
-| Prometheus / Metrics scrape   | 9100+         | Keep behind VPN and IP allowlists; disable if metrics are collected by sidecars.                     |
-| SMTP relay                    | 587 / 465     | Require STARTTLS/SMTPS with credential auth; scope accounts to command notifications only.           |
+| Service / Flow               | Default Port  | Notes & Hardening Steps                                                                              |
+| ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
+| HTTPS API + Socket.IO        | 443 (or 3000) | Reverse proxy with TLS termination; restrict to trusted operator ranges or VPN.                      |
+| Serial worker (local device) | n/a (USB)     | Physical access only; ensure `/dev/tty*` or COM ports are root-owned and audit device plug events.   |
+| PostgreSQL / Prisma          | 5432          | Bind to localhost/VPC only; require SCRAM auth and TLS; rotate credentials.                          |
+| MQTT broker (federation)     | 1883 / 8883   | Prefer 8883 with mutual TLS; enforce client ID allowlists; rate-limit connection attempts.           |
+| TAK/CoT bridge               | 8087 / 8089   | Use TLS profiles when possible; generate per-client API keys; segregate on dedicated security group. |
+| Prometheus / Metrics scrape  | 9100+         | Keep behind VPN and IP allowlists; disable if metrics are collected by sidecars.                     |
+| SMTP relay                   | 587 / 465     | Require STARTTLS/SMTPS with credential auth; scope accounts to command notifications only.           |
+
 ## Repository Layout
 
 ```
@@ -494,30 +495,30 @@ ALLOW_ERASE_FORCE=false
 
 Optional environment flags:
 
-| Variable           | Description                                               |
-| ------------------ | --------------------------------------------------------- |
-| `JWT_SECRET`       | If auth is enabled later                                  |
-| `SITE_ID`          | Default site for ingest                                   |
-| `WS_MAX_CLIENTS`   | Socket.IO connection limit                                |
-| `SERIAL_PROTOCOL`  | Parser profile (`meshtastic-like`, `nmea-like`, etc.)     |
-| `HTTPS_ENABLED`    | `true` to serve the backend over HTTPS                    |
-| `HTTPS_KEY_PATH`   | PEM private key path when HTTPS is enabled                |
-| `HTTPS_CERT_PATH`  | PEM certificate (or chain) path for HTTPS                 |
-| `HTTPS_CA_PATH`    | Optional comma separated CA bundle paths                  |
-| `HTTPS_PASSPHRASE` | Passphrase if the private key is encrypted                |
-| `HTTP_REDIRECT_PORT` | Optional plain HTTP listener that 301-redirects to HTTPS |
-| `TAK_ENABLED`      | `true` to boot the TAK bridge automatically               |
-| `TAK_PROTOCOL`     | TAK transport (`UDP`, `TCP`, or `HTTPS`)                  |
-| `TAK_HOST`         | TAK core hostname or IP                                   |
-| `TAK_PORT`         | Port that matches the TAK protocol (e.g., 6969/8088/8443) |
-| `TAK_TLS`          | `true` when TLS certificates are required                 |
-| `TAK_USERNAME`     | Optional basic-auth username for TAK gateways             |
-| `TAK_PASSWORD`     | Optional basic-auth password (otherwise set via UI)       |
-| `TAK_API_KEY`      | Optional API key for HTTPS-based TAK cores                |
-| `TWO_FACTOR_ISSUER` | Label shown in authenticator apps (default `AntiHunter Command Center`) |
-| `TWO_FACTOR_TOKEN_EXPIRY` | Lifetime of the temporary two-factor challenge token (default `10m`) |
-| `TWO_FACTOR_WINDOW` | Allowed OTP drift window (number of 30s steps, default `1`) |
-| `TWO_FACTOR_SECRET_KEY` | 32+ character passphrase used to encrypt stored authenticator secrets (AES-256-GCM). Leave unset only for local development. |
+| Variable                  | Description                                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `JWT_SECRET`              | If auth is enabled later                                                                                                     |
+| `SITE_ID`                 | Default site for ingest                                                                                                      |
+| `WS_MAX_CLIENTS`          | Socket.IO connection limit                                                                                                   |
+| `SERIAL_PROTOCOL`         | Parser profile (`meshtastic-like`, `nmea-like`, etc.)                                                                        |
+| `HTTPS_ENABLED`           | `true` to serve the backend over HTTPS                                                                                       |
+| `HTTPS_KEY_PATH`          | PEM private key path when HTTPS is enabled                                                                                   |
+| `HTTPS_CERT_PATH`         | PEM certificate (or chain) path for HTTPS                                                                                    |
+| `HTTPS_CA_PATH`           | Optional comma separated CA bundle paths                                                                                     |
+| `HTTPS_PASSPHRASE`        | Passphrase if the private key is encrypted                                                                                   |
+| `HTTP_REDIRECT_PORT`      | Optional plain HTTP listener that 301-redirects to HTTPS                                                                     |
+| `TAK_ENABLED`             | `true` to boot the TAK bridge automatically                                                                                  |
+| `TAK_PROTOCOL`            | TAK transport (`UDP`, `TCP`, or `HTTPS`)                                                                                     |
+| `TAK_HOST`                | TAK core hostname or IP                                                                                                      |
+| `TAK_PORT`                | Port that matches the TAK protocol (e.g., 6969/8088/8443)                                                                    |
+| `TAK_TLS`                 | `true` when TLS certificates are required                                                                                    |
+| `TAK_USERNAME`            | Optional basic-auth username for TAK gateways                                                                                |
+| `TAK_PASSWORD`            | Optional basic-auth password (otherwise set via UI)                                                                          |
+| `TAK_API_KEY`             | Optional API key for HTTPS-based TAK cores                                                                                   |
+| `TWO_FACTOR_ISSUER`       | Label shown in authenticator apps (default `AntiHunter Command Center`)                                                      |
+| `TWO_FACTOR_TOKEN_EXPIRY` | Lifetime of the temporary two-factor challenge token (default `10m`)                                                         |
+| `TWO_FACTOR_WINDOW`       | Allowed OTP drift window (number of 30s steps, default `1`)                                                                  |
+| `TWO_FACTOR_SECRET_KEY`   | 32+ character passphrase used to encrypt stored authenticator secrets (AES-256-GCM). Leave unset only for local development. |
 
 Frontend currently consumes backend settings via API, so no extra `.env` is needed.
 
@@ -533,13 +534,12 @@ The files are optional; supply whichever ones make sense for your deployment mod
 
 ### Serial defaults & persistence
 
-The serial stack now persists its configuration through the database so that each site retains its last-known settings even after restarts.
+Each Command Center installation owns a single local LoRa gateway, so the serial stack now persists **one global configuration** (record id `serial`) regardless of how many sites you manage through federation.
 
-- On first access (`GET /serial/config`), the backend seeds the `SerialConfig` row for the current site with any `SERIAL_*` values that were present in the environment (e.g., `SERIAL_DEVICE`, `SERIAL_BAUD`, `SERIAL_DELIMITER`, `SERIAL_RECONNECT_BASE_MS`, etc.). This makes the UI immediately reflect the values you shipped via `.env`, but operators can still revise them from the **Config → Serial** card.
-- Subsequent edits through the UI/API write directly to the `SerialConfig` table and override the env defaults for that site. Env variables only act as bootstrap values; they do not overwrite user changes.
-- Multi-site deployments get one serial profile per site ID. When you add a new site, its initial config will again fall back to whatever `SERIAL_*` values are active in the environment of that backend instance.
-
-If you change the env defaults and want them to apply to an existing site, use the UI/API to update that site’s serial settings or remove the row (the service will recreate it using the new defaults). 
+- On first access (`GET /serial/config`), the backend seeds that global record with any `SERIAL_*` values present in the environment (e.g., `SERIAL_DEVICE`, `SERIAL_BAUD`, `SERIAL_DELIMITER`, `SERIAL_RECONNECT_BASE_MS`, etc.). The **Config → Serial** card immediately reflects those defaults so operators can tweak them without touching `.env`.
+- Subsequent edits through the UI/API write directly to the database and override the env defaults. Environment variables are only used as bootstrap values—they will not overwrite saved settings on restart.
+- Changing the env defaults later? Use the UI/API (or delete the lone `SerialConfig` row) to reapply them. `SITE_ID` still labels events for federation, but it no longer influences serial persistence.
+- The Serial card also shows a **Detected Ports** dropdown (populated from `GET /serial/ports`) and a **Reset to defaults** button (`POST /serial/config/reset`). Use them to quickly switch USB devices or re-seed from the current env without touching the database manually.
 
 ### Two-Factor Authentication (optional)
 
@@ -682,6 +682,7 @@ When you already have AntiHunter Command & Control PRO running in a live environ
    ```bash
    pnpm --filter @command-center/backend exec prisma migrate deploy
    ```
+
    - In containerized or managed environments, execute the same command inside the deployment target prior to restarting services.
    - If the migration fails, resolve the database issue before proceeding; never run the backend against a partially migrated schema.
 3. **Rebuild backend and frontend bundles**
@@ -783,13 +784,16 @@ On first boot the seed script provisions:
 Log in at `http://localhost:8080` with those credentials and change the password immediately.
 
 > **Upgrades / existing databases:** When pulling a new release against an existing Postgres volume, apply migrations before restarting services:
+>
 > ```bash
 > docker compose run --rm --no-deps backend \
 >   pnpm --filter @command-center/backend exec prisma migrate deploy
 > ```
+>
 > If you ever hit a stuck migration (e.g., Prisma `P3009/P3018`), see the [Troubleshooting](#troubleshooting) section for recovery steps.
 
 > **Seeding inside Docker:** The production image omits dev dependencies. If you need to re-run the seed (e.g., to recreate the default admin), first install the backend dev deps inside a temporary container:
+>
 > ```bash
 > docker compose run --rm --no-deps backend sh -lc "
 >   pnpm install --filter @command-center/backend --prod=false --ignore-scripts &&
@@ -862,6 +866,7 @@ pnpm build
 ```
 
 Serve `apps/frontend/dist` with your preferred static host (Nginx, S3, etc.) and run `node dist/main.js` for the backend (or deploy via PM2/systemd).
+
 ## Production Deployment
 
 1. **Provision infrastructure**
@@ -883,19 +888,24 @@ Serve `apps/frontend/dist` with your preferred static host (Nginx, S3, etc.) and
    - Frontend builds read `VITE_BACKEND_URL` (defaults to `/api`). Adjust if you host the API under a different base path.
 
 3. **Apply database migrations**
+
    ```bash
    pnpm --filter @command-center/backend exec prisma migrate deploy
    ```
+
    (In Docker use `docker compose run --rm --no-deps backend ...`.)
 
 4. **Seed defaults (optional)**
    Run this once per environment to create the initial admin and config rows:
+
    ```bash
    pnpm --filter @command-center/backend prisma:seed
    ```
+
    Inside Docker, install backend dev dependencies first (see the note under [Useful Scripts](#useful-scripts)).
 
 5. **Build backend and frontend artifacts**
+
    ```bash
    pnpm --filter @command-center/backend build
    pnpm --filter @command-center/frontend build
@@ -958,7 +968,6 @@ Serve `apps/frontend/dist` with your preferred static host (Nginx, S3, etc.) and
    ```
 
    **Helpful commands**
-
    - Tail Nginx logs: `tail -f /var/log/nginx/error.log /var/log/nginx/access.log`
    - Test upstream: `curl -Ivk https://ahcc.example.com/api/healthz`
    - Reload config: `nginx -t && systemctl reload nginx`
@@ -982,7 +991,6 @@ sudo scripts/deploy-nginx-backend.sh
 ```
 
 Review the variables at the top of the script (`REPO_DIR`, `DOMAIN`, certificate paths, database URL, etc.) before executing. The script prints post-deploy health checks you can curl to confirm the stack is healthy.
-
 
 ## Serial Hardware & Meshtastic Sniffer
 
@@ -1051,24 +1059,25 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 - **Configuration cards:** Each card has expanded width (min 360px) so action buttons remain inside the panel even in dark mode.
 
 - **TAK bridge:** The Config -> TAK Bridge card surfaces enablement, per-stream toggles (nodes, targets, command ack/results, alert severities), credentials, and the **Restart Bridge** action. Watch backend logs for lines prefixed with `TAK_BRIDGE` to confirm successful subscriptions or authentication failures.
-| **Prisma P1000 (invalid DB credentials)**         | The backend cannot authenticate to Postgres. Verify `DATABASE_URL` matches the actual user/password. With the default compose file use `postgresql://command_center:command_center@postgres:5432/command_center`. Restart the backend after correcting the credentials.|
+  | **Prisma P1000 (invalid DB credentials)** | The backend cannot authenticate to Postgres. Verify `DATABASE_URL` matches the actual user/password. With the default compose file use `postgresql://command_center:command_center@postgres:5432/command_center`. Restart the backend after correcting the credentials.|
 
 ## Troubleshooting
 
-| Symptom                                             | Suggested Fix |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Frontend shows a blank page or 404 after deploy** | Ensure the SPA is served from the `/` root and that your reverse proxy rewrites unknown routes to `index.html`. In Docker, the bundled Nginx config already handles this. |
-| **Cannot log in with default credentials**          | Confirm the seed ran: the backend container logs should show "Running database migrations...". If you customized `ADMIN_EMAIL`/`ADMIN_PASSWORD`, restart the backend with the new values or rerun `prisma:seed`. |
-| **Backend returns `ECONNREFUSED` for Postgres**     | Check `docker compose logs postgres`; the DB must be healthy before the backend starts. If running locally, verify `DATABASE_URL` matches your Postgres host/port and that migrations were applied. |
-| **Serial device not detected**                      | On Windows note the `COM` port. On Linux grant access (`sudo usermod -aG dialout $USER` then re-login). Update Config -> Serial or `.env` `SERIAL_DEVICE` with the correct path and restart the backend. |
-| **No alerts despite telemetry**                     | Confirm devices flashed with the companion firmware send events, sockets are connected (check `/healthz`), and that the terminal/alert filters are not hiding the severity you expect. |
-| **Custom alarm audio silent or too loud**           | After uploading a WAV file, adjust per-level volume sliders and click "Test". If volume does not change, refresh the page to reload cached audio. Supported format: 16-bit PCM WAV. |
-| **Docker push fails due to upstream changes**       | Run `git pull --rebase origin main`, resolve conflicts, then `git push`. This keeps your fork in sync before you build and publish images. |
-| **Client notification: _Invalid Serial config?_**   | Meshtastic emits this when "Override console serial port" is enabled while running an interactive profile. Disable the override in firmware or switch the node to an output-only profile (NMEA/CalTopo) before reconnecting. |
-| **MQTT connect timeout**                            | Ensure the backend is running (check `/healthz`) and that you are using a reachable endpoint. Some brokers require WebSockets (`ws://...`) instead of raw TCP (`mqtt://...`). Leave username/password blank for anonymous brokers and enable site replication before expecting events. |
-| **HTTPS reverse proxy (502 / TLS errors)**          | Verify Nginx proxies `/api` and `/socket.io` to the backend on the correct host/port. Include websocket headers (`Upgrade`/`Connection`), tail `/var/log/nginx/error.log`, and test with `curl -Ivk https://your-domain/api/healthz`. See the [Nginx quick reference](#production-deployment) for a working example. |
-| **Prisma P1000 (invalid DB credentials)**           | The backend cannot authenticate to Postgres. Verify `DATABASE_URL` matches the real database user/password. With the default compose file use `postgresql://command_center:command_center@postgres:5432/command_center`. After fixing it, restart the backend. |
+| Symptom                                             | Suggested Fix                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Frontend shows a blank page or 404 after deploy** | Ensure the SPA is served from the `/` root and that your reverse proxy rewrites unknown routes to `index.html`. In Docker, the bundled Nginx config already handles this.                                                                                                                                                                      |
+| **Cannot log in with default credentials**          | Confirm the seed ran: the backend container logs should show "Running database migrations...". If you customized `ADMIN_EMAIL`/`ADMIN_PASSWORD`, restart the backend with the new values or rerun `prisma:seed`.                                                                                                                               |
+| **Backend returns `ECONNREFUSED` for Postgres**     | Check `docker compose logs postgres`; the DB must be healthy before the backend starts. If running locally, verify `DATABASE_URL` matches your Postgres host/port and that migrations were applied.                                                                                                                                            |
+| **Serial device not detected**                      | On Windows note the `COM` port. On Linux grant access (`sudo usermod -aG dialout $USER` then re-login). Update Config -> Serial or `.env` `SERIAL_DEVICE` with the correct path and restart the backend.                                                                                                                                       |
+| **No alerts despite telemetry**                     | Confirm devices flashed with the companion firmware send events, sockets are connected (check `/healthz`), and that the terminal/alert filters are not hiding the severity you expect.                                                                                                                                                         |
+| **Custom alarm audio silent or too loud**           | After uploading a WAV file, adjust per-level volume sliders and click "Test". If volume does not change, refresh the page to reload cached audio. Supported format: 16-bit PCM WAV.                                                                                                                                                            |
+| **Docker push fails due to upstream changes**       | Run `git pull --rebase origin main`, resolve conflicts, then `git push`. This keeps your fork in sync before you build and publish images.                                                                                                                                                                                                     |
+| **Client notification: _Invalid Serial config?_**   | Meshtastic emits this when "Override console serial port" is enabled while running an interactive profile. Disable the override in firmware or switch the node to an output-only profile (NMEA/CalTopo) before reconnecting.                                                                                                                   |
+| **MQTT connect timeout**                            | Ensure the backend is running (check `/healthz`) and that you are using a reachable endpoint. Some brokers require WebSockets (`ws://...`) instead of raw TCP (`mqtt://...`). Leave username/password blank for anonymous brokers and enable site replication before expecting events.                                                         |
+| **HTTPS reverse proxy (502 / TLS errors)**          | Verify Nginx proxies `/api` and `/socket.io` to the backend on the correct host/port. Include websocket headers (`Upgrade`/`Connection`), tail `/var/log/nginx/error.log`, and test with `curl -Ivk https://your-domain/api/healthz`. See the [Nginx quick reference](#production-deployment) for a working example.                           |
+| **Prisma P1000 (invalid DB credentials)**           | The backend cannot authenticate to Postgres. Verify `DATABASE_URL` matches the real database user/password. With the default compose file use `postgresql://command_center:command_center@postgres:5432/command_center`. After fixing it, restart the backend.                                                                                 |
 | **Prisma P3009/P3018 (failed migration loop)**      | Inspect `_prisma_migrations` for rows with `finished_at` NULL. Mark them rolled back (`prisma migrate resolve --rolled-back <migration_name>`), recreate any missing objects (e.g., enums or tables), run `docker compose run --rm --no-deps backend pnpm --filter @command-center/backend exec prisma migrate deploy`, then restart services. |
+
 ---
 
 ## Legal Disclaimer
@@ -1092,9 +1101,3 @@ THE SOFTWARE IS PROVIDED AS IS AND AS AVAILABLE, WITHOUT WARRANTY OF ANY KIND, E
 You alone are responsible for ensuring your deployment complies with all applicable laws, regulations, licenses, permits, organizational policies, and third-party rights. No advice or information, whether oral or written, obtained from the project or through the Software, creates any warranty or obligation not expressly stated in this disclaimer. Continued use signifies your agreement to indemnify and hold harmless the authors, developers, maintainers, and contributors from claims arising out of or related to your activities with the Software.
 
 If you do not agree to these terms, **do not build, deploy, or run** AntiHunter Command & Control PRO.
-
-
-
-
-
-

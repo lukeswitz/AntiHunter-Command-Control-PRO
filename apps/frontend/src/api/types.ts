@@ -229,7 +229,6 @@ export interface AppSettings {
 }
 
 export interface SerialConfig {
-  siteId: string;
   devicePath?: string | null;
   baud?: number | null;
   dataBits?: number | null;
@@ -242,6 +241,14 @@ export interface SerialConfig {
   reconnectMaxAttempts?: number | null;
   enabled: boolean;
   updatedAt: string;
+}
+
+export interface SerialPortInfo {
+  path: string;
+  manufacturer?: string | null;
+  serialNumber?: string | null;
+  vendorId?: string | null;
+  productId?: string | null;
 }
 
 export interface RuntimeConfig {

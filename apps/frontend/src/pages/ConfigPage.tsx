@@ -7,6 +7,7 @@ import type {
   AlarmLevel,
   AppSettings,
   SerialConfig,
+  SerialPortInfo,
   SerialState,
   SiteSummary,
   MqttSiteConfig,
@@ -197,6 +198,12 @@ export function ConfigPage() {
     queryFn: () => apiClient.get<SerialConfig>('/serial/config'),
   });
 
+  const serialPortsQuery = useQuery({
+    queryKey: ['serialPorts'],
+    queryFn: () => apiClient.get<SerialPortInfo[]>('/serial/ports'),
+    staleTime: 30_000,
+  });
+
   const sitesQuery = useQuery({
     queryKey: ['sites'],
     queryFn: () => apiClient.get<SiteSummary[]>('/sites'),
@@ -276,12 +283,17 @@ export function ConfigPage() {
   const cardClass = (...sections: ConfigSectionId[]) =>
     sections.includes(activeSection) ? 'config-card' : 'config-card config-card--hidden';
 
-  const runtimeSiteId =
-    runtimeConfigQuery.data?.siteId ??
-    serialConfig?.siteId ??
-    serialConfigQuery.data?.siteId ??
-    null;
+  const runtimeSiteId = runtimeConfigQuery.data?.siteId ?? null;
   const runtimeSiteLabel = runtimeSiteId ?? null;
+  const serialPorts = serialPortsQuery.data ?? [];
+  const serialPortsError =
+    serialPortsQuery.error instanceof Error ? serialPortsQuery.error.message : null;
+  const serialPortSelectValue =
+    serialConfig &&
+    serialConfig.devicePath &&
+    serialPorts.some((port) => port.path === serialConfig.devicePath)
+      ? serialConfig.devicePath
+      : '';
   const firewallStats = firewallOverviewQuery.data?.stats ?? null;
   const firewallConfig = firewallOverviewQuery.data?.config ?? null;
   const [firewallSaving, setFirewallSaving] = useState(false);
@@ -509,15 +521,30 @@ export function ConfigPage() {
   });
 
   const updateSerialConfigMutation = useMutation({
-    mutationFn: (body: Partial<SerialConfig> & { siteId: string }) =>
+    mutationFn: (body: Partial<SerialConfig>) =>
       apiClient.put<SerialConfig>('/serial/config', body),
     onSuccess: (data) => {
       queryClient.setQueryData(['serialConfig'], data);
       setSerialConfig(data);
+      setConfigNotice({ type: 'success', text: 'Serial configuration updated.' });
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : 'Unable to update serial configuration.';
+      setConfigNotice({ type: 'error', text: message });
+    },
+  });
+
+  const resetSerialConfigMutation = useMutation({
+    mutationFn: () => apiClient.post<SerialConfig>('/serial/config/reset', {}),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['serialConfig'], data);
+      setSerialConfig(data);
+      setConfigNotice({ type: 'success', text: 'Serial configuration reset to defaults.' });
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : 'Unable to reset serial configuration.';
       setConfigNotice({ type: 'error', text: message });
     },
   });
@@ -806,7 +833,19 @@ export function ConfigPage() {
     if (!serialConfig) return;
     const next = { ...serialConfig, ...patch };
     setSerialConfig(next);
-    updateSerialConfigMutation.mutate({ ...patch, siteId: serialConfig.siteId });
+    updateSerialConfigMutation.mutate(patch);
+  };
+
+  const handleSerialPortSelect = (event: ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    if (!value) {
+      return;
+    }
+    updateSerialSetting({ devicePath: value });
+  };
+
+  const handleSerialReset = () => {
+    resetSerialConfigMutation.mutate();
   };
 
   const updateTakSetting = (patch: Partial<TakConfig>) => {
@@ -2064,19 +2103,56 @@ export function ConfigPage() {
                   When enabled, the ingest service reconnects automatically using the settings
                   below.
                 </span>
+                <div className="serial-actions">
+                  <button
+                    type="button"
+                    className="control-chip"
+                    onClick={() => serialPortsQuery.refetch()}
+                    disabled={serialPortsQuery.isFetching}
+                  >
+                    {serialPortsQuery.isFetching ? 'Refreshing ports...' : 'Refresh Ports'}
+                  </button>
+                  <button
+                    type="button"
+                    className="control-chip control-chip--danger"
+                    onClick={handleSerialReset}
+                    disabled={resetSerialConfigMutation.isPending}
+                  >
+                    {resetSerialConfigMutation.isPending ? 'Resetting…' : 'Reset to Defaults'}
+                  </button>
+                </div>
                 <div className="config-row">
                   <span className="config-label">Device Path</span>
-                  <input
-                    placeholder="/dev/ttyUSB0"
-                    value={serialConfig.devicePath ?? ''}
-                    onChange={(event) =>
-                      updateSerialSetting({ devicePath: event.target.value || null })
-                    }
-                  />
-                  <span className="config-hint">
-                    Path to the radio / serial bridge. On Windows use COM ports, on Linux use
-                    /dev/tty*.
-                  </span>
+                  <div className="serial-device-picker">
+                    <select
+                      value={serialPortSelectValue}
+                      onChange={handleSerialPortSelect}
+                      disabled={serialPortsQuery.isLoading}
+                    >
+                      <option value="">Select detected port</option>
+                      {serialPorts.map((port) => (
+                        <option key={port.path} value={port.path}>
+                          {port.path}
+                          {port.manufacturer ? ` (${port.manufacturer})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      placeholder="/dev/ttyUSB0"
+                      value={serialConfig.devicePath ?? ''}
+                      onChange={(event) =>
+                        updateSerialSetting({ devicePath: event.target.value || null })
+                      }
+                    />
+                  </div>
+                  {serialPortsError ? (
+                    <span className="form-error">{serialPortsError}</span>
+                  ) : (
+                    <span className="config-hint">
+                      Path to the radio / serial bridge. On Windows use COM ports, on Linux use
+                      /dev/tty*.
+                    </span>
+                  )}
                 </div>
                 <div className="config-row">
                   <span className="config-label">Baud Rate</span>

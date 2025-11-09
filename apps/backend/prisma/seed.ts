@@ -47,10 +47,10 @@ async function main() {
   });
 
   await prisma.serialConfig.upsert({
-    where: { siteId: seedSiteId },
+    where: { id: 'serial' },
     update: {},
     create: {
-      siteId: seedSiteId,
+      id: 'serial',
     },
   });
 

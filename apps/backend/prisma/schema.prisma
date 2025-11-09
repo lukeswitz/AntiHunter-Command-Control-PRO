@@ -9,41 +9,41 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  passwordHash String
-  role         Role
-  legalAcceptedAt DateTime?
-  firstName    String?
-  lastName     String?
-  phone        String?
-  jobTitle     String?
-  isActive     Boolean       @default(true)
-  twoFactorEnabled Boolean   @default(false)
-  twoFactorSecret  String?
-  twoFactorTempSecret String?
-  twoFactorRecoveryCodes String[] @default([])
-  twoFactorEnabledAt DateTime?
-  failedLoginAttempts Int    @default(0)
-  lastFailedLoginAt   DateTime?
-  lockedAt            DateTime?
-  lockedUntil         DateTime?
-  lockedBy            String?
-  lockedReason        String?
-  lastLoginAt         DateTime?
-  lastLoginIp         String?
-  lastLoginCountry    String?
-  lastLoginUserAgent  String?
-  anomalyFlag         Boolean @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  passwordHash           String
+  role                   Role
+  legalAcceptedAt        DateTime?
+  firstName              String?
+  lastName               String?
+  phone                  String?
+  jobTitle               String?
+  isActive               Boolean   @default(true)
+  twoFactorEnabled       Boolean   @default(false)
+  twoFactorSecret        String?
+  twoFactorTempSecret    String?
+  twoFactorRecoveryCodes String[]  @default([])
+  twoFactorEnabledAt     DateTime?
+  failedLoginAttempts    Int       @default(0)
+  lastFailedLoginAt      DateTime?
+  lockedAt               DateTime?
+  lockedUntil            DateTime?
+  lockedBy               String?
+  lockedReason           String?
+  lastLoginAt            DateTime?
+  lastLoginIp            String?
+  lastLoginCountry       String?
+  lastLoginUserAgent     String?
+  anomalyFlag            Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  commandLogs  CommandLog[]
-  auditLogs    AuditLog[]
-  preferences  UserPreference?
-  permissions  UserPermission[]
-  siteAccess   UserSiteAccess[]
-  invitationsSent UserInvitation[] @relation("UserInvitations")
+  commandLogs         CommandLog[]
+  auditLogs           AuditLog[]
+  preferences         UserPreference?
+  permissions         UserPermission[]
+  siteAccess          UserSiteAccess[]
+  invitationsSent     UserInvitation[]     @relation("UserInvitations")
   passwordResetTokens PasswordResetToken[]
 }
 
@@ -88,80 +88,80 @@ enum FirewallLogOutcome {
 }
 
 model AppConfig {
-  id                   Int      @id @default(1)
-  appName              String   @default("Command Center")
-  timezone             String?
-  env                  String   @default("DEV")
+  id       Int     @id @default(1)
+  appName  String  @default("Command Center")
+  timezone String?
+  env      String  @default("DEV")
 
-  protocol             String   @default("meshtastic-like")
-  ackTimeoutMs         Int      @default(3000)
-  resultTimeoutMs      Int      @default(10000)
-  maxRetries           Int      @default(2)
-  perNodeCmdRate       Int      @default(8)
-  globalCmdRate        Int      @default(30)
+  protocol        String @default("meshtastic-like")
+  ackTimeoutMs    Int    @default(3000)
+  resultTimeoutMs Int    @default(10000)
+  maxRetries      Int    @default(2)
+  perNodeCmdRate  Int    @default(8)
+  globalCmdRate   Int    @default(30)
 
-  detectMode           Int      @default(2)
-  detectChannels       String   @default("1..14")
-  detectScanSecs       Int      @default(300)
-  allowForever         Boolean  @default(false)
-  baselineSecs         Int      @default(300)
-  deviceScanSecs       Int      @default(300)
-  droneSecs            Int      @default(600)
-  deauthSecs           Int      @default(300)
-  randomizeSecs        Int      @default(600)
+  detectMode     Int     @default(2)
+  detectChannels String  @default("1..14")
+  detectScanSecs Int     @default(300)
+  allowForever   Boolean @default(false)
+  baselineSecs   Int     @default(300)
+  deviceScanSecs Int     @default(300)
+  droneSecs      Int     @default(600)
+  deauthSecs     Int     @default(300)
+  randomizeSecs  Int     @default(600)
 
-  defaultRadiusM       Int      @default(200)
+  defaultRadiusM Int @default(200)
 
-  logLevel             String   @default("info")
-  structuredLogs       Boolean  @default(true)
+  logLevel       String  @default("info")
+  structuredLogs Boolean @default(true)
 
-  nodePosRetentionDays Int      @default(30)
-  commandRetentionDays Int      @default(180)
-  auditRetentionDays   Int      @default(365)
+  nodePosRetentionDays Int @default(30)
+  commandRetentionDays Int @default(180)
+  auditRetentionDays   Int @default(365)
 
-  metricsEnabled       Boolean  @default(true)
-  metricsPath          String   @default("/metrics")
-  healthEnabled        Boolean  @default(true)
+  metricsEnabled Boolean @default(true)
+  metricsPath    String  @default("/metrics")
+  healthEnabled  Boolean @default(true)
 
-  mapTileUrl           String   @default("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
-  mapAttribution       String   @default("OpenStreetMap contributors")
-  minZoom              Int      @default(2)
-  maxZoom              Int      @default(18)
+  mapTileUrl     String @default("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+  mapAttribution String @default("OpenStreetMap contributors")
+  minZoom        Int    @default(2)
+  maxZoom        Int    @default(18)
 
-  alertColorIdle       String   @default("#38BDF8")
-  alertColorInfo       String   @default("#2563EB")
-  alertColorNotice     String   @default("#22C55E")
-  alertColorAlert      String   @default("#F97316")
-  alertColorCritical   String   @default("#EF4444")
+  alertColorIdle     String @default("#38BDF8")
+  alertColorInfo     String @default("#2563EB")
+  alertColorNotice   String @default("#22C55E")
+  alertColorAlert    String @default("#F97316")
+  alertColorCritical String @default("#EF4444")
 
-  mailEnabled         Boolean  @default(false)
-  mailHost            String?
-  mailPort            Int?     @default(587)
-  mailSecure          Boolean  @default(false)
-  mailUser            String?
-  mailPassword        String?
-  mailFrom            String   @default("Command Center <no-reply@command-center.local>")
-  mailPreview         Boolean  @default(true)
-  securityAppUrl      String   @default("http://localhost:5173")
-  invitationExpiryHours Int   @default(48)
-  passwordResetExpiryHours Int @default(4)
+  mailEnabled              Boolean @default(false)
+  mailHost                 String?
+  mailPort                 Int?    @default(587)
+  mailSecure               Boolean @default(false)
+  mailUser                 String?
+  mailPassword             String?
+  mailFrom                 String  @default("Command Center <no-reply@command-center.local>")
+  mailPreview              Boolean @default(true)
+  securityAppUrl           String  @default("http://localhost:5173")
+  invitationExpiryHours    Int     @default(48)
+  passwordResetExpiryHours Int     @default(4)
 
-  allowApi             Boolean  @default(true)
-  updatedAt            DateTime @updatedAt
+  allowApi  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
 }
 
 model Node {
-  id          String          @id
-  siteId      String?
+  id           String    @id
+  siteId       String?
   originSiteId String?
-  name        String?
-  lastMessage String?
-  lastSeen    DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  name         String?
+  lastMessage  String?
+  lastSeen     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  site        Site?           @relation(fields: [siteId], references: [id])
-  positions   NodePosition[]
+  site           Site?                 @relation(fields: [siteId], references: [id])
+  positions      NodePosition[]
   triangulations TriangulationResult[]
 
   @@index([siteId])
@@ -169,60 +169,60 @@ model Node {
 }
 
 model NodePosition {
-  id        String   @id @default(cuid())
-  nodeId    String
-  lat       Float
-  lon       Float
-  ts        DateTime @default(now())
+  id     String   @id @default(cuid())
+  nodeId String
+  lat    Float
+  lon    Float
+  ts     DateTime @default(now())
 
-  node      Node     @relation(fields: [nodeId], references: [id])
+  node Node @relation(fields: [nodeId], references: [id])
 
   @@index([nodeId, ts])
 }
 
 model Target {
-  id        String   @id @default(cuid())
-  siteId    String?
-  name      String?
-  mac       String?
-  deviceType String?
+  id          String       @id @default(cuid())
+  siteId      String?
+  name        String?
+  mac         String?
+  deviceType  String?
   firstNodeId String?
-  lat       Float
-  lon       Float
-  url       String?
-  notes     String?
-  tags      String[] @default([])
-  status    TargetStatus @default(ACTIVE)
-  createdBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lat         Float
+  lon         Float
+  url         String?
+  notes       String?
+  tags        String[]     @default([])
+  status      TargetStatus @default(ACTIVE)
+  createdBy   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  site      Site?    @relation(fields: [siteId], references: [id])
+  site Site? @relation(fields: [siteId], references: [id])
 
   @@index([siteId, status])
 }
 
 model InventoryDevice {
-  mac                 String   @id
+  mac                 String    @id
   siteId              String?
   vendor              String?
   type                String?
   ssid                String?
   channel             Int?
-  hits                Int      @default(0)
+  hits                Int       @default(0)
   lastSeen            DateTime?
   maxRSSI             Int?
   minRSSI             Int?
   avgRSSI             Float?
-  locallyAdministered Boolean  @default(false)
-  multicast           Boolean  @default(false)
+  locallyAdministered Boolean   @default(false)
+  multicast           Boolean   @default(false)
   lastNodeId          String?
   lastLat             Float?
   lastLon             Float?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  site                Site?    @relation(fields: [siteId], references: [id])
+  site Site? @relation(fields: [siteId], references: [id])
 
   @@index([siteId])
   @@index([lastSeen])
@@ -239,34 +239,34 @@ model CommandTemplate {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  site       Site?    @relation(fields: [siteId], references: [id])
+  site Site? @relation(fields: [siteId], references: [id])
 }
 
 model CommandLog {
-  id              String        @id @default(cuid())
-  siteId          String?
-  originSiteId    String?
-  userId          String?
-  target          String
-  name            String
-  params          Json?
-  status          CommandStatus @default(PENDING)
-  startedAt       DateTime      @default(now())
-  createdAt       DateTime      @default(now())
-  finishedAt      DateTime?
-  ackKind         String?
-  ackStatus       String?
-  ackNode         String?
-  resultText      String?
-  errorText       String?
-  idempotencyKey  String?       @unique
-  requestIp       String?
-  userAgent       String?
+  id                String        @id @default(cuid())
+  siteId            String?
+  originSiteId      String?
+  userId            String?
+  target            String
+  name              String
+  params            Json?
+  status            CommandStatus @default(PENDING)
+  startedAt         DateTime      @default(now())
+  createdAt         DateTime      @default(now())
+  finishedAt        DateTime?
+  ackKind           String?
+  ackStatus         String?
+  ackNode           String?
+  resultText        String?
+  errorText         String?
+  idempotencyKey    String?       @unique
+  requestIp         String?
+  userAgent         String?
   clientFingerprint String?
 
-  site            Site?         @relation(fields: [siteId], references: [id])
-  originSite      Site?         @relation("CommandOriginSite", fields: [originSiteId], references: [id])
-  user            User?         @relation(fields: [userId], references: [id])
+  site       Site? @relation(fields: [siteId], references: [id])
+  originSite Site? @relation("CommandOriginSite", fields: [originSiteId], references: [id])
+  user       User? @relation(fields: [userId], references: [id])
 
   @@index([siteId])
   @@index([originSiteId])
@@ -276,22 +276,22 @@ model CommandLog {
 }
 
 model Geofence {
-  id                String      @id @default(cuid())
-  siteId            String?
-  originSiteId      String?
-  name              String
-  description       String?
-  color             String      @default("#1d4ed8")
-  polygon           Json
-  alarmEnabled      Boolean     @default(true)
-  alarmLevel        AlarmLevel  @default(ALERT)
-  alarmMessage      String      @default("{entity} entered geofence {geofence}")
+  id                 String     @id @default(cuid())
+  siteId             String?
+  originSiteId       String?
+  name               String
+  description        String?
+  color              String     @default("#1d4ed8")
+  polygon            Json
+  alarmEnabled       Boolean    @default(true)
+  alarmLevel         AlarmLevel @default(ALERT)
+  alarmMessage       String     @default("{entity} entered geofence {geofence}")
   alarmTriggerOnExit Boolean    @default(false)
-  createdBy         String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  createdBy          String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
-  site              Site?       @relation(fields: [siteId], references: [id])
+  site Site? @relation(fields: [siteId], references: [id])
 
   @@index([siteId])
   @@index([originSiteId])
@@ -316,8 +316,8 @@ model AuditLog {
   after     Json?
   createdAt DateTime @default(now())
 
-  site      Site?    @relation(fields: [siteId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
+  site Site? @relation(fields: [siteId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
 
   @@index([siteId, createdAt])
 }
@@ -335,56 +335,56 @@ model TriangulationResult {
   lines     String
   createdAt DateTime @default(now())
 
-  node      Node     @relation(fields: [nodeId], references: [id])
+  node Node @relation(fields: [nodeId], references: [id])
 
   @@index([targetRef])
   @@index([nodeId, createdAt])
 }
 
 model AlarmConfig {
-  id             Int     @id @default(1)
-  audioPack      String  @default("default")
-  volumeInfo     Int     @default(60)
-  volumeNotice   Int     @default(70)
-  volumeAlert    Int     @default(80)
-  volumeCritical Int     @default(90)
-  gapInfoMs      Int     @default(1000)
-  gapNoticeMs    Int     @default(1500)
-  gapAlertMs     Int     @default(2000)
-  gapCriticalMs  Int     @default(0)
-  dndStart       String?
-  dndEnd         String?
-  backgroundAllowed Boolean @default(false)
-  updatedAt      DateTime @updatedAt
+  id                Int      @id @default(1)
+  audioPack         String   @default("default")
+  volumeInfo        Int      @default(60)
+  volumeNotice      Int      @default(70)
+  volumeAlert       Int      @default(80)
+  volumeCritical    Int      @default(90)
+  gapInfoMs         Int      @default(1000)
+  gapNoticeMs       Int      @default(1500)
+  gapAlertMs        Int      @default(2000)
+  gapCriticalMs     Int      @default(0)
+  dndStart          String?
+  dndEnd            String?
+  backgroundAllowed Boolean  @default(false)
+  updatedAt         DateTime @updatedAt
 }
 
 model AlarmSound {
-  level     String  @id
+  level     String   @id
   filename  String
   updatedAt DateTime @updatedAt
 }
 
 model VisualConfig {
-  id               Int     @id @default(1)
-  pulseHzAlert     Float   @default(1.0)
-  pulseHzCritical  Float   @default(2.0)
-  blinkMs          Int     @default(400)
-  strokeBasePx     Int     @default(2)
-  strokeCriticalPx Int     @default(4)
-  theme            String  @default("auto")
+  id               Int      @id @default(1)
+  pulseHzAlert     Float    @default(1.0)
+  pulseHzCritical  Float    @default(2.0)
+  blinkMs          Int      @default(400)
+  strokeBasePx     Int      @default(2)
+  strokeCriticalPx Int      @default(4)
+  theme            String   @default("auto")
   updatedAt        DateTime @updatedAt
 }
 
 model CoverageConfig {
-  id             Int     @id @default(1)
-  defaultRadiusM Int     @default(200)
-  dynamicEnabled Boolean @default(false)
+  id             Int      @id @default(1)
+  defaultRadiusM Int      @default(200)
+  dynamicEnabled Boolean  @default(false)
   dynamicModel   String?
   updatedAt      DateTime @updatedAt
 }
 
 model NodeCoverageOverride {
-  nodeId       String @id
+  nodeId       String   @id
   radiusMeters Int
   updatedAt    DateTime @updatedAt
 }
@@ -400,73 +400,70 @@ model Site {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  serial    SerialConfig?
-  mqtt      MqttConfig?
-  nodes     Node[]
-  targets   Target[]
-  geofences Geofence[]
-  devices   InventoryDevice[]
-  commandLogs CommandLog[]
-  originCommandLogs CommandLog[] @relation("CommandOriginSite")
-  audits    AuditLog[]
-  templates CommandTemplate[]
-  userAccess UserSiteAccess[]
-  firewallLogs FirewallLog[]
+  mqtt              MqttConfig?
+  nodes             Node[]
+  targets           Target[]
+  geofences         Geofence[]
+  devices           InventoryDevice[]
+  commandLogs       CommandLog[]
+  originCommandLogs CommandLog[]      @relation("CommandOriginSite")
+  audits            AuditLog[]
+  templates         CommandTemplate[]
+  userAccess        UserSiteAccess[]
+  firewallLogs      FirewallLog[]
 }
 
 model SerialConfig {
-  siteId              String @id
-  devicePath          String?
-  baud                Int?
-  dataBits            Int?
-  parity              String?
-  stopBits            Int?
-  delimiter           String?
-  reconnectBaseMs     Int?
-  reconnectMaxMs      Int?
-  reconnectJitter     Float?
+  id                   String   @id @default("serial")
+  devicePath           String?
+  baud                 Int?
+  dataBits             Int?
+  parity               String?
+  stopBits             Int?
+  delimiter            String?
+  reconnectBaseMs      Int?
+  reconnectMaxMs       Int?
+  reconnectJitter      Float?
   reconnectMaxAttempts Int?
-  enabled             Boolean @default(true)
-  updatedAt           DateTime @updatedAt
-
-  site                Site   @relation(fields: [siteId], references: [id])
+  enabled              Boolean  @default(true)
+  updatedAt            DateTime @updatedAt
 }
 
 model MqttConfig {
-  id          Int     @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   brokerUrl   String
   clientId    String
   username    String?
   password    String?
-  tlsEnabled  Boolean @default(true)
+  tlsEnabled  Boolean  @default(true)
   caPem       String?
   certPem     String?
   keyPem      String?
-  qosEvents   Int     @default(1)
-  qosCommands Int     @default(1)
-  enabled     Boolean @default(false)
+  qosEvents   Int      @default(1)
+  qosCommands Int      @default(1)
+  enabled     Boolean  @default(false)
   siteId      String
   updatedAt   DateTime @updatedAt
 
-  site        Site    @relation(fields: [siteId], references: [id])
+  site Site @relation(fields: [siteId], references: [id])
 
   @@unique([siteId])
 }
 
 model UserPreference {
-  userId         String @id
-  theme          String @default("auto")
-  density        String @default("compact")
-  mapState       Json?
-  tablePrefs     Json?
+  userId          String   @id
+  theme           String   @default("auto")
+  density         String   @default("compact")
+  mapState        Json?
+  tablePrefs      Json?
   terminalFilters Json?
-  muteLevels     Json?
-  language       String @default("en")
-  notifications  Json?
-  timeFormat     String @default("24h")
-  updatedAt      DateTime @updatedAt
+  muteLevels      Json?
+  language        String   @default("en")
+  notifications   Json?
+  timeFormat      String   @default("24h")
+  updatedAt       DateTime @updatedAt
 
-  user           User   @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 enum TargetStatus {
@@ -482,28 +479,28 @@ enum TakProtocol {
 }
 
 model TakConfig {
-  id            Int          @id @default(1)
-  enabled       Boolean      @default(false)
-  protocol      TakProtocol  @default(UDP)
-  host          String?
-  port          Int?
-  tlsEnabled    Boolean      @default(false)
-  cafile        String?
-  certfile      String?
-  keyfile       String?
-  username      String?
-  password      String?
-  apiKey        String?
-  streamNodes          Boolean @default(true)
-  streamTargets        Boolean @default(true)
-  streamCommandAcks    Boolean @default(false)
-  streamCommandResults Boolean @default(false)
-  streamAlertInfo      Boolean @default(false)
-  streamAlertNotice    Boolean @default(true)
-  streamAlertAlert     Boolean @default(true)
-  streamAlertCritical  Boolean @default(true)
-  lastConnected DateTime?
-  updatedAt     DateTime     @updatedAt
+  id                   Int         @id @default(1)
+  enabled              Boolean     @default(false)
+  protocol             TakProtocol @default(UDP)
+  host                 String?
+  port                 Int?
+  tlsEnabled           Boolean     @default(false)
+  cafile               String?
+  certfile             String?
+  keyfile              String?
+  username             String?
+  password             String?
+  apiKey               String?
+  streamNodes          Boolean     @default(true)
+  streamTargets        Boolean     @default(true)
+  streamCommandAcks    Boolean     @default(false)
+  streamCommandResults Boolean     @default(false)
+  streamAlertInfo      Boolean     @default(false)
+  streamAlertNotice    Boolean     @default(true)
+  streamAlertAlert     Boolean     @default(true)
+  streamAlertCritical  Boolean     @default(true)
+  lastConnected        DateTime?
+  updatedAt            DateTime    @updatedAt
 }
 
 model FirewallConfig {
@@ -528,35 +525,35 @@ model FirewallRule {
   reason    String?
   expiresAt DateTime?
   createdBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   @@index([ip])
 }
 
 model FirewallLog {
-  id        String            @id @default(cuid())
+  id        String             @id @default(cuid())
   ip        String
   country   String?
-  path      String            @default("*")
-  method    String            @default("UNKNOWN")
+  path      String             @default("*")
+  method    String             @default("UNKNOWN")
   outcome   FirewallLogOutcome
   ruleId    String?
-  attempts  Int               @default(1)
-  firstSeen DateTime          @default(now())
-  lastSeen  DateTime          @default(now())
-  blocked   Boolean           @default(false)
+  attempts  Int                @default(1)
+  firstSeen DateTime           @default(now())
+  lastSeen  DateTime           @default(now())
+  blocked   Boolean            @default(false)
   reason    String?
   siteId    String?
   userAgent String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
-  site      Site?             @relation(fields: [siteId], references: [id])
+  site Site? @relation(fields: [siteId], references: [id])
 
+  @@unique([ip, outcome, path])
   @@index([ip])
   @@index([outcome])
-  @@unique([ip, outcome, path])
 }
 
 model UserPermission {
@@ -592,27 +589,27 @@ model UserSiteAccess {
 }
 
 model UserInvitation {
-  id         String   @id @default(cuid())
-  email      String
-  role       Role
-  token      String   @unique
-  expiresAt  DateTime
-  siteIds    String[]
-  permissions String[] @default([])
-  message    String?
-  inviterId  String?
-  acceptedAt DateTime?
-  createdAt  DateTime @default(now())
+  id          String    @id @default(cuid())
+  email       String
+  role        Role
+  token       String    @unique
+  expiresAt   DateTime
+  siteIds     String[]
+  permissions String[]  @default([])
+  message     String?
+  inviterId   String?
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
 
   inviter User? @relation("UserInvitations", fields: [inviterId], references: [id])
 }
 
 model PasswordResetToken {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  token      String   @unique
+  token      String    @unique
   expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
   consumedAt DateTime?
 
   user User @relation(fields: [userId], references: [id])
