@@ -201,6 +201,18 @@ export class MqttGeofencesService implements OnModuleInit, OnModuleDestroy {
         geofenceId: event.geofence.id,
       };
       await this.mqttService.publishToAll(topic, JSON.stringify(message));
+    } else if (event.type === 'delete-request') {
+      const targetSiteId = event.geofence.originSiteId;
+      if (!targetSiteId || targetSiteId === this.localSiteId) {
+        return;
+      }
+      const topic = this.buildDeleteTopic(targetSiteId);
+      const message: GeofenceDeleteMessage = {
+        type: 'geofence.delete',
+        originSiteId: this.localSiteId,
+        geofenceId: event.geofence.id,
+      };
+      await this.mqttService.publishToAll(topic, JSON.stringify(message));
     }
   }
 

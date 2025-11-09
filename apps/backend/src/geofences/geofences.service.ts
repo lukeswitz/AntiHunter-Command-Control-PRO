@@ -43,7 +43,8 @@ export interface GeofenceResponse {
 
 export type GeofenceEvent =
   | { type: 'upsert'; geofence: GeofenceResponse }
-  | { type: 'delete'; geofence: GeofenceResponse };
+  | { type: 'delete'; geofence: GeofenceResponse }
+  | { type: 'delete-request'; geofence: GeofenceResponse };
 
 export interface GeofenceUpsertPayload {
   id: string;
@@ -222,9 +223,15 @@ export class GeofencesService {
       throw new NotFoundException(`Geofence ${id} not found`);
     }
 
+    const mapped = this.mapEntity(existing);
+
     await this.prisma.geofence.delete({ where: { id } });
 
-    const mapped = this.mapEntity(existing);
+    if (existing.originSiteId && existing.originSiteId !== this.localSiteId) {
+      this.changes$.next({ type: 'delete-request', geofence: mapped });
+      return mapped;
+    }
+
     this.changes$.next({ type: 'delete', geofence: mapped });
     return mapped;
   }
