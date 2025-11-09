@@ -69,7 +69,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 
 ## UI Modules at a Glance
 
-Each primary view ships with rich operator context. Replace the placeholder images below with real screenshots once the UI is finalized.
+Each primary view ships with rich operator context.
 
 #### Map
 
