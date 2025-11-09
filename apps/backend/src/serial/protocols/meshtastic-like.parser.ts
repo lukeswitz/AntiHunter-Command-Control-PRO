@@ -62,13 +62,13 @@ const VIBRATION_REGEX =
 const DEVICE_REGEX =
   /^(?<node>[A-Za-z0-9_-]+):\s*DEVICE:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})(?:\s+(?<band>[A-Za-z0-9]+))?\s+(?<rssi>-?\d+)(?:\s+(?<extras>.*))?$/i;
 const GPS_STATUS_REGEX =
-  /^(?<node>[A-Za-z0-9_-]+):\s*GPS:\s*(?<status>[A-Z]+)\s*Location[=:](?<lat>-?\d+(?:\.\d+)?)\s*,\s*(?<lon>-?\d+(?:\.\d+)?)\s*Satellites[=:](?<sats>\d+)\s*HDOP[=:](?<hdop>\d+(?:\.\d+)?)/i;
+  /^(?<node>[A-Za-z0-9_-]+)\s*:?\s*GPS:\s*(?<status>[A-Z]+)\s*Location(?:[:=]|\s+)(?:[A-Z]+\s+)*(?<lat>-?\d+(?:\.\d+)?)(?:\s*(?:deg)?\s*[NnSs])?\s*,\s*(?<lon>-?\d+(?:\.\d+)?)(?:\s*(?:deg)?\s*[EeWw])?\s*Satellites[=:](?<sats>\d+)\s*HDOP[=:](?<hdop>\d+(?:\.\d+)?)/i;
 const GPS_SIMPLE_REGEX =
-  /^(?<node>[A-Za-z0-9_-]+):\s*GPS(?:[:=]\s*|\s+)(?<lat>-?\d+(?:\.\d+)?)\s*,\s*(?<lon>-?\d+(?:\.\d+)?)/i;
+  /^(?<node>[A-Za-z0-9_-]+)\s*:?\s*GPS(?:[:=]\s*|\s+)(?:[A-Za-z]+[\s:]+)*(?<lat>-?\d+(?:\.\d+)?)(?:\s*(?:deg)?\s*[NnSs])?,\s*(?<lon>-?\d+(?:\.\d+)?)(?:\s*(?:deg)?\s*[EeWw])?/i;
 const NODE_HEARTBEAT_REGEX =
   /^\[NODE_HB\]\s*(?<node>[A-Za-z0-9_-]+).*?GPS[=:](?<lat>-?\d+\.\d+),\s*(?<lon>-?\d+\.\d+)/i;
 const STATUS_REGEX =
-  /^(?<node>[A-Za-z0-9_-]+)\s*:?\s*STATUS:\s*Mode:(?<mode>[A-Za-z0-9+]+)\s+Scan:(?<scan>[A-Za-z]+)\s+Hits:(?<hits>\d+)\s+Unique:(?<unique>\d+)\s+Temp:\s*(?<tempC>[0-9.]+)\s*(?:\u00b0?\s*)?C(?:\s*\/\s*(?<tempF>[0-9.]+)\s*(?:\u00b0?\s*)?F)?\s+Up:(?<uptime>[0-9:]+)(?:\s+Targets:(?<targets>\d+))?(?:\s+GPS[:=](?<gpsLat>-?\d+(?:\.\d+)?),\s*(?<gpsLon>-?\d+(?:\.\d+)?))?/i;
+  /^(?<node>[A-Za-z0-9_-]+)\s*:?\s*STATUS\b\s*:?\s*Mode:(?<mode>[A-Za-z0-9+]+)\s+Scan:(?<scan>[A-Za-z]+)\s+Hits:(?<hits>\d+)\s+Unique:(?<unique>\d+)\s+Temp:\s*(?<tempC>-?\d+(?:\.\d+)?)\s*(?:\u00b0?\s*)?C(?:\s*\/\s*(?<tempF>[A-Za-z0-9.+-]+)\s*(?:\u00b0?\s*)?F)?\s+Up:(?<uptime>[0-9:]+)(?:\s+Targets:(?<targets>\d+))?(?:\s+(?:[A-Za-z0-9_-]+\s+)?GPS(?:[:=]\s*|\s+)(?<gpsLat>-?\d+(?:\.\d+)?)(?:\s*(?:deg)?\s*[NnSs])?,\s*(?<gpsLon>-?\d+(?:\.\d+)?)(?:\s*(?:deg)?\s*[EeWw])?)?/i;
 const ANOMALY_REGEX =
   /^(?<node>[A-Za-z0-9_-]+):\s*ANOMALY(?:-(?<isNew>NEW))?:\s*(?<type>[A-Za-z0-9_-]+)\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)(?:\s+(?<details>.*))?$/i;
 const CONFIG_ACK_REGEX = /^(?<node>[A-Za-z0-9_-]+):\s*CONFIG_ACK:(?<type>[A-Z_]+):(?<value>.+)$/i;
@@ -459,9 +459,6 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
       const lat = toNumber(gpsSimpleMatch.groups.lat);
       const lon = toNumber(gpsSimpleMatch.groups.lon);
       if (lat != null && lon != null) {
-        if (this.isDuplicateGps(nodeId, lat, lon)) {
-          return [];
-        }
         this.recordGps(nodeId, lat, lon);
         const formattedLat = formatCoordinate(lat, true);
         const formattedLon = formatCoordinate(lon, false);
@@ -502,11 +499,13 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
       if (statusMatch.groups.targets) {
         message += ` Targets:${statusMatch.groups.targets}`;
       }
+      const tempC = toNumber(statusMatch.groups.tempC);
+      const tempF = toNumber(statusMatch.groups.tempF);
       const data: Record<string, unknown> = {
         hits: toNumber(statusMatch.groups.hits),
         unique: toNumber(statusMatch.groups.unique),
-        tempC: toNumber(statusMatch.groups.tempC),
-        tempF: toNumber(statusMatch.groups.tempF),
+        tempC,
+        tempF,
         uptime: statusMatch.groups.uptime,
       };
       if (statusMatch.groups.mode) {
@@ -539,10 +538,13 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
       if (hasInlineGps) {
         const formattedLat = formatCoordinate(lat, true);
         const formattedLon = formatCoordinate(lon, false);
-        if (!this.isDuplicateGps(nodeId, lat, lon)) {
-          this.recordGps(nodeId, lat, lon);
-          results.push(this.toTelemetry(nodeId, lat, lon, line, 'Status GPS'));
-        }
+        this.recordGps(nodeId, lat, lon);
+        results.push(
+          this.toTelemetry(nodeId, lat, lon, line, 'Status GPS', {
+            temperatureC: tempC,
+            temperatureF: tempF,
+          }),
+        );
         results.push(
           this.buildStatusAlert(pendingStatus, {
             lat,
@@ -893,15 +895,24 @@ export class MeshtasticLikeParser implements SerialProtocolParser {
     lon: number,
     raw: string,
     lastMessage?: string,
+    extras?: {
+      temperatureC?: number | null;
+      temperatureF?: number | null;
+    },
   ): SerialNodeTelemetry {
+    const timestamp = new Date();
+    const hasTemperature = extras?.temperatureC != null || extras?.temperatureF != null;
     return {
       kind: 'node-telemetry',
       nodeId,
       lat,
       lon,
-      timestamp: new Date(),
+      timestamp,
       lastMessage,
       raw,
+      temperatureC: typeof extras?.temperatureC === 'number' ? extras.temperatureC : undefined,
+      temperatureF: typeof extras?.temperatureF === 'number' ? extras.temperatureF : undefined,
+      temperatureUpdatedAt: hasTemperature ? timestamp : undefined,
     };
   }
   private buildAckEvent(

@@ -13,6 +13,9 @@ export interface NodeSummary {
   siteColor?: string | null;
   siteCountry?: string | null;
   siteCity?: string | null;
+  temperatureC?: number | null;
+  temperatureF?: number | null;
+  temperatureUpdatedAt?: string | null;
 }
 
 export interface PartialNode {
@@ -28,6 +31,9 @@ export interface PartialNode {
   siteColor?: string | null;
   siteCountry?: string | null;
   siteCity?: string | null;
+  temperatureC?: number | string | null;
+  temperatureF?: number | string | null;
+  temperatureUpdatedAt?: string | number | Date | null;
 }
 
 export type IncomingNode = NodeSummary | PartialNode;
@@ -212,9 +218,35 @@ function normalizeNode(node: IncomingNode): NodeSummary {
     return 0;
   };
 
+  const ensureOptionalNumber = (value: number | string | null | undefined): number | null => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
   const ensureIsoString = (value: string | number | Date | null | undefined): string => {
     if (!value) {
       return new Date().toISOString();
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (typeof value === 'number') {
+      return new Date(value).toISOString();
+    }
+    return value;
+  };
+
+  const ensureOptionalIsoString = (
+    value: string | number | Date | null | undefined,
+  ): string | null => {
+    if (value == null) {
+      return null;
     }
     if (value instanceof Date) {
       return value.toISOString();
@@ -247,6 +279,9 @@ function normalizeNode(node: IncomingNode): NodeSummary {
     siteColor: node.siteColor ?? null,
     siteCountry: node.siteCountry ?? null,
     siteCity: node.siteCity ?? null,
+    temperatureC: ensureOptionalNumber(node.temperatureC),
+    temperatureF: ensureOptionalNumber(node.temperatureF),
+    temperatureUpdatedAt: ensureOptionalIsoString(node.temperatureUpdatedAt),
   };
 }
 

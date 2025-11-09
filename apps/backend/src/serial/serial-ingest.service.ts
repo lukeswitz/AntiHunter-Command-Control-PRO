@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Subscription } from 'rxjs';
 
 import { SerialService } from './serial.service';
-import { SerialParseResult, SerialTargetDetected } from './serial.types';
+import { SerialAlertEvent, SerialParseResult, SerialTargetDetected } from './serial.types';
 import { CommandsService } from '../commands/commands.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { NodesService } from '../nodes/nodes.service';
@@ -144,33 +144,45 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
 
     switch (event.kind) {
       case 'node-telemetry':
-        await this.nodesService.upsert({
-          id: event.nodeId,
-          name: event.nodeId,
-          lat: event.lat,
-          lon: event.lon,
-          lastMessage: event.lastMessage,
-          ts: event.timestamp ?? new Date(),
-          lastSeen: event.timestamp ?? new Date(),
-          siteId,
-        });
-        this.gateway.emitEvent({
-          type: 'node.telemetry',
-          nodeId: event.nodeId,
-          lat: event.lat,
-          lon: event.lon,
-          raw: event.raw,
-          siteId,
-        });
-        void this.takService.streamNodeTelemetry({
-          nodeId: event.nodeId,
-          name: event.nodeId,
-          lat: event.lat,
-          lon: event.lon,
-          message: event.lastMessage,
-          siteId,
-          timestamp: event.timestamp ?? new Date(),
-        });
+        {
+          const temperatureProvided =
+            event.temperatureC !== undefined || event.temperatureF !== undefined;
+          const temperatureUpdatedAt =
+            event.temperatureUpdatedAt ??
+            (temperatureProvided ? (event.timestamp ?? new Date()) : undefined);
+          await this.nodesService.upsert({
+            id: event.nodeId,
+            name: event.nodeId,
+            lat: event.lat,
+            lon: event.lon,
+            lastMessage: event.lastMessage,
+            ts: event.timestamp ?? new Date(),
+            lastSeen: event.timestamp ?? new Date(),
+            siteId,
+            temperatureC: event.temperatureC,
+            temperatureF: event.temperatureF,
+            temperatureUpdatedAt,
+          });
+          this.gateway.emitEvent({
+            type: 'node.telemetry',
+            nodeId: event.nodeId,
+            lat: event.lat,
+            lon: event.lon,
+            raw: event.raw,
+            siteId,
+            temperatureC: event.temperatureC ?? null,
+            temperatureF: event.temperatureF ?? null,
+          });
+          void this.takService.streamNodeTelemetry({
+            nodeId: event.nodeId,
+            name: event.nodeId,
+            lat: event.lat,
+            lon: event.lon,
+            message: event.lastMessage,
+            siteId,
+            timestamp: event.timestamp ?? new Date(),
+          });
+        }
         break;
       case 'target-detected':
         {
@@ -253,8 +265,10 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
       case 'alert':
         {
           const timestamp = new Date();
-          const lat = typeof event.data?.lat === 'number' ? event.data.lat : undefined;
-          const lon = typeof event.data?.lon === 'number' ? event.data.lon : undefined;
+          const { lat, lon } = this.extractCoordinates(event);
+          const { temperatureC, temperatureF } = this.extractAlertTemperatures(event);
+          const temperatureProvided = temperatureC !== undefined || temperatureF !== undefined;
+          const temperatureUpdatedAt = temperatureProvided ? timestamp : undefined;
           this.gateway.emitEvent({
             type: 'event.alert',
             timestamp: timestamp.toISOString(),
@@ -268,8 +282,36 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             raw: event.raw,
             siteId,
           });
+          if (event.nodeId && lat != null && lon != null) {
+            await this.nodesService.upsert({
+              id: event.nodeId,
+              name: event.nodeId,
+              lat,
+              lon,
+              lastMessage: event.message,
+              ts: timestamp,
+              lastSeen: timestamp,
+              siteId,
+              ...(temperatureProvided && {
+                temperatureC,
+                temperatureF,
+                temperatureUpdatedAt,
+              }),
+            });
+          }
           if (event.nodeId && event.message) {
-            await this.nodesService.updateLastMessage(event.nodeId, event.message, timestamp);
+            await this.nodesService.updateLastMessage(
+              event.nodeId,
+              event.message,
+              timestamp,
+              temperatureProvided
+                ? {
+                    temperatureC,
+                    temperatureF,
+                    temperatureUpdatedAt,
+                  }
+                : undefined,
+            );
           }
           void this.takService.streamAlert({
             level: event.level,
@@ -352,6 +394,68 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
       }
     }
     return false;
+  }
+
+  private parseNumeric(value: unknown): number | undefined {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : undefined;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  }
+
+  private extractCoordinates(event: SerialAlertEvent): { lat?: number; lon?: number } {
+    const latValue = typeof event.data?.lat === 'number' ? event.data.lat : undefined;
+    const lonValue = typeof event.data?.lon === 'number' ? event.data.lon : undefined;
+    if (latValue != null && lonValue != null) {
+      return { lat: latValue, lon: lonValue };
+    }
+    const text = event.message ?? event.raw ?? '';
+    const coordinateRegex =
+      /GPS(?:[:=\s]+[A-Z]+[\s:]*)?(?:[A-Za-z0-9_-]+\s+)?(?<lat>-?\d+(?:\.\d+)?)(?:\s*(?:deg)?\s*(?<latDir>[NnSs]))?,\s*(?<lon>-?\d+(?:\.\d+)?)(?:\s*(?:deg)?\s*(?<lonDir>[EeWw]))?/;
+    const match = coordinateRegex.exec(text);
+    if (!match?.groups) {
+      return {};
+    }
+    const latParsed = Number(match.groups.lat);
+    const lonParsed = Number(match.groups.lon);
+    if (!Number.isFinite(latParsed) || !Number.isFinite(lonParsed)) {
+      return {};
+    }
+    const latDir = match.groups.latDir?.toUpperCase();
+    const lonDir = match.groups.lonDir?.toUpperCase();
+    const latFinal =
+      latDir === 'S' ? -Math.abs(latParsed) : latDir === 'N' ? Math.abs(latParsed) : latParsed;
+    const lonFinal =
+      lonDir === 'W' ? -Math.abs(lonParsed) : lonDir === 'E' ? Math.abs(lonParsed) : lonParsed;
+    return { lat: latFinal, lon: lonFinal };
+  }
+
+  private extractAlertTemperatures(event: SerialAlertEvent): {
+    temperatureC?: number;
+    temperatureF?: number;
+  } {
+    const temperatureC = this.parseNumeric(event.data?.tempC ?? event.data?.temperatureC);
+    const temperatureF = this.parseNumeric(event.data?.tempF ?? event.data?.temperatureF);
+    if (temperatureC !== undefined || temperatureF !== undefined) {
+      return { temperatureC, temperatureF };
+    }
+    const text = event.message ?? event.raw ?? '';
+    const tempRegex =
+      /temp(?:erature)?[:=\s]*(?<c>-?\d+(?:\.\d+)?)\s*(?:°?\s*C)?(?:\s*\/\s*(?<f>-?\d+(?:\.\d+)?)\s*(?:°?\s*F)?)?/i;
+    const match = tempRegex.exec(text);
+    if (!match?.groups) {
+      return {};
+    }
+    const parsedC = match.groups.c ? Number(match.groups.c) : undefined;
+    const parsedF = match.groups.f ? Number(match.groups.f) : undefined;
+    return {
+      temperatureC: Number.isFinite(parsedC) ? parsedC : undefined,
+      temperatureF: Number.isFinite(parsedF) ? parsedF : undefined,
+    };
   }
 
   private buildDuplicateKey(event: SerialParseResult, siteId: string | null): string | null {

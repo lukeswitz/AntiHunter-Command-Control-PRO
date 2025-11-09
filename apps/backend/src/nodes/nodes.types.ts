@@ -12,6 +12,9 @@ export interface NodeSnapshot {
   siteCountry?: string | null;
   siteCity?: string | null;
   originSiteId?: string | null;
+  temperatureC?: number | null;
+  temperatureF?: number | null;
+  temperatureUpdatedAt?: Date | null;
 }
 
 export interface NodeDiff {

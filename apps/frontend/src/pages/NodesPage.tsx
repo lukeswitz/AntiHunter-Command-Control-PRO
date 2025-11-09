@@ -79,7 +79,6 @@ export function NodesPage() {
                 <th>Last Seen</th>
                 <th>Location</th>
                 <th>Temperature</th>
-                <th>SD Card</th>
                 <th>Last Message</th>
                 <th>Actions</th>
               </tr>
@@ -128,7 +127,6 @@ export function NodesPage() {
                     )}
                   </td>
                   <td>{row.temperature ?? <span className="muted">N/A</span>}</td>
-                  <td>{row.sdStatus ?? <span className="muted">N/A</span>}</td>
                   <td className="last-message-cell">
                     {row.lastMessage ?? <span className="muted">No messages yet</span>}
                   </td>
@@ -164,6 +162,9 @@ function buildRow(node: {
   siteColor?: string | null;
   siteCountry?: string | null;
   siteCity?: string | null;
+  temperatureC?: number | null;
+  temperatureF?: number | null;
+  temperatureUpdatedAt?: string | null;
 }): NodeRow {
   const lastSeenDate = node.lastSeen ? new Date(node.lastSeen) : undefined;
   const lastSeenDisplay = lastSeenDate ? lastSeenDate.toLocaleString() : 'Unknown';
@@ -175,8 +176,7 @@ function buildRow(node: {
   const lon = hasCoords ? Number(node.lon) : undefined;
   const location = lat != null && lon != null ? `${lat.toFixed(6)}, ${lon.toFixed(6)}` : undefined;
 
-  const temperature = extractTemperature(node.lastMessage);
-  const sdStatus = extractSdStatus(node.lastMessage);
+  const temperature = formatTemperature(node);
   const locationTokens = [node.siteCountry, node.siteCity].filter(Boolean) as string[];
   const locationLabel = locationTokens.length > 0 ? locationTokens.join(' / ') : null;
   const primaryLabel = locationLabel ?? node.siteName ?? node.siteId ?? 'Local';
@@ -192,7 +192,6 @@ function buildRow(node: {
     lastSeenRelative,
     location,
     temperature,
-    sdStatus,
     lastMessage: node.lastMessage ?? undefined,
     lat,
     lon,
@@ -213,7 +212,6 @@ interface NodeRow {
   lastSeenRelative: string | null;
   location?: string;
   temperature?: string;
-  sdStatus?: string;
   lastMessage?: string;
   lat?: number;
   lon?: number;
@@ -245,6 +243,20 @@ function formatRelativeTime(date: Date): string | null {
   return `${days}d ago`;
 }
 
+function formatTemperature(node: {
+  temperatureC?: number | null;
+  temperatureF?: number | null;
+  lastMessage?: string | null;
+}): string | undefined {
+  if (typeof node.temperatureC === 'number' && Number.isFinite(node.temperatureC)) {
+    return `${node.temperatureC.toFixed(1)} °C`;
+  }
+  if (typeof node.temperatureF === 'number' && Number.isFinite(node.temperatureF)) {
+    return `${node.temperatureF.toFixed(1)} °F`;
+  }
+  return extractTemperature(node.lastMessage);
+}
+
 function extractTemperature(message?: string | null): string | undefined {
   if (!message) {
     return undefined;
@@ -260,22 +272,6 @@ function extractTemperature(message?: string | null): string | undefined {
   const unit = match[2] ? match[2].toUpperCase() : 'C';
   return `${value.toFixed(1)} ${unit}`;
 }
-function extractSdStatus(message?: string | null): string | undefined {
-  if (!message) {
-    return undefined;
-  }
-  if (/sd\s*card/i.test(message)) {
-    if (/fail|error|missing|not\s*detected/i.test(message)) {
-      return 'Fault';
-    }
-    if (/ok|mounted|ready/i.test(message)) {
-      return 'OK';
-    }
-    return message;
-  }
-  return undefined;
-}
-
 function composeNodeKey(nodeId: string, siteId?: string | null): string {
   return `${siteId ?? 'default'}::${nodeId}`;
 }

@@ -4,11 +4,11 @@ AntiHunter Command & Control PRO is currently in a **beta** state and has not co
 
 ## Supported Versions
 
-| Version branch | Supported? | Notes |
-| --- | --- | --- |
-| `main` | ✅ | Actively developed; security fixes land here first. |
-| Release tags | ⚠️ | Beta snapshots only. Please update to the latest `main` build. |
-| Forks / custom builds | ❌ | Out of scope unless the issue reproduces on an unmodified build from this repository. |
+| Version branch        | Supported? | Notes                                                                                 |
+| --------------------- | ---------- | ------------------------------------------------------------------------------------- |
+| `main`                | ✅         | Actively developed; security fixes land here first.                                   |
+| Release tags          | ⚠️         | Beta snapshots only. Please update to the latest `main` build.                        |
+| Forks / custom builds | ❌         | Out of scope unless the issue reproduces on an unmodified build from this repository. |
 
 ## Reporting a Vulnerability
 

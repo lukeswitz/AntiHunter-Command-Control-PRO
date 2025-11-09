@@ -52,6 +52,18 @@ const DETECTION_MODE_OPTIONS = [
 
 const TAK_PROTOCOL_OPTIONS: TakProtocol[] = ['UDP', 'TCP', 'HTTPS'];
 
+const DEFAULT_RADIUS_LIMITS = {
+  min: 50,
+  max: 2000,
+};
+
+type SerialConnectPayload = {
+  path?: string;
+  baudRate?: number;
+  delimiter?: string;
+  protocol?: string;
+};
+
 const PROTOCOL_OPTIONS = [
   { value: 'meshtastic-like', label: 'Meshtastic JSON/CBOR' },
   { value: 'raw-lines', label: 'Raw Lines' },
@@ -196,6 +208,11 @@ export function ConfigPage() {
   const serialConfigQuery = useQuery({
     queryKey: ['serialConfig'],
     queryFn: () => apiClient.get<SerialConfig>('/serial/config'),
+  });
+  const serialStateQuery = useQuery({
+    queryKey: ['serialState'],
+    queryFn: () => apiClient.get<SerialState>('/serial/state'),
+    refetchInterval: 5000,
   });
 
   const serialPortsQuery = useQuery({
@@ -761,12 +778,8 @@ export function ConfigPage() {
   };
 
   const serialTestMutation = useMutation({
-    mutationFn: (payload: {
-      path?: string;
-      baudRate?: number;
-      delimiter?: string;
-      protocol?: string;
-    }) => apiClient.post<SerialState>('/serial/connect', payload),
+    mutationFn: (payload: SerialConnectPayload) =>
+      apiClient.post<SerialState>('/serial/connect', payload),
     onMutate: () => {
       setSerialTestStatus({ status: 'running', message: 'Attempting to connect...' });
     },
@@ -778,6 +791,7 @@ export function ConfigPage() {
             `Connected to ${state.path ?? 'device'} ${state.baudRate ? `@ ${state.baudRate} baud` : ''}`.trim(),
         });
         void serialConfigQuery.refetch();
+        void serialStateQuery.refetch();
       } else {
         setSerialTestStatus({
           status: 'error',
@@ -792,6 +806,47 @@ export function ConfigPage() {
       });
     },
   });
+
+  const serialConnectMutation = useMutation({
+    mutationFn: (payload: SerialConnectPayload) =>
+      apiClient.post<SerialState>('/serial/connect', payload),
+    onSuccess: (state) => {
+      queryClient.setQueryData(['serialState'], state);
+      setConfigNotice({ type: 'success', text: 'Serial connection established.' });
+      void serialConfigQuery.refetch();
+      void serialStateQuery.refetch();
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : 'Unable to connect to serial device.';
+      setConfigNotice({ type: 'error', text: message });
+    },
+  });
+
+  const serialDisconnectMutation = useMutation({
+    mutationFn: () => apiClient.post<SerialState>('/serial/disconnect', {}),
+    onSuccess: (state) => {
+      queryClient.setQueryData(['serialState'], state);
+      setConfigNotice({ type: 'info', text: 'Serial connection closed.' });
+      void serialStateQuery.refetch();
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : 'Unable to disconnect from serial device.';
+      setConfigNotice({ type: 'error', text: message });
+    },
+  });
+
+  const serialState = serialStateQuery.data ?? null;
+  const serialToggleBusy = serialConnectMutation.isPending || serialDisconnectMutation.isPending;
+  const serialToggleDisabled = serialToggleBusy || !serialConfig || serialStateQuery.isLoading;
+  const serialToggleLabel = serialToggleBusy
+    ? serialState?.connected
+      ? 'Disconnecting...'
+      : 'Connecting...'
+    : serialState?.connected
+      ? 'Disconnect Serial'
+      : 'Connect Serial';
 
   const ouiImportMutation = useMutation({
     mutationFn: ({ file, mode }: { file: File; mode: 'replace' | 'merge' }) => {
@@ -834,6 +889,19 @@ export function ConfigPage() {
     const next = { ...serialConfig, ...patch };
     setSerialConfig(next);
     updateSerialConfigMutation.mutate(patch);
+  };
+
+  const handleDefaultRadiusChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!appSettings) return;
+    const parsed = Number(event.target.value);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+    const next = { ...appSettings, defaultRadiusM: parsed };
+    setAppSettings(next);
+    if (parsed >= DEFAULT_RADIUS_LIMITS.min && parsed <= DEFAULT_RADIUS_LIMITS.max) {
+      updateAppSettingsMutation.mutate({ defaultRadiusM: parsed });
+    }
   };
 
   const handleSerialPortSelect = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -1014,16 +1082,11 @@ export function ConfigPage() {
     });
   };
 
-  const handleTestSerial = () => {
+  const buildSerialConnectPayload = (): SerialConnectPayload | null => {
     if (!appSettings || !serialConfig) {
-      setSerialTestStatus({
-        status: 'error',
-        message: 'Serial settings are not loaded yet.',
-      });
-      return;
+      return null;
     }
-
-    const payload: { path?: string; baudRate?: number; delimiter?: string; protocol?: string } = {};
+    const payload: SerialConnectPayload = {};
     if (serialConfig.devicePath) {
       payload.path = serialConfig.devicePath;
     }
@@ -1034,8 +1097,35 @@ export function ConfigPage() {
       payload.delimiter = serialConfig.delimiter ?? undefined;
     }
     payload.protocol = appSettings.protocol ?? 'meshtastic-like';
+    return payload;
+  };
 
+  const handleTestSerial = () => {
+    const payload = buildSerialConnectPayload();
+    if (!payload) {
+      setSerialTestStatus({
+        status: 'error',
+        message: 'Serial settings are not loaded yet.',
+      });
+      return;
+    }
     serialTestMutation.mutate(payload);
+  };
+
+  const handleSerialToggle = () => {
+    if (serialConnectMutation.isPending || serialDisconnectMutation.isPending) {
+      return;
+    }
+    if (serialState?.connected) {
+      serialDisconnectMutation.mutate();
+      return;
+    }
+    const payload = buildSerialConnectPayload();
+    if (!payload) {
+      setConfigNotice({ type: 'error', text: 'Serial settings are not loaded yet.' });
+      return;
+    }
+    serialConnectMutation.mutate(payload);
   };
 
   const handleOuiExport = (format: 'csv' | 'json') => {
@@ -1133,6 +1223,14 @@ export function ConfigPage() {
           </p>
         </div>
         <div className="controls-row config-header-controls">
+          <button
+            type="button"
+            className="control-chip"
+            onClick={handleSerialToggle}
+            disabled={serialToggleDisabled}
+          >
+            {serialToggleLabel}
+          </button>
           <div className="config-header-controls__pair">
             <button
               type="button"
@@ -3173,12 +3271,10 @@ export function ConfigPage() {
                   <span className="config-label">Default Radius (m)</span>
                   <input
                     type="number"
+                    min={DEFAULT_RADIUS_LIMITS.min}
+                    max={DEFAULT_RADIUS_LIMITS.max}
                     value={appSettings.defaultRadiusM}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      if (!Number.isFinite(value)) return;
-                      updateAppSetting({ defaultRadiusM: value });
-                    }}
+                    onChange={handleDefaultRadiusChange}
                   />
                 </div>
                 <div className="config-row">

@@ -12,7 +12,6 @@ import {
   MdPerson,
   MdHub,
   MdExtension,
-  MdNotificationsActive,
 } from 'react-icons/md';
 import { NavLink } from 'react-router-dom';
 
@@ -26,7 +25,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/map', label: 'Map', icon: MdMap },
   { to: '/console', label: 'Console', icon: MdTerminal },
-  { to: '/terminal', label: 'Events', icon: MdNotificationsActive },
   { to: '/inventory', label: 'Inventory', icon: MdWifiTethering },
   { to: '/targets', label: 'Targets', icon: MdMyLocation },
   { to: '/geofences', label: 'Geofences', icon: MdOutlineAreaChart },

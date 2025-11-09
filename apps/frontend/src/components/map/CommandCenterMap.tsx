@@ -23,7 +23,7 @@ import { canonicalNodeId } from '../../stores/node-store';
 import type { TargetMarker } from '../../stores/target-store';
 
 const FALLBACK_CENTER: LatLngExpression = [0, 0];
-const DEFAULT_RADIUS_FALLBACK = 200;
+const DEFAULT_RADIUS_FALLBACK = 50;
 const COVERAGE_MULTIPLIER = 5;
 type HeatPoint = [number, number, number];
 type BaseLayerDefinition = {

@@ -1,32 +1,32 @@
 {
-    "name":  "command-center",
-    "version":  "0.1.0",
-    "private":  true,
-    "packageManager":  "pnpm@9.9.0",
-    "engines":  {
-                    "node":  "\u003e=20"
-                },
-    "workspaces":  [
-                       "apps/backend",
-                       "apps/frontend"
-                   ],
-    "scripts":  {
-                    "dev":  "pnpm -r --parallel dev",
-                    "AHCC":  "pnpm dev",
-                    "build":  "pnpm -r build",
-                    "lint":  "pnpm -r lint",
-                    "format":  "pnpm -r format",
-                    "seed":  "pnpm --filter @command-center/backend prisma:seed",
-                    "tool:sniffer":  "pnpm exec ts-node --transpile-only --project tools/tsconfig.sniffer.json tools/meshtastic-sniffer.ts"
-                },
-    "dependencies":  {
-                         "serialport":  "^12.0.0",
-                         "@serialport/parser-delimiter":  "^12.0.0",
-                         "argparse":  "^2.0.1"
-                     },
-    "devDependencies":  {
-                            "ts-node":  "^10.9.2",
-                            "@types/node":  "^20.19.23",
-                            "@types/argparse":  "^2.0.16"
-                        }
+  "name": "command-center",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.9.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend"
+  ],
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "AHCC": "pnpm dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
+    "seed": "pnpm --filter @command-center/backend prisma:seed",
+    "tool:sniffer": "pnpm exec ts-node --transpile-only --project tools/tsconfig.sniffer.json tools/meshtastic-sniffer.ts"
+  },
+  "dependencies": {
+    "serialport": "^12.0.0",
+    "@serialport/parser-delimiter": "^12.0.0",
+    "argparse": "^2.0.1"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "@types/node": "^20.19.23",
+    "@types/argparse": "^2.0.16"
+  }
 }

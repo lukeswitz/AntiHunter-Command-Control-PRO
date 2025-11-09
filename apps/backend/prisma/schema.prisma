@@ -110,7 +110,7 @@ model AppConfig {
   deauthSecs     Int     @default(300)
   randomizeSecs  Int     @default(600)
 
-  defaultRadiusM Int @default(200)
+  defaultRadiusM Int @default(50)
 
   logLevel       String  @default("info")
   structuredLogs Boolean @default(true)
@@ -157,6 +157,9 @@ model Node {
   name         String?
   lastMessage  String?
   lastSeen     DateTime?
+  temperatureC Float?
+  temperatureF Float?
+  temperatureUpdatedAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -377,7 +380,7 @@ model VisualConfig {
 
 model CoverageConfig {
   id             Int      @id @default(1)
-  defaultRadiusM Int      @default(200)
+  defaultRadiusM Int      @default(50)
   dynamicEnabled Boolean  @default(false)
   dynamicModel   String?
   updatedAt      DateTime @updatedAt

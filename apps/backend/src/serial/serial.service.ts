@@ -239,6 +239,13 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private siteId: string;
   private packetIdCounter = Math.floor(Math.random() * 0xffff);
   private readonly broadcastNum = 0xffffffff;
+  private readonly reconnectBaseMs: number;
+  private readonly reconnectMaxMs: number;
+  private readonly reconnectJitter: number;
+  private readonly reconnectMaxAttempts: number;
+  private reconnectAttempts = 0;
+  private reconnectTimer?: NodeJS.Timeout;
+  private manualDisconnect = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -247,38 +254,46 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     this.siteId = this.configService.get<string>('site.id', 'default');
     this.globalRateLimit = this.configService.get<number>('serial.globalRate', 30);
     this.perTargetRateLimit = this.configService.get<number>('serial.perTargetRate', 8);
+    this.reconnectBaseMs = this.configService.get<number>('serial.reconnectBaseMs', 500);
+    this.reconnectMaxMs = this.configService.get<number>('serial.reconnectMaxMs', 15_000);
+    this.reconnectJitter = this.configService.get<number>('serial.reconnectJitter', 0.2);
+    this.reconnectMaxAttempts =
+      this.configService.get<number>('serial.reconnectMaxAttempts', 0) ?? 0;
   }
 
   async onModuleInit(): Promise<void> {
-    try {
-      const storedConfig = await this.serialConfigService.getConfig();
-
-      if (storedConfig.enabled === false) {
-        this.logger.log('Serial auto-connect disabled via configuration');
-        return;
-      }
-
-      await this.connect({
-        path: storedConfig.devicePath ?? this.configService.get<string>('serial.device'),
-        baudRate: storedConfig.baud ?? this.configService.get<number>('serial.baudRate', 115200),
-        delimiter:
-          storedConfig.delimiter ?? this.configService.get<string>('serial.delimiter', '\n'),
-        protocol: (this.configService.get<string>('serial.protocol', 'meshtastic-like') ??
-          'meshtastic-like') as ProtocolKey,
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error during serial auto-connect';
-      if (error instanceof BadRequestException) {
-        this.logger.log(`Serial auto-connect skipped: ${message}`);
-      } else {
-        this.logger.error(`Serial auto-connect failed: ${message}`);
-      }
-    }
+    await this.autoConnect().catch((error) => {
+      this.handleAutoConnectFailure(error);
+    });
   }
 
   onModuleDestroy(): void {
     void this.disconnect();
+  }
+
+  private async autoConnect(): Promise<void> {
+    const storedConfig = await this.serialConfigService.getConfig();
+    if (storedConfig.enabled === false) {
+      this.logger.log('Serial auto-connect disabled via configuration');
+      return;
+    }
+    await this.connect({
+      path: storedConfig.devicePath ?? this.configService.get<string>('serial.device'),
+      baudRate: storedConfig.baud ?? this.configService.get<number>('serial.baudRate', 115200),
+      delimiter: storedConfig.delimiter ?? this.configService.get<string>('serial.delimiter', '\n'),
+      protocol: (this.configService.get<string>('serial.protocol', 'meshtastic-like') ??
+        'meshtastic-like') as ProtocolKey,
+    });
+  }
+
+  private handleAutoConnectFailure(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
+    if (error instanceof BadRequestException) {
+      this.logger.log(`Serial auto-connect skipped: ${message}`);
+    } else {
+      this.logger.error(`Serial auto-connect failed: ${message}`);
+    }
+    this.scheduleReconnect(message);
   }
 
   getIncomingStream(): Observable<string> {
@@ -313,6 +328,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    this.clearReconnectTimer();
     const baudRate = options?.baudRate ?? this.configService.get<number>('serial.baudRate', 115200);
     const requestedDelimiterRaw =
       options?.delimiter ?? this.configService.get<string>('serial.delimiter', '\n') ?? '\n';
@@ -362,6 +378,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           enabled: true,
         });
         this.logger.log(`Connected to serial port ${candidatePath}`);
+        this.reconnectAttempts = 0;
         return;
       } catch (error) {
         lastError = error;
@@ -384,17 +401,22 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    await new Promise<void>((resolve, reject) => {
-      this.port?.close((err) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve();
+    this.manualDisconnect = true;
+    this.clearReconnectTimer();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this.port?.close((err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve();
+        });
       });
-    });
-
-    this.cleanup();
+    } finally {
+      this.cleanup();
+      this.manualDisconnect = false;
+    }
   }
 
   async queueCommand(request: QueueCommandRequest): Promise<void> {
@@ -438,6 +460,48 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     this.packetIdCounter = Math.floor(Math.random() * 0xffff);
   }
 
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+  }
+
+  private scheduleReconnect(reason: string): void {
+    if (this.manualDisconnect) {
+      return;
+    }
+    if (this.reconnectMaxAttempts > 0 && this.reconnectAttempts >= this.reconnectMaxAttempts) {
+      this.logger.warn(
+        `Serial reconnect skipped: maximum attempts (${this.reconnectMaxAttempts}) reached`,
+      );
+      return;
+    }
+    if (this.reconnectTimer) {
+      return;
+    }
+    if (this.reconnectBaseMs <= 0) {
+      return;
+    }
+    const nextAttempt = this.reconnectAttempts + 1;
+    const exponentialDelay = this.reconnectBaseMs * Math.pow(2, nextAttempt - 1);
+    const cappedDelay =
+      this.reconnectMaxMs > 0 ? Math.min(exponentialDelay, this.reconnectMaxMs) : exponentialDelay;
+    const jitterRange = cappedDelay * this.reconnectJitter;
+    const jitter = jitterRange ? (Math.random() * 2 - 1) * jitterRange : 0;
+    const delay = Math.max(250, Math.round(cappedDelay + jitter));
+    this.logger.warn(
+      `Serial reconnect scheduled in ${delay}ms (attempt ${nextAttempt}${
+        reason ? `, reason: ${reason}` : ''
+      })`,
+    );
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      this.reconnectAttempts = nextAttempt;
+      this.autoConnect().catch((error) => this.handleAutoConnectFailure(error));
+    }, delay);
+  }
+
   private async writeBuffer(buffer: Buffer): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       const port = this.port;
@@ -451,7 +515,24 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           reject(err);
           return;
         }
+        let settled = false;
+        const cleanup = () => {
+          settled = true;
+        };
+        const timeout = setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          cleanup();
+          this.logger.warn('Serial drain timed out; assuming write completed');
+          resolve();
+        }, 1000);
         port.drain((drainErr) => {
+          if (settled) {
+            return;
+          }
+          clearTimeout(timeout);
+          cleanup();
           if (drainErr) {
             this.lastError = drainErr.message;
             reject(drainErr);
@@ -715,6 +796,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     this.port.on('close', () => {
       this.logger.warn('Serial port connection closed');
       this.cleanup();
+      if (!this.manualDisconnect) {
+        this.scheduleReconnect('port closed');
+      }
     });
   }
 }

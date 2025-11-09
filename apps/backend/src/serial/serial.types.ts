@@ -14,6 +14,9 @@ export interface SerialNodeTelemetry {
   timestamp?: Date;
   lastMessage?: string;
   raw: string;
+  temperatureC?: number;
+  temperatureF?: number;
+  temperatureUpdatedAt?: Date;
 }
 
 export interface SerialTargetDetected {

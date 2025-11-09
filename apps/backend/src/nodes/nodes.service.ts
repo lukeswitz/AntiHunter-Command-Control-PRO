@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 
 import { NodeDiff, NodeSnapshot } from './nodes.types';
@@ -47,25 +48,55 @@ export class NodesService implements OnModuleInit {
     const lat = this.toNumber(snapshot.lat);
     const lon = this.toNumber(snapshot.lon);
     const originSiteId = snapshot.originSiteId ?? this.localSiteId;
+    const snapshotSiteId = snapshot.siteId ?? undefined;
+
+    const temperatureTouched =
+      snapshot.temperatureC !== undefined ||
+      snapshot.temperatureF !== undefined ||
+      snapshot.temperatureUpdatedAt !== undefined;
+    const temperatureUpdatedAtValue =
+      snapshot.temperatureUpdatedAt !== undefined
+        ? snapshot.temperatureUpdatedAt
+        : temperatureTouched
+          ? now
+          : undefined;
 
     await this.prisma.$transaction(async (tx) => {
+      const createPayload: Prisma.NodeUncheckedCreateInput = {
+        id: snapshot.id,
+        name: snapshot.name ?? undefined,
+        lastMessage: snapshot.lastMessage ?? undefined,
+        lastSeen: snapshot.lastSeen ?? now,
+        originSiteId,
+      };
+      const updatePayload: Prisma.NodeUncheckedUpdateInput = {
+        name: snapshot.name ?? undefined,
+        lastMessage: snapshot.lastMessage ?? undefined,
+        lastSeen: snapshot.lastSeen ?? now,
+        originSiteId,
+      };
+      if (snapshotSiteId !== undefined) {
+        createPayload.siteId = snapshotSiteId;
+        updatePayload.siteId = snapshotSiteId;
+      }
+
+      if (snapshot.temperatureC !== undefined) {
+        createPayload.temperatureC = snapshot.temperatureC;
+        updatePayload.temperatureC = snapshot.temperatureC;
+      }
+      if (snapshot.temperatureF !== undefined) {
+        createPayload.temperatureF = snapshot.temperatureF;
+        updatePayload.temperatureF = snapshot.temperatureF;
+      }
+      if (temperatureUpdatedAtValue !== undefined) {
+        createPayload.temperatureUpdatedAt = temperatureUpdatedAtValue;
+        updatePayload.temperatureUpdatedAt = temperatureUpdatedAtValue;
+      }
+
       await tx.node.upsert({
         where: { id: snapshot.id },
-        create: {
-          id: snapshot.id,
-          name: snapshot.name ?? undefined,
-          lastMessage: snapshot.lastMessage ?? undefined,
-          lastSeen: snapshot.lastSeen ?? now,
-          siteId: snapshot.siteId ?? undefined,
-          originSiteId,
-        },
-        update: {
-          name: snapshot.name ?? undefined,
-          lastMessage: snapshot.lastMessage ?? undefined,
-          lastSeen: snapshot.lastSeen ?? now,
-          siteId: snapshot.siteId ?? undefined,
-          originSiteId,
-        },
+        create: createPayload,
+        update: updatePayload,
       });
 
       if (Number.isFinite(lat) && Number.isFinite(lon)) {
@@ -109,6 +140,16 @@ export class NodesService implements OnModuleInit {
       siteColor: siteColor ?? existing?.siteColor,
       siteCountry: siteCountry ?? existing?.siteCountry,
       siteCity: siteCity ?? existing?.siteCity,
+      temperatureC:
+        snapshot.temperatureC !== undefined ? snapshot.temperatureC : existing?.temperatureC,
+      temperatureF:
+        snapshot.temperatureF !== undefined ? snapshot.temperatureF : existing?.temperatureF,
+      temperatureUpdatedAt:
+        snapshot.temperatureUpdatedAt !== undefined
+          ? snapshot.temperatureUpdatedAt
+          : temperatureTouched
+            ? now
+            : existing?.temperatureUpdatedAt,
     };
 
     this.nodes.set(snapshot.id, merged);
@@ -167,36 +208,84 @@ export class NodesService implements OnModuleInit {
     return this.diff$.asObservable();
   }
 
-  async updateLastMessage(nodeId: string, message: string, lastSeen?: Date): Promise<void> {
+  async updateLastMessage(
+    nodeId: string,
+    message: string,
+    lastSeen?: Date,
+    extras?: {
+      temperatureC?: number | null;
+      temperatureF?: number | null;
+      temperatureUpdatedAt?: Date | null;
+    },
+  ): Promise<void> {
     const existing = this.nodes.get(nodeId);
     if (!existing) {
       return;
     }
 
     const timestamp = lastSeen ?? new Date();
+    const temperatureTouched =
+      extras?.temperatureC !== undefined ||
+      extras?.temperatureF !== undefined ||
+      extras?.temperatureUpdatedAt !== undefined;
+    const temperatureUpdatedAtValue =
+      extras?.temperatureUpdatedAt !== undefined
+        ? extras.temperatureUpdatedAt
+        : temperatureTouched
+          ? timestamp
+          : undefined;
+
     const updated: NodeSnapshot = {
       ...existing,
       lastMessage: message,
       lastSeen: timestamp,
       originSiteId: existing.originSiteId ?? this.localSiteId,
     };
+    if (extras?.temperatureC !== undefined) {
+      updated.temperatureC = extras.temperatureC;
+    }
+    if (extras?.temperatureF !== undefined) {
+      updated.temperatureF = extras.temperatureF;
+    }
+    if (temperatureUpdatedAtValue !== undefined) {
+      updated.temperatureUpdatedAt = temperatureUpdatedAtValue ?? null;
+    }
 
     try {
+      const createPayload: Prisma.NodeUncheckedCreateInput = {
+        id: nodeId,
+        name: existing.name ?? undefined,
+        lastMessage: message,
+        lastSeen: timestamp,
+        originSiteId: existing.originSiteId ?? this.localSiteId,
+      };
+      const updatePayload: Prisma.NodeUncheckedUpdateInput = {
+        lastMessage: message,
+        lastSeen: timestamp,
+        originSiteId: existing.originSiteId ?? this.localSiteId,
+        ...(extras?.temperatureC !== undefined && { temperatureC: extras.temperatureC }),
+        ...(extras?.temperatureF !== undefined && { temperatureF: extras.temperatureF }),
+        ...(temperatureUpdatedAtValue !== undefined && {
+          temperatureUpdatedAt: temperatureUpdatedAtValue,
+        }),
+      };
+      if (existing.siteId) {
+        createPayload.siteId = existing.siteId;
+        updatePayload.siteId = existing.siteId;
+      }
+      if (extras?.temperatureC !== undefined) {
+        createPayload.temperatureC = extras.temperatureC;
+      }
+      if (extras?.temperatureF !== undefined) {
+        createPayload.temperatureF = extras.temperatureF;
+      }
+      if (temperatureUpdatedAtValue !== undefined) {
+        createPayload.temperatureUpdatedAt = temperatureUpdatedAtValue;
+      }
       await this.prisma.node.upsert({
         where: { id: nodeId },
-        create: {
-          id: nodeId,
-          name: existing.name ?? undefined,
-          lastMessage: message,
-          lastSeen: timestamp,
-          siteId: existing.siteId ?? undefined,
-          originSiteId: existing.originSiteId ?? this.localSiteId,
-        },
-        update: {
-          lastMessage: message,
-          lastSeen: timestamp,
-          originSiteId: existing.originSiteId ?? this.localSiteId,
-        },
+        create: createPayload,
+        update: updatePayload,
       });
     } catch (error) {
       this.logger.warn(`Failed to persist last message for node ${nodeId}: ${String(error)}`);
@@ -224,6 +313,9 @@ export class NodesService implements OnModuleInit {
     name: string | null;
     lastMessage: string | null;
     lastSeen: Date | null;
+    temperatureC: number | null;
+    temperatureF: number | null;
+    temperatureUpdatedAt: Date | null;
     positions: Array<{ lat: number; lon: number; ts: Date }>;
     originSiteId: string | null;
     site?: {
@@ -249,6 +341,9 @@ export class NodesService implements OnModuleInit {
       siteCountry: node.site?.country ?? undefined,
       siteCity: node.site?.city ?? undefined,
       originSiteId: node.originSiteId ?? node.site?.id ?? undefined,
+      temperatureC: node.temperatureC ?? undefined,
+      temperatureF: node.temperatureF ?? undefined,
+      temperatureUpdatedAt: node.temperatureUpdatedAt ?? undefined,
     };
   }
 

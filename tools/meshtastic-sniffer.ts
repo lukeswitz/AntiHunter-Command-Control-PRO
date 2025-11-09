@@ -125,7 +125,9 @@ async function main(): Promise<void> {
   const output = openOutputStream(options.outputPath, options.append);
 
   output.on('error', (err) => {
-    console.error(`[sniffer] failed to write to ${options.outputPath}: ${err instanceof Error ? err.message : err}`);
+    console.error(
+      `[sniffer] failed to write to ${options.outputPath}: ${err instanceof Error ? err.message : err}`,
+    );
     process.exit(1);
   });
 

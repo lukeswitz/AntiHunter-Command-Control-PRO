@@ -154,7 +154,7 @@ export function MapPage() {
     () => extractAlertColors(appSettingsQuery.data),
     [appSettingsQuery.data],
   );
-  const mapDefaultRadius = appSettingsQuery.data?.defaultRadiusM ?? 100;
+  const mapDefaultRadius = appSettingsQuery.data?.defaultRadiusM ?? 50;
 
   const alertIndicatorMap = useMemo(() => {
     const severityRank: Record<IndicatorSeverity, number> = {
