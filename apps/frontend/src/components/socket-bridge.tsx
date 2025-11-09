@@ -11,6 +11,9 @@ import { canonicalNodeId, NodeDiffPayload, NodeSummary, useNodeStore } from '../
 import { TerminalEntry, TerminalLevel, useTerminalStore } from '../stores/terminal-store';
 
 const NOTIFICATION_CATEGORIES = new Set(['gps', 'status', 'console']);
+const DEVICE_LINE_REGEX =
+  /^(?:[A-Za-z0-9_-]+):?\s*DEVICE:(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}(?:\s+[A-Za-z0-9]+)?\s+-?\d+/i;
+const DEVICE_FALLBACK_REGEX = /^[A-Za-z0-9_-]+\s+DEVICE:?$/i;
 
 type TerminalEntryInput = Omit<TerminalEntry, 'id' | 'timestamp'> & { timestamp?: string };
 
@@ -309,6 +312,26 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
         isNotification = false;
       } else if (isNotification && terminalLevel === 'info') {
         terminalLevel = 'notice';
+      }
+
+      const deviceTextCandidate =
+        (typeof base.raw === 'string' && base.raw) ||
+        (typeof base.line === 'string' && base.line) ||
+        message;
+      const looksLikeDeviceNotification =
+        isNotification &&
+        deviceTextCandidate &&
+        (DEVICE_LINE_REGEX.test(deviceTextCandidate) ||
+          DEVICE_FALLBACK_REGEX.test(deviceTextCandidate)) &&
+        (!category || category === 'status' || category === 'console');
+      if (looksLikeDeviceNotification) {
+        return {
+          message: message ?? deviceTextCandidate ?? 'Device event',
+          level: 'info',
+          source: 'raw',
+          timestamp: typeof base.timestamp === 'string' ? base.timestamp : undefined,
+          siteId: base.siteId,
+        };
       }
 
       const source = isNotification ? 'notification' : 'alert';
