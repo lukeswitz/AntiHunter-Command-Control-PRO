@@ -14,6 +14,25 @@ type EventBroadcastMessage = {
   payload: CommandCenterEvent;
 };
 
+type DroneTelemetryEvent = CommandCenterEvent & {
+  type: 'drone.telemetry';
+  droneId?: string;
+  mac?: string | null;
+  nodeId?: string | null;
+  siteName?: string | null;
+  siteColor?: string | null;
+  siteCountry?: string | null;
+  siteCity?: string | null;
+  lat?: number;
+  lon?: number;
+  altitude?: number | string | null;
+  speed?: number | string | null;
+  operatorLat?: number | string | null;
+  operatorLon?: number | string | null;
+  rssi?: number | string | null;
+  timestamp?: string | Date;
+};
+
 const EVENT_TOPIC_PATTERN = 'ahcc/+/events/+';
 const FEDERATED_EVENT_TYPES = new Set([
   'event.alert',
@@ -156,7 +175,7 @@ export class MqttEventsService implements OnModuleInit, OnModuleDestroy {
       siteId: message.payload.siteId ?? originSiteId,
     };
 
-    if (event.type === 'drone.telemetry') {
+    if (isDroneTelemetryEvent(event)) {
       const droneId = typeof event.droneId === 'string' ? event.droneId : undefined;
       const lat = typeof event.lat === 'number' ? event.lat : Number(event.lat);
       const lon = typeof event.lon === 'number' ? event.lon : Number(event.lon);
@@ -206,6 +225,10 @@ export class MqttEventsService implements OnModuleInit, OnModuleDestroy {
     const sanitized = eventType.replace(/\//g, '-').replace(/\s+/g, '-').replace(/\./g, '-');
     return `ahcc/${siteId}/events/${sanitized}`;
   }
+}
+
+function isDroneTelemetryEvent(event: CommandCenterEvent): event is DroneTelemetryEvent {
+  return event.type === 'drone.telemetry';
 }
 
 function toNumber(value: unknown): number | undefined {
