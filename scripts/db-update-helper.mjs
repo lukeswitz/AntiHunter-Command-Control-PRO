@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from 'child_process';
-import { readdirSync } from 'fs';
+import { readdirSync, existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -120,6 +120,63 @@ async function baselineAllMigrations() {
   console.log('✅ Baseline recorded.\n');
 }
 
+function findDuplicateTableCreates() {
+  const tableMap = new Map();
+  for (const migration of migrations) {
+    const sqlPath = path.join(migrationDir, migration, 'migration.sql');
+    if (!existsSync(sqlPath)) {
+      continue;
+    }
+    const content = readFileSync(sqlPath, 'utf8');
+    const regex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?([A-Za-z0-9_]+)["`]?/gi;
+    const tablesInMigration = new Set();
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      tablesInMigration.add(match[1].toLowerCase());
+    }
+    for (const table of tablesInMigration) {
+      if (!tableMap.has(table)) {
+        tableMap.set(table, []);
+      }
+      tableMap.get(table).push(migration);
+    }
+  }
+  return Array.from(tableMap.entries())
+    .map(([table, list]) => ({ table, migrations: list.sort() }))
+    .filter((entry) => entry.migrations.length > 1);
+}
+
+async function resolveDuplicateCreates() {
+  const duplicates = findDuplicateTableCreates();
+  if (duplicates.length === 0) {
+    return;
+  }
+  console.log('⚠️  Detected duplicate CREATE TABLE statements. Cleaning redundant migrations:');
+  for (const entry of duplicates) {
+    const [primary, ...redundant] = entry.migrations;
+    for (const migration of redundant) {
+      console.log(`   • ${entry.table} already created in ${primary}; marking ${migration} as applied.`);
+      try {
+        await runPrisma(['migrate', 'resolve', '--applied', migration, '--schema', prismaSchemaPath], {
+          capture: true,
+        });
+      } catch (error) {
+        const details = [error.stderr, error.stdout, error.message].filter(Boolean).join('\n');
+        if (
+          details.includes('already been recorded') ||
+          details.includes('already recorded as applied') ||
+          details.includes('No migration found')
+        ) {
+          console.log(`     ↳ ${migration} already recorded, skipping.`);
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+  console.log('✅ Duplicate migrations marked as applied.\n');
+}
+
 async function handleDrift(statusOutput) {
   console.error('⚠️  Drift detected: your database schema differs from prisma/schema.prisma.');
   console.error('Review the diff below and reconcile manually.\n');
@@ -134,6 +191,9 @@ async function handleDrift(statusOutput) {
 async function main() {
   console.log('=== AntiHunter Command Center :: Database Updater ===\n');
   try {
+    if (migrations.length > 0) {
+      await resolveDuplicateCreates();
+    }
     const status = await getStatus();
     switch (status.state) {
       case 'upToDate':

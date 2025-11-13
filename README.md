@@ -748,7 +748,7 @@ When you already have AntiHunter Command & Control PRO running in a live environ
 
    - In containerized or managed environments, execute the same command inside the deployment target prior to restarting services.
    - If the migration fails, resolve the database issue before proceeding; never run the backend against a partially migrated schema.
-   - Prefer an automatic helper that inspects the current installation? Run `pnpm update-db` (alias of `node scripts/db-update-helper.mjs`) and it will detect pending migrations, baseline existing schemas, and apply updates. If drift is detected it prints the Prisma guidance you need to follow.
+   - Prefer an automatic helper that inspects the current installation? Run `pnpm update-db` (alias of `node scripts/db-update-helper.mjs`) and it will detect pending migrations, baseline existing schemas, skip duplicate CREATE TABLE migrations, and apply updates. If drift is detected it prints the Prisma guidance you need to follow.
 
 3. **Rebuild backend and frontend bundles**
    ```bash
@@ -1107,7 +1107,7 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 | `pnpm --filter @command-center/backend prisma:studio` | Inspect DB via Prisma Studio                                              |
 | `pnpm --filter @command-center/backend prisma:seed`   | Reseed config rows                                                        |
 | `pnpm seed`                                           | Shortcut to seed default admin (requires pnpm on host)                    |
-| `pnpm update-db` (or `node scripts/db-update-helper.mjs`) | Auto-detects DB state, baselines existing schemas, runs `prisma migrate deploy`, and surfaces drift guidance |
+| `pnpm update-db` (or `node scripts/db-update-helper.mjs`) | Auto-detects DB state, baselines existing schemas, removes duplicate CREATE TABLE migrations, runs `prisma migrate deploy`, and surfaces drift guidance |
 | `pnpm --filter @command-center/frontend preview`      | Preview SPA production build                                              |
 | `pnpm exec node scripts/drone-simulator.cjs --token "<JWT>" [options]` | Push simulated mesh lines (node bootstrap + drone telemetry) into `/api/serial/simulate` for end-to-end testing. |
 
