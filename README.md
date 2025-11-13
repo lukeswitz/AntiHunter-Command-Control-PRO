@@ -67,6 +67,37 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Operations controls:** API and UI actions to clear nodes, manage coverage, and import/export settings.
 - **Security posture:** built-in rate limiting, honeypot+submit heuristics, MFA, and an adaptive firewall with geo/IP policies, auto-bans, and detailed auditing.
 
+## Drone Awareness & FAA Enhancements
+
+### Drone Tracker & Inventory Drawer
+
+- The live map now spawns a **Drone Tracker & Inventory** drawer whenever a telemetry frame arrives. The drawer lists every tracked drone/operator pair on a single line, shows the current heading (cardinal string), operator details, FAA metadata, and exposes map focus buttons for each entry.
+- Clicking a drone or operator on the map re-opens the drawer if it was dismissed. Hostile rows pulse red, neutral/friendly rows pick up their site colors, and **Unknown** defaults to the new blue palette so status is immediately obvious.
+- Status changes (Friendly / Neutral / Hostile) are committed through `PATCH /api/drones/:id/status` and reflected everywhere (map markers, drawer rows, Socket.IO events, MQTT federation). The UI guards against race conditions so you can keep toggling a status even while telemetry continues to stream.
+- Set `DRONES_RECORD_INVENTORY=true` (see [Configuration](#configuration)) to automatically mirror every drone detection into the Inventory module; clearing inventory now flushes the drone cache and removes map markers until fresh telemetry arrives.
+
+### FAA Registry Integration
+
+- The **Config → FAA Registry** card can download and parse the public `ReleasableAircraft.zip` archive from the FAA (`https://registry.faa.gov/database/ReleasableAircraft.zip`). Uploading the ZIP (or just `MASTER.txt`) populates the local lookup cache.
+- When the Command Center has internet access, it also performs on-demand lookups using the uasdoc API (`https://uasdoc.faa.gov/listDocs/{RID}`) through a throttled background queue. Results are cached for `FAA_ONLINE_CACHE_TTL_MINUTES` (default 60) and each RID/MAC lookup is rate-limited via `FAA_ONLINE_LOOKUP_COOLDOWN_MINUTES` (default 10).
+- FAA matches update the drawer, map tooltips, and websocket/MQTT payloads automatically, so operators always see the craft and registrant names even after a restart.
+
+### Drone Geofence Breach Alarms
+
+- Geofences now evaluate drone positions in addition to ground nodes. Tripping a perimeter raises a dedicated **Drone Geofence Breach** alarm level with its own sound slot on the **Config → Alarms** page.
+- While a breach is active the impacted geofence keeps its configured color but pulsates to draw attention, and the Drone Tracker drawer highlights the offending aircraft.
+
+### Flight Trails, Operators, and Persistence
+
+- Each drone and operator pin now uses the same status-driven palette, includes heading vectors, and draws a historical trail so you can reconstruct the approach path.
+- The backend keeps only one copy of each drone snapshot in memory and debounces writes to the database, preventing the persistence flood that previously occurred when running simulators or high-rate feeds.
+- MQTT federation has been updated to publish only local drones and to retry failed subscriptions with exponential backoff, ensuring remote sites receive telemetry even across flaky links.
+
+### Simulator-Driven Testing
+
+- `scripts/drone-simulator.cjs` posts fully formatted mesh lines to `/api/serial/simulate`, bootstraps a node, and streams drone telemetry (drone + operator positions) every 5 s. Supply an ADMIN JWT via `--token` to drive end-to-end tests without field hardware—see [Useful Scripts](#useful-scripts) for usage.
+- The simulator supports real RID/MAC lists, adjustable speeds, and node/operator geometry. Because it mirrors the on-air payload format, every downstream parser (inventory, FAA lookup, alarms, MQTT) exercises the exact same code path you get from the live mesh.
+
 ## UI Modules at a Glance
 
 Each primary view ships with rich operator context.
@@ -528,8 +559,19 @@ Optional environment flags:
 | `TWO_FACTOR_TOKEN_EXPIRY` | Lifetime of the temporary two-factor challenge token (default `10m`)                                                         |
 | `TWO_FACTOR_WINDOW`       | Allowed OTP drift window (number of 30s steps, default `1`)                                                                  |
 | `TWO_FACTOR_SECRET_KEY`   | 32+ character passphrase used to encrypt stored authenticator secrets (AES-256-GCM). Leave unset only for local development. |
+| `DRONES_RECORD_INVENTORY` | `true` to auto-create/update inventory entries whenever a drone telemetry frame contains a MAC address + reporting node.    |
+| `FAA_ONLINE_LOOKUP_ENABLED` | Set to `false` to force offline-only FAA lookups (default `true`).                                                         |
+| `FAA_ONLINE_CACHE_TTL_MINUTES` | Minutes to cache positive FAA matches returned from the uasdoc API (default `60`).                                      |
+| `FAA_ONLINE_LOOKUP_COOLDOWN_MINUTES` | Per-RID/MAC cooldown between online lookup attempts (default `10`).                                              |
 
 Frontend currently consumes backend settings via API, so no extra `.env` is needed.
+
+### Drone & FAA configuration quick steps
+
+1. **Mirror detections into inventory:** add `DRONES_RECORD_INVENTORY=true` to `apps/backend/.env` (or set it via your secrets manager) and restart the backend. Every drone telemetry event that includes a MAC + node id is now persisted in the Inventory module in addition to the live tracker.
+2. **Seed FAA data offline:** download [ReleasableAircraft.zip](https://registry.faa.gov/database/ReleasableAircraft.zip) from the FAA, then open **Config → FAA Registry** in the UI and click **Upload ZIP** (or upload `MASTER.txt`) to populate the local cache. The parser runs server-side and the FAA card shows ingest progress plus the number of cached aircraft.
+3. **Enable/disable online lookups:** the same FAA card exposes a **Online Lookup** toggle backed by `FAA_ONLINE_LOOKUP_ENABLED`. Leave it on when the Command Center has outbound internet access; turn it off for fully air-gapped deployments. Online lookups hit `https://uasdoc.faa.gov/listDocs/{RID}` using the cooldown/TTL described by the env vars above.
+4. **Customize drone geofence alarms:** browse to **Config → Alarms**, scroll to the new **Drone Geofence Breach** slot, upload a custom tone if desired, and test it with the preview button. The alarm fires whenever a tracked drone crosses a geofence boundary.
 
 ### Environment file layout
 
@@ -1068,6 +1110,7 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 
 | Command                                               | Description                                                               |
 | ----------------------------------------------------- | ------------------------------------------------------------------------- |
+| `pnpm AHCC`                                           | Boots the backend + frontend dev servers in parallel (`pnpm -r --parallel dev`). |
 | `pnpm lint`                                           | ESLint across backend + frontend                                          |
 | `pnpm format`                                         | Prettier writes                                                           |
 | `pnpm --filter @command-center/backend prisma:studio` | Inspect DB via Prisma Studio                                              |
@@ -1075,6 +1118,25 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 | `pnpm seed`                                           | Shortcut to seed default admin (requires pnpm on host)                    |
 | `node scripts/db-update-helper.mjs`                   | Interactive menu to baseline/resolve migrations or reset the schema       |
 | `pnpm --filter @command-center/frontend preview`      | Preview SPA production build                                              |
+| `pnpm exec node scripts/drone-simulator.cjs --token "<JWT>" [options]` | Push simulated mesh lines (node bootstrap + drone telemetry) into `/api/serial/simulate` for end-to-end testing. |
+
+### Drone simulator usage
+
+1. **Grab an ADMIN JWT** via `pnpm --filter @command-center/backend dev` → login at `http://localhost:3000/api/auth/login` (or use the default seed credentials) and copy the `accessToken` from the response.
+2. **Run the simulator** from the repo root:
+
+   ```bash
+   pnpm exec node scripts/drone-simulator.cjs \
+     --token "$ADMIN_JWT" \
+     --drone-id 1581F5FJD239C00DW22E \
+     --mac 60:60:1F:30:2C:3D \
+     --node AH99 \
+     --node-lat 40.7138 \
+     --node-lon -74.0050 \
+     --iterations 60
+   ```
+
+   Defaults: 5 s message interval, 50–70 km/h approach speed, operator ~450 m from the node, drone spawning ~1.1 km out. Override geometry with `--start-distance`, `--operator-radius`, or provide comma-separated `--drone-ids/--macs` for quick swaps. Every run seeds node bootstrap lines, emits the drone/operator telemetry, and exercises the parser, FAA enrichment, alarms, and inventory ingestion without any hardware.
 
 > **Docker note.** Production containers only install runtime dependencies, so the first time you seed from inside the backend container you must install the backend workspace dev deps and then run the seed:
 >
