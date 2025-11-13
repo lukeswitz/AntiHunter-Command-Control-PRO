@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { createInterface } from 'readline';
 import { spawn } from 'child_process';
 import { readdirSync } from 'fs';
 import path from 'path';
@@ -9,236 +8,166 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const backendDir = path.join(repoRoot, 'apps', 'backend');
-const migrationsDir = path.join(backendDir, 'prisma', 'migrations');
-
-const rl = createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-function ask(question) {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => resolve(answer.trim()));
-  });
+const prismaSchemaPath = 'prisma/schema.prisma';
+const migrationDir = path.join(backendDir, 'prisma', 'migrations');
+let migrations = [];
+try {
+  migrations = readdirSync(migrationDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+} catch (error) {
+  console.warn('⚠️  Unable to read migrations directory:', error.message);
 }
 
-function runCommand(command, args, options = {}) {
-  const cwd = options.cwd ?? backendDir;
+const pnpmPrefix = ['--filter', '@command-center/backend', 'exec', '--', 'prisma'];
+const isWindows = process.platform === 'win32';
+
+async function runPrisma(args, { capture = false } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd,
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
+    const child = spawn(
+      'pnpm',
+      [...pnpmPrefix, ...args],
+      {
+        cwd: backendDir,
+        shell: isWindows,
+        stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+      },
+    );
+    if (!capture) {
+      child.on('exit', (code) => {
+        if (code === 0) {
+          resolve({ code });
+        } else {
+          reject(new Error(`Command failed with code ${code}`));
+        }
+      });
+      child.on('error', reject);
+      return;
+    }
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
     });
     child.on('error', reject);
     child.on('exit', (code) => {
       if (code === 0) {
-        resolve();
+        resolve({ stdout, stderr, code });
       } else {
-        reject(new Error(`${command} ${args.join(' ')} exited with code ${code}`));
+        const error = new Error(stderr || stdout || `Command failed with code ${code}`);
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
       }
     });
   });
 }
 
-function listMigrations() {
-  try {
-    const entries = readdirSync(migrationsDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .sort();
-    if (entries.length === 0) {
-      console.log('No migrations found.\n');
-      return;
+function analyzeStatus(output) {
+  const text = output.toLowerCase();
+  if (text.includes('database schema is up to date')) {
+    return 'upToDate';
+  }
+  if (text.includes('have not yet been applied') || text.includes('pending') || text.includes('need to be applied')) {
+    return 'pending';
+  }
+  if (text.includes('database schema is not empty') && text.includes('baseline')) {
+    return 'needsBaseline';
+  }
+  if (text.includes('drift detected')) {
+    return 'drift';
+  }
+  return 'unknown';
+}
+
+async function getStatus() {
+  const result = await runPrisma(['migrate', 'status', '--schema', prismaSchemaPath], { capture: true });
+  return {
+    raw: result.stdout + result.stderr,
+    state: analyzeStatus(result.stdout + result.stderr),
+  };
+}
+
+async function applyMigrations() {
+  console.log('➡️  Running Prisma migrate deploy…');
+  await runPrisma(['migrate', 'deploy', '--schema', prismaSchemaPath]);
+  console.log('✅ Migrations applied.\n');
+}
+
+async function baselineAllMigrations() {
+  if (migrations.length === 0) {
+    console.log('⚠️  No migrations directory found. Skipping baseline step.');
+    return;
+  }
+  console.log('📌 Existing schema detected without migration history. Marking migrations as applied…');
+  for (const name of migrations) {
+    try {
+      await runPrisma(['migrate', 'resolve', '--applied', name, '--schema', prismaSchemaPath]);
+      console.log(`   • Marked ${name} as applied`);
+    } catch (error) {
+      if (error.stderr?.includes('already applied') || error.stderr?.includes('already been recorded')) {
+        console.log(`   • ${name} already recorded, skipping`);
+        continue;
+      }
+      throw error;
     }
-    entries.forEach((name, index) => {
-      console.log(`${String(index + 1).padStart(2, ' ')}. ${name}`);
-    });
-    console.log('');
-  } catch (error) {
-    console.error('Unable to read migrations directory:', error.message);
   }
+  console.log('✅ Baseline recorded.\n');
 }
 
-async function baselineInitialMigration() {
-  const migration = '20251027205237_init';
-  console.log(`\nMarking ${migration} as applied...\n`);
-  try {
-    await runCommand('pnpm', [
-      '--filter',
-      '@command-center/backend',
-      'prisma',
-      'migrate',
-      'resolve',
-      '--applied',
-      migration,
-    ]);
-    console.log('\nBaseline successful.\n');
-  } catch (error) {
-    console.error('\nBaseline failed:', error.message, '\n');
-  }
-}
-
-async function baselineSpecificMigration() {
-  console.log('\nAvailable migrations:\n');
-  listMigrations();
-  const name = await ask('Enter exact migration name to mark as applied: ');
-  if (!name) {
-    console.log('No migration provided.\n');
-    return;
-  }
-  console.log(`\nMarking ${name} as applied...\n`);
-  try {
-    await runCommand('pnpm', [
-      '--filter',
-      '@command-center/backend',
-      'prisma',
-      'migrate',
-      'resolve',
-      '--applied',
-      name,
-    ]);
-    console.log('\nMigration marked as applied.\n');
-  } catch (error) {
-    console.error('\nFailed to mark migration as applied:', error.message, '\n');
-  }
-}
-
-async function markRolledBack() {
-  console.log('\nAvailable migrations:\n');
-  listMigrations();
-  const name = await ask('Enter exact migration name to mark as rolled back: ');
-  if (!name) {
-    console.log('No migration provided.\n');
-    return;
-  }
-  console.log(`\nMarking ${name} as rolled back...\n`);
-  try {
-    await runCommand('pnpm', [
-      '--filter',
-      '@command-center/backend',
-      'prisma',
-      'migrate',
-      'resolve',
-      '--rolled-back',
-      name,
-    ]);
-    console.log('\nMigration marked as rolled back.\n');
-  } catch (error) {
-    console.error('\nFailed to mark migration as rolled back:', error.message, '\n');
-  }
-}
-
-async function runMigrateDeploy() {
-  console.log('\nRunning prisma migrate deploy...\n');
-  try {
-    await runCommand('pnpm', ['--filter', '@command-center/backend', 'exec', 'prisma', 'migrate', 'deploy']);
-    console.log('\nMigrations applied successfully.\n');
-  } catch (error) {
-    console.error('\nMigration failed:', error.message, '\n');
-  }
-}
-
-async function runMigrateReset() {
-  console.log('\nWARNING: This will drop the database schema and reapply migrations.');
-  const confirm = await ask('Type RESET to continue: ');
-  if (confirm !== 'RESET') {
-    console.log('Reset cancelled.\n');
-    return;
-  }
-  try {
-    await runCommand('pnpm', [
-      '--filter',
-      '@command-center/backend',
-      'prisma',
-      'migrate',
-      'reset',
-      '--force',
-      '--skip-seed',
-    ]);
-    console.log('\nDatabase reset complete.\n');
-  } catch (error) {
-    console.error('\nReset failed:', error.message, '\n');
-  }
-}
-
-async function dropPublicSchema() {
-  console.log('\nDANGER: This will drop and recreate the public schema (all data will be lost).');
-  const confirm = await ask('Type DROP to continue: ');
-  if (confirm !== 'DROP') {
-    console.log('Operation cancelled.\n');
-    return;
-  }
-  const script = 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;';
-  try {
-    await runCommand('pnpm', [
-      '--filter',
-      '@command-center/backend',
-      'exec',
-      'prisma',
-      'db',
-      'execute',
-      '--script',
-      script,
-    ]);
-    console.log('\nSchema recreated. Run migrate deploy next.\n');
-  } catch (error) {
-    console.error('\nFailed to drop schema:', error.message, '\n');
-  }
-}
-
-async function mainMenu() {
-  console.log('\n=== Database Update Helper ===\n');
-  console.log('1) Baseline initial migration (20251027205237_init)');
-  console.log('2) Mark a migration as applied');
-  console.log('3) Mark a migration as rolled back');
-  console.log('4) Run prisma migrate deploy');
-  console.log('5) Reset database schema (prisma migrate reset)');
-  console.log('6) Drop and recreate public schema');
-  console.log('7) List migrations');
-  console.log('0) Exit\n');
-
-  const choice = await ask('Select an option: ');
-  switch (choice) {
-    case '1':
-      await baselineInitialMigration();
-      break;
-    case '2':
-      await baselineSpecificMigration();
-      break;
-    case '3':
-      await markRolledBack();
-      break;
-    case '4':
-      await runMigrateDeploy();
-      break;
-    case '5':
-      await runMigrateReset();
-      break;
-    case '6':
-      await dropPublicSchema();
-      break;
-    case '7':
-      listMigrations();
-      break;
-    case '0':
-      rl.close();
-      return false;
-    default:
-      console.log('\nUnknown option.\n');
-  }
-  return true;
+async function handleDrift(statusOutput) {
+  console.error('⚠️  Drift detected: your database schema differs from prisma/schema.prisma.');
+  console.error('Review the diff below and reconcile manually.\n');
+  console.error(statusOutput);
+  console.log('\nSuggested commands:');
+  console.log('  pnpm --filter @command-center/backend exec -- prisma migrate diff \\');
+  console.log('    --from-schema-datasource --to-schema prisma/schema.prisma --script');
+  console.log('  pnpm --filter @command-center/backend exec -- prisma migrate resolve --applied <migration>');
+  console.log('\nAfter reconciling, rerun pnpm update-db.');
 }
 
 async function main() {
-  let keepRunning = true;
-  while (keepRunning) {
-    keepRunning = await mainMenu();
+  console.log('=== AntiHunter Command Center :: Database Updater ===\n');
+  try {
+    const status = await getStatus();
+    switch (status.state) {
+      case 'upToDate':
+        console.log('✅ Database schema is already up to date. No action required.');
+        break;
+      case 'pending':
+        await applyMigrations();
+        break;
+      case 'needsBaseline':
+        await baselineAllMigrations();
+        await applyMigrations();
+        break;
+      case 'drift':
+        await handleDrift(status.raw);
+        process.exitCode = 1;
+        break;
+      default:
+        console.warn('⚠️  Unable to determine database state automatically. Full output:\n');
+        console.log(status.raw);
+        console.log('\nPlease review the output above or rerun with `pnpm --filter @command-center/backend exec -- prisma migrate status`.');
+        process.exitCode = 1;
+    }
+  } catch (error) {
+    console.error('\n❌ Database update failed.');
+    if (error.stderr || error.stdout) {
+      console.error(error.stderr || error.stdout);
+    } else {
+      console.error(error.message);
+    }
+    console.log('\nIf this happens repeatedly, try:');
+    console.log('  pnpm --filter @command-center/backend exec -- prisma migrate deploy');
+    console.log('  pnpm --filter @command-center/backend exec -- prisma migrate resolve --help');
+    process.exitCode = 1;
   }
-  process.exit(0);
 }
 
-main().catch((error) => {
-  console.error('Unexpected error:', error);
-  process.exit(1);
-});
+main();
