@@ -19,6 +19,7 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
 1. [Overview](#overview)
 2. [Core Features](#core-features)
    - [Key Highlights](#key-highlights)
+   - [Digital Detection, Scanning & Triangulation](#digital-detection-scanning--triangulation)
    - [Drone Awareness & FAA Enhancements](#drone-awareness--faa-enhancements)
    - [UI Modules at a Glance](#ui-modules-at-a-glance)
 3. [Architecture](#architecture)
@@ -50,26 +51,13 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 
 ### Key Highlights
 
-- **Real-time node tracking:** live map, trails/history, dynamic radius pulses, and geofence focus.
+### Digital Detection, Scanning & Triangulation
 
-- **Detection workflows:** configurable scan presets, baseline collection, drone/deauth/randomization pipelines.
-
-- **Command console:** parameterized command templates, audit logs, FOREVER protections, and command lifecycle tracking.
-
-- **Alarms:** volume/rate limit per level, default tones, custom WAV uploads, do-not-disturb windows, and configurable color pulses on the map.
-
-- **Inventory & targets:** ingestion of target data, vendor/OUI resolution, promotion to targets, triangulation capture, and exports.
-
-- **Integrations:** TAK/CoT bridge with per-stream controls, MQTT federation, and SMTP hooks for alerting/administration.
-
-- **Multi-site aware:** each site can have bespoke MQTT configuration, coverage overrides, and admin assignments, while the local serial link is managed once per Command Center instance.
-
-- **User management:** profile updates, admin console for user creation/role management, per-user preferences (theme, density, time format).
-
-- **Geofence automation:** per-geofence alarms with enter/exit triggers, map focus highlights, and wizard-driven geometry authoring.
-
-- **Operations controls:** API and UI actions to clear nodes, manage coverage, and import/export settings.
-- **Security posture:** built-in rate limiting, honeypot+submit heuristics, MFA, and an adaptive firewall with geo/IP policies, auto-bans, and detailed auditing
+- **Digital detections**: Meshtastic-like frames are parsed in real time and normalized into inventory entries with vendor/OUI resolution. The detector renders RSSI, timestamps, and raw payloads so analysts can confirm legitimacy.
+- **Scanning workflows**: Command presets fire scan/baseline/deauth/randomization pipelines against nodes, with FOREVER protections and audit trails. Operators can schedule sweeps, chain commands, and monitor acknowledgements/results inside the console.
+- **Tracking**: Every detection updates the live map with trails, heading vectors, RSSI pulses, and site-specific coloration. Inventory rows store the location history so you can pivot from console <-> map <-> export seamlessly.
+- **Triangulation**: Multi-node detection events feed the triangulation engine, capturing angle-of-arrival data set by the nodes. Results surface in the Targets module with exports for external tooling (e.g., CSV/GeoJSON) and can be reviewed in the map view as overlays.
+- **Exports & auditing**: Scan logs, triangulation snapshots, and detection histories are exportable from their respective modules, ensuring mission reporting and post-op analysis are one click away.
 ### Drone Awareness & FAA Enhancements
 
 #### Drone Tracker & Inventory Drawer
@@ -1209,5 +1197,8 @@ THE SOFTWARE IS PROVIDED AS IS AND AS AVAILABLE, WITHOUT WARRANTY OF ANY KIND, E
 You alone are responsible for ensuring your deployment complies with all applicable laws, regulations, licenses, permits, organizational policies, and third-party rights. No advice or information, whether oral or written, obtained from the project or through the Software, creates any warranty or obligation not expressly stated in this disclaimer. Continued use signifies your agreement to indemnify and hold harmless the authors, developers, maintainers, and contributors from claims arising out of or related to your activities with the Software.
 
 If you do not agree to these terms, **do not build, deploy, or run** AntiHunter Command & Control PRO.
+
+
+
 
 
