@@ -50,9 +50,7 @@ export type SerialClusterMessage =
   | SerialClusterRpcRequestMessage
   | SerialClusterRpcResponseMessage;
 
-export function serializeSerialParseResult(
-  event: SerialParseResult,
-): SerializedSerialParseResult {
+export function serializeSerialParseResult(event: SerialParseResult): SerializedSerialParseResult {
   const payload = { ...event } as SerializedSerialParseResult;
   const timestamp = (event as { timestamp?: Date }).timestamp;
   if (timestamp instanceof Date) {

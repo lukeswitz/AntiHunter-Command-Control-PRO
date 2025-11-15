@@ -1,5 +1,4 @@
 import { create, toBinary } from '@bufbuild/protobuf';
-import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   Injectable,
@@ -12,13 +11,10 @@ import type { AutoDetectTypes } from '@serialport/bindings-cpp';
 import * as SerialPortBindings from '@serialport/bindings-cpp';
 import { ReadlineParser } from '@serialport/parser-readline';
 import { SerialPortStream } from '@serialport/stream';
+import { randomUUID } from 'crypto';
 import { Observable, Subject } from 'rxjs';
 
 import { createParser, ensureMeshtasticProtobufs, ProtocolKey } from './protocol-registry';
-import { SerialConfigService } from './serial-config.service';
-import { SERIAL_DELIMITER_CANDIDATES } from './serial.config.defaults';
-import { SerialParseResult, SerialProtocolParser } from './serial.types';
-import { SerialConnectionOptions, SerialState } from './serial.interfaces';
 import {
   deserializeSerialParseResult,
   serializeSerialParseResult,
@@ -26,6 +22,10 @@ import {
   SerialClusterRole,
   SerialRpcAction,
 } from './serial-cluster.types';
+import { SerialConfigService } from './serial-config.service';
+import { SERIAL_DELIMITER_CANDIDATES } from './serial.config.defaults';
+import { SerialConnectionOptions, SerialState } from './serial.interfaces';
+import { SerialParseResult, SerialProtocolParser } from './serial.types';
 import { buildCommandPayload } from '../commands/command-builder';
 
 const Binding = resolveBinding();
@@ -242,7 +242,11 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private readonly rpcTimeoutMs: number;
   private readonly pendingRpc = new Map<
     string,
-    { resolve: (value: unknown) => void; reject: (reason?: unknown) => void; timeout: NodeJS.Timeout }
+    {
+      resolve: (value: unknown) => void;
+      reject: (reason?: unknown) => void;
+      timeout: NodeJS.Timeout;
+    }
   >();
   private clusterMessageListener?: (message: unknown) => void;
   private replicaState: SerialState = { connected: false };
@@ -264,7 +268,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       'standalone';
     this.clusterRole =
       configuredRole === 'leader' || configuredRole === 'replica' ? configuredRole : 'standalone';
-    this.clusterMessagingEnabled = this.clusterRole !== 'standalone' && typeof process.send === 'function';
+    this.clusterMessagingEnabled =
+      this.clusterRole !== 'standalone' && typeof process.send === 'function';
     this.rpcTimeoutMs = this.configService.get<number>('serial.rpcTimeoutMs', 8000) ?? 8000;
   }
 
