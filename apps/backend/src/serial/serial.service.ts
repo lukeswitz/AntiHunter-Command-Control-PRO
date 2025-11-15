@@ -1196,8 +1196,24 @@ function delay(ms: number): Promise<void> {
 }
 
 function sanitizeLine(value: string): string {
+  // Strip BOM and control characters except standard whitespace.
+  let cleaned = value.replace(/\uFEFF/g, '');
+  cleaned = Array.from(cleaned)
+    .filter((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code === 0x09 || code === 0x0a || code === 0x0d || code >= 0x20;
+    })
+    .join('');
+
+  // Remove leading non-printable/garbage prefixes before the first useful token.
+  const firstUseful = cleaned.search(/[A-Za-z0-9@]/);
+  if (firstUseful > 0) {
+    cleaned = cleaned.slice(firstUseful);
+  }
+
   // Remove placeholder Fahrenheit fragments like "/undefinedF" or "undefinedF".
-  return value.replace(/\/?undefinedf\b/gi, '').trim();
+  cleaned = cleaned.replace(/\/?undefinedf\b/gi, '');
+  return cleaned.trim();
 }
 
 function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
