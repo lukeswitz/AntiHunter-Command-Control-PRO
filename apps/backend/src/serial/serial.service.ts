@@ -1201,25 +1201,58 @@ function sanitizeLine(value: string): string {
 }
 
 function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
-  const telemetryRegex =
-    /Node\s+(?<id>[A-Za-z0-9_.:-]+)\s+telemetry update.*\((?<lat>-?\d+(?:\.\d+)?),\s*(?<lon>-?\d+(?:\.\d+)?)\)/i;
-  const match = telemetryRegex.exec(line);
-  if (!match?.groups) {
-    return null;
-  }
-  const lat = Number(match.groups.lat);
-  const lon = Number(match.groups.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-    return null;
-  }
-  return [
-    {
-      kind: 'node-telemetry',
-      nodeId: match.groups.id,
-      lat,
-      lon,
-      lastMessage: line,
+  const results: SerialParseResult[] = [];
+
+  // Status/health style messages: "AH1 Status Mode:WiFi+BLE ... GPS 63.742531 deg N, 11.306883 deg E"
+  const statusMatch =
+    /^(?<node>[A-Za-z0-9_.:-]+)\s+Status\s+Mode:[^\r\n]*?(?:GPS\s+(?<lat>-?\d+(?:\.\d+)?)\s*deg\s*[NnSs],\s*(?<lon>-?\d+(?:\.\d+)?)\s*deg\s*[EeWw])?/i.exec(
+      line,
+    );
+  if (statusMatch?.groups) {
+    const lat = statusMatch.groups.lat ? Number(statusMatch.groups.lat) : undefined;
+    const lon = statusMatch.groups.lon ? Number(statusMatch.groups.lon) : undefined;
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lon);
+    results.push({
+      kind: 'alert',
+      level: 'INFO',
+      category: 'status',
+      nodeId: statusMatch.groups.node,
+      message: line,
+      data: undefined,
       raw: line,
-    },
-  ];
+      ...(hasCoords ? { lat: lat as number, lon: lon as number } : {}),
+    });
+    if (hasCoords) {
+      results.push({
+        kind: 'node-telemetry',
+        nodeId: statusMatch.groups.node,
+        lat: lat as number,
+        lon: lon as number,
+        lastMessage: line,
+        raw: line,
+      });
+    }
+  }
+
+  // Generic telemetry: "Node X telemetry update (lat, lon)"
+  const telemetryMatch =
+    /Node\s+(?<id>[A-Za-z0-9_.:-]+)\s+telemetry update.*\((?<lat>-?\d+(?:\.\d+)?),\s*(?<lon>-?\d+(?:\.\d+)?)\)/i.exec(
+      line,
+    );
+  if (telemetryMatch?.groups) {
+    const lat = Number(telemetryMatch.groups.lat);
+    const lon = Number(telemetryMatch.groups.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      results.push({
+        kind: 'node-telemetry',
+        nodeId: telemetryMatch.groups.id,
+        lat,
+        lon,
+        lastMessage: line,
+        raw: line,
+      });
+    }
+  }
+
+  return results.length > 0 ? results : null;
 }
