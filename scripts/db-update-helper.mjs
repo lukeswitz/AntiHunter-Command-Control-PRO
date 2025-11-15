@@ -10,6 +10,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const backendDir = path.join(repoRoot, 'apps', 'backend');
 const prismaSchemaPath = 'prisma/schema.prisma';
 const migrationDir = path.join(backendDir, 'prisma', 'migrations');
+
 let migrations = [];
 try {
   migrations = readdirSync(migrationDir, { withFileTypes: true })
@@ -17,7 +18,7 @@ try {
     .map((entry) => entry.name)
     .sort();
 } catch (error) {
-  console.warn('⚠️  Unable to read migrations directory:', error.message);
+  console.warn('Unable to read migrations directory:', error.message);
 }
 
 const pnpmPrefix = ['--filter', '@command-center/backend', 'exec', '--', 'prisma'];
@@ -25,22 +26,15 @@ const isWindows = process.platform === 'win32';
 
 async function runPrisma(args, { capture = false } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      'pnpm',
-      [...pnpmPrefix, ...args],
-      {
-        cwd: backendDir,
-        shell: isWindows,
-        stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
-      },
-    );
+    const child = spawn('pnpm', [...pnpmPrefix, ...args], {
+      cwd: backendDir,
+      shell: isWindows,
+      stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+    });
+
     if (!capture) {
       child.on('exit', (code) => {
-        if (code === 0) {
-          resolve({ code });
-        } else {
-          reject(new Error(`Command failed with code ${code}`));
-        }
+        code === 0 ? resolve({ code }) : reject(new Error(`Command failed with code ${code}`));
       });
       child.on('error', reject);
       return;
@@ -48,22 +42,14 @@ async function runPrisma(args, { capture = false } = {}) {
 
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
+    child.stdout?.on('data', (chunk) => { stdout += chunk.toString(); });
+    child.stderr?.on('data', (chunk) => { stderr += chunk.toString(); });
     child.on('error', reject);
     child.on('exit', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr, code });
-      } else {
-        const error = new Error(stderr || stdout || `Command failed with code ${code}`);
-        error.stdout = stdout;
-        error.stderr = stderr;
-        reject(error);
-      }
+      const error = new Error(stderr || stdout || `Command failed with code ${code}`);
+      error.stdout = stdout;
+      error.stderr = stderr;
+      code === 0 ? resolve({ stdout, stderr, code }) : reject(error);
     });
   });
 }
@@ -87,14 +73,9 @@ function analyzeStatus(output) {
 
 async function getStatus() {
   try {
-    const result = await runPrisma(['migrate', 'status', '--schema', prismaSchemaPath], {
-      capture: true,
-    });
+    const result = await runPrisma(['migrate', 'status', '--schema', prismaSchemaPath], { capture: true });
     const output = (result.stdout ?? '') + (result.stderr ?? '');
-    return {
-      raw: output,
-      state: analyzeStatus(output),
-    };
+    return { raw: output, state: analyzeStatus(output) };
   } catch (error) {
     const output = [error.stdout, error.stderr, error.message].filter(Boolean).join('\n');
     const state = analyzeStatus(output);
@@ -105,139 +86,206 @@ async function getStatus() {
   }
 }
 
-async function applyMigrations() {
-  console.log('➡️  Running Prisma migrate deploy…');
-  await runPrisma(['migrate', 'deploy', '--schema', prismaSchemaPath]);
-  console.log('✅ Migrations applied.\n');
-}
-
-async function baselineAllMigrations() {
-  if (migrations.length === 0) {
-    console.log('⚠️  No migrations directory found. Skipping baseline step.');
-    return;
+function extractFailedMigrations(output) {
+  const migrations = new Set();
+  const regex = /The `([^`]+)` migration.*failed/gi;
+  let match;
+  while ((match = regex.exec(output)) !== null) {
+    migrations.add(match[1]);
   }
-  console.log('📌 Existing schema detected without migration history. Marking migrations as applied…');
-  for (const name of migrations) {
-    try {
-      await runPrisma(['migrate', 'resolve', '--applied', name, '--schema', prismaSchemaPath]);
-      console.log(`   • Marked ${name} as applied`);
-    } catch (error) {
-      if (error.stderr?.includes('already applied') || error.stderr?.includes('already been recorded')) {
-        console.log(`   • ${name} already recorded, skipping`);
-        continue;
-      }
-      throw error;
-    }
-  }
-  console.log('✅ Baseline recorded.\n');
+  const p3018 = output.match(/Migration name: ([^\n]+)/i);
+  if (p3018) migrations.add(p3018[1].trim());
+  return Array.from(migrations);
 }
 
 function findDuplicateTableCreates() {
   const tableMap = new Map();
+  
   for (const migration of migrations) {
     const sqlPath = path.join(migrationDir, migration, 'migration.sql');
-    if (!existsSync(sqlPath)) {
-      continue;
-    }
+    if (!existsSync(sqlPath)) continue;
+    
     const content = readFileSync(sqlPath, 'utf8');
     const regex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?([A-Za-z0-9_]+)["`]?/gi;
-    const tablesInMigration = new Set();
     let match;
+    
     while ((match = regex.exec(content)) !== null) {
-      tablesInMigration.add(match[1].toLowerCase());
-    }
-    for (const table of tablesInMigration) {
+      const table = match[1].toLowerCase();
       if (!tableMap.has(table)) {
         tableMap.set(table, []);
       }
       tableMap.get(table).push(migration);
     }
   }
+  
   return Array.from(tableMap.entries())
     .map(([table, list]) => ({ table, migrations: list.sort() }))
     .filter((entry) => entry.migrations.length > 1);
 }
 
-async function resolveDuplicateCreates() {
+async function resolveDuplicates() {
   const duplicates = findDuplicateTableCreates();
-  if (duplicates.length === 0) {
-    return;
-  }
-  console.log('⚠️  Detected duplicate CREATE TABLE statements. Cleaning redundant migrations:');
+  if (duplicates.length === 0) return false;
+  
+  let actuallyResolved = 0;
+  
   for (const entry of duplicates) {
     const [primary, ...redundant] = entry.migrations;
+    
     for (const migration of redundant) {
-      console.log(`   • ${entry.table} already created in ${primary}; marking ${migration} as applied.`);
       try {
-        await runPrisma(['migrate', 'resolve', '--applied', migration, '--schema', prismaSchemaPath], {
-          capture: true,
-        });
-      } catch (error) {
-        const details = [error.stderr, error.stdout, error.message].filter(Boolean).join('\n');
-        if (
-          details.includes('already been recorded') ||
-          details.includes('already recorded as applied') ||
-          details.includes('No migration found')
-        ) {
-          console.log(`     ↳ ${migration} already recorded, skipping.`);
-          continue;
+        await runPrisma(['migrate', 'resolve', '--applied', migration, '--schema', prismaSchemaPath], { capture: true });
+        if (actuallyResolved === 0) {
+          console.log('Resolving duplicate CREATE TABLE statements:\n');
         }
-        throw error;
+        console.log(`  Table ${entry.table}: marked ${migration} as applied`);
+        actuallyResolved++;
+      } catch (error) {
+        const output = [error.stderr, error.stdout].filter(Boolean).join('\n');
+        if (!output.includes('already been recorded') && !output.includes('already recorded as applied')) {
+          throw error;
+        }
       }
     }
   }
-  console.log('✅ Duplicate migrations marked as applied.\n');
+  
+  if (actuallyResolved > 0) {
+    console.log();
+  }
+  
+  return actuallyResolved > 0;
 }
 
-async function handleDrift(statusOutput) {
-  console.error('⚠️  Drift detected: your database schema differs from prisma/schema.prisma.');
-  console.error('Review the diff below and reconcile manually.\n');
+async function baselineAllMigrations() {
+  if (migrations.length === 0) {
+    console.log('No migrations found to baseline');
+    return;
+  }
+  
+  console.log('Existing schema detected without migration history\n');
+  console.log('Marking migrations as applied:\n');
+  
+  for (const name of migrations) {
+    try {
+      await runPrisma(['migrate', 'resolve', '--applied', name, '--schema', prismaSchemaPath], { capture: true });
+      console.log(`  ${name}`);
+    } catch (error) {
+      const output = [error.stderr, error.stdout].filter(Boolean).join('\n');
+      if (output.includes('already applied') || output.includes('already been recorded')) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  console.log();
+}
+
+async function markAsApplied(migrationName) {
+  try {
+    await runPrisma(['migrate', 'resolve', '--applied', migrationName, '--schema', prismaSchemaPath], { capture: true });
+    return true;
+  } catch (err) {
+    const output = [err.stderr, err.stdout].filter(Boolean).join('\n');
+    return output.includes('already been recorded');
+  }
+}
+
+async function attemptDeploy() {
+  try {
+    await runPrisma(['migrate', 'deploy', '--schema', prismaSchemaPath], { capture: true });
+    return { success: true };
+  } catch (error) {
+    const fullOutput = [error.stderr, error.stdout, error.message].filter(Boolean).join('\n');
+    const failed = extractFailedMigrations(fullOutput);
+    return failed.length > 0 ? { success: false, failedMigrations: failed } : Promise.reject(error);
+  }
+}
+
+function handleDrift(statusOutput) {
+  console.error('\nDrift detected: database schema differs from prisma/schema.prisma\n');
+  console.error('Review the output and reconcile manually:\n');
   console.error(statusOutput);
   console.log('\nSuggested commands:');
   console.log('  pnpm --filter @command-center/backend exec -- prisma migrate diff \\');
   console.log('    --from-schema-datasource --to-schema prisma/schema.prisma --script');
   console.log('  pnpm --filter @command-center/backend exec -- prisma migrate resolve --applied <migration>');
-  console.log('\nAfter reconciling, rerun pnpm update-db.');
+  console.log('\nAfter reconciling, rerun pnpm update-db');
 }
 
 async function main() {
   console.log('=== AntiHunter Command Center :: Database Updater ===\n');
+  
   try {
+    let hadDuplicates = false;
     if (migrations.length > 0) {
-      await resolveDuplicateCreates();
+      hadDuplicates = await resolveDuplicates();
     }
+    
     const status = await getStatus();
-    switch (status.state) {
-      case 'upToDate':
-        console.log('✅ Database schema is already up to date. No action required.');
-        break;
-      case 'pending':
-        await applyMigrations();
-        break;
-      case 'needsBaseline':
-        await baselineAllMigrations();
-        await applyMigrations();
-        break;
-      case 'drift':
-        await handleDrift(status.raw);
-        process.exitCode = 1;
-        break;
-      default:
-        console.warn('⚠️  Unable to determine database state automatically. Full output:\n');
-        console.log(status.raw);
-        console.log('\nPlease review the output above or rerun with `pnpm --filter @command-center/backend exec -- prisma migrate status`.');
-        process.exitCode = 1;
+    
+    if (status.state === 'upToDate') {
+      console.log('Database is up to date');
+      return;
     }
-  } catch (error) {
-    console.error('\n❌ Database update failed.');
-    if (error.stderr || error.stdout) {
-      console.error(error.stderr || error.stdout);
+    
+    if (status.state === 'drift') {
+      handleDrift(status.raw);
+      process.exitCode = 1;
+      return;
+    }
+    
+    if (status.state === 'needsBaseline') {
+      await baselineAllMigrations();
+    }
+    
+    let result = await attemptDeploy();
+    const processed = new Set();
+    
+    while (!result.success && result.failedMigrations) {
+      for (const migration of result.failedMigrations) {
+        if (processed.has(migration)) continue;
+        
+        console.log(`Marking as applied: ${migration}`);
+        if (await markAsApplied(migration)) {
+          processed.add(migration);
+        }
+      }
+      
+      if (result.failedMigrations.every(m => processed.has(m))) {
+        result = await attemptDeploy();
+      } else {
+        break;
+      }
+    }
+    
+    if (!result.success) {
+      console.error('\nFailed to resolve all migrations');
+      console.log('\nManual fix:');
+      console.log(`  cd ${backendDir}`);
+      console.log('  pnpm prisma migrate status');
+      console.log('  pnpm prisma migrate resolve --applied <migration>');
+      console.log('  pnpm prisma migrate deploy');
+      process.exitCode = 1;
     } else {
-      console.error(error.message);
+      if (!hadDuplicates && processed.size === 0 && status.state !== 'needsBaseline') {
+        console.log('Database migrations applied successfully');
+      } else {
+        console.log('Database migrations applied successfully');
+      }
     }
+    
+  } catch (error) {
+    console.error('\nDatabase update failed:', error.message);
+    
+    if (error.stdout || error.stderr) {
+      console.error('\nOutput:');
+      console.error(error.stderr || error.stdout);
+    }
+    
     console.log('\nIf this happens repeatedly, try:');
     console.log('  pnpm --filter @command-center/backend exec -- prisma migrate deploy');
     console.log('  pnpm --filter @command-center/backend exec -- prisma migrate resolve --help');
+    
     process.exitCode = 1;
   }
 }
