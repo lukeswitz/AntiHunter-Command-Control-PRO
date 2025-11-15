@@ -1203,32 +1203,35 @@ function sanitizeLine(value: string): string {
 function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
   const results: SerialParseResult[] = [];
 
-  // Status/health style messages: "AH1 Status Mode:WiFi+BLE ... GPS 63.742531 deg N, 11.306883 deg E"
+  const cleaned = stripAnsi(line);
+  const payload = cleaned.includes(' msg=') ? cleaned.split(' msg=')[1] : cleaned;
+
+  // Status messages like: "AH1: STATUS: ... Temp:57.6C ... GPS:63.742538,11.306898"
   const statusMatch =
-    /^(?<node>[A-Za-z0-9_.:-]+)\s+Status\s+Mode:[^\r\n]*?(?:GPS\s+(?<lat>-?\d+(?:\.\d+)?)\s*deg\s*[NnSs],\s*(?<lon>-?\d+(?:\.\d+)?)\s*deg\s*[EeWw])?/i.exec(
-      line,
+    /^(?<id>[A-Za-z0-9_.:-]+):?\s*STATUS:.*?GPS[:\s]+(?<lat>-?\d+(?:\.\d+)?)[,\s]+(?<lon>-?\d+(?:\.\d+)?)/i.exec(
+      payload,
     );
   if (statusMatch?.groups) {
-    const lat = statusMatch.groups.lat ? Number(statusMatch.groups.lat) : undefined;
-    const lon = statusMatch.groups.lon ? Number(statusMatch.groups.lon) : undefined;
-    const hasCoords = Number.isFinite(lat) && Number.isFinite(lon);
-    results.push({
-      kind: 'alert',
-      level: 'INFO',
-      category: 'status',
-      nodeId: statusMatch.groups.node,
-      message: line,
-      data: undefined,
-      raw: line,
-      ...(hasCoords ? { lat: lat as number, lon: lon as number } : {}),
-    });
-    if (hasCoords) {
+    const lat = Number(statusMatch.groups.lat);
+    const lon = Number(statusMatch.groups.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      results.push({
+        kind: 'alert',
+        level: 'NOTICE',
+        category: 'status',
+        nodeId: statusMatch.groups.id,
+        message: payload,
+        data: undefined,
+        raw: line,
+        lat,
+        lon,
+      });
       results.push({
         kind: 'node-telemetry',
-        nodeId: statusMatch.groups.node,
-        lat: lat as number,
-        lon: lon as number,
-        lastMessage: line,
+        nodeId: statusMatch.groups.id,
+        lat,
+        lon,
+        lastMessage: payload,
         raw: line,
       });
     }
@@ -1237,7 +1240,7 @@ function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
   // Generic telemetry: "Node X telemetry update (lat, lon)"
   const telemetryMatch =
     /Node\s+(?<id>[A-Za-z0-9_.:-]+)\s+telemetry update.*\((?<lat>-?\d+(?:\.\d+)?),\s*(?<lon>-?\d+(?:\.\d+)?)\)/i.exec(
-      line,
+      payload,
     );
   if (telemetryMatch?.groups) {
     const lat = Number(telemetryMatch.groups.lat);
@@ -1248,11 +1251,31 @@ function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
         nodeId: telemetryMatch.groups.id,
         lat,
         lon,
-        lastMessage: line,
+        lastMessage: payload,
         raw: line,
       });
     }
   }
 
   return results.length > 0 ? results : null;
+}
+
+function stripAnsi(value: string): string {
+  // Remove ANSI escape sequences (color codes, etc.).
+  let result = '';
+  let i = 0;
+  while (i < value.length) {
+    if (value[i] === '\u001b' && value[i + 1] === '[') {
+      // Skip until we hit a letter (ANSI terminator)
+      i += 2;
+      while (i < value.length && !/[A-Za-z]/.test(value[i])) {
+        i += 1;
+      }
+      i += 1; // consume the terminator
+    } else {
+      result += value[i];
+      i += 1;
+    }
+  }
+  return result;
 }
