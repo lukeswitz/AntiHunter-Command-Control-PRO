@@ -153,7 +153,10 @@ export class MeshtasticNewParser implements SerialProtocolParser {
       /\bReceived routing\b/i.test(payload) ||
       /\bDeviceTelemetry\b/i.test(payload) ||
       /\bPowerTelemetry\b/i.test(payload) ||
-      /\bEnvironmentTelemetry\b/i.test(payload)
+      /\bEnvironmentTelemetry\b/i.test(payload) ||
+      /\bExternal Notification Module\b/i.test(payload) ||
+      /\bToPhone queue is full\b/i.test(payload) ||
+      /\bRebroadcast received floodmsg\b/i.test(payload)
     ) {
       return [];
     }
