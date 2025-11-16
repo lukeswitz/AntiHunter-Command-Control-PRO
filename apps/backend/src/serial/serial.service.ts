@@ -1269,6 +1269,9 @@ function sanitizeLine(value: string): string {
     cleaned = markerMatch[1];
   }
 
+  // Remove ANSI color/control codes.
+  cleaned = stripAnsi(cleaned);
+
   return cleaned.trim();
 }
 
