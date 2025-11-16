@@ -190,12 +190,8 @@ export class MeshtasticNewParser implements SerialProtocolParser {
       const nodeId = this.normalizeNodeId(statusMatch.groups.id) || sourceId;
       const lat = Number(statusMatch.groups.lat);
       const lon = Number(statusMatch.groups.lon);
-      const hdop = statusMatch.groups.hdop ? Number(statusMatch.groups.hdop) : undefined;
       if (nodeId && Number.isFinite(lat) && Number.isFinite(lon)) {
-        // Drop truncated status lines where HDOP is missing/partial; status messages always include HDOP.
-        if (!Number.isFinite(hdop)) {
-          return [];
-        }
+        const hdop = statusMatch.groups.hdop ? Number(statusMatch.groups.hdop) : undefined;
         const tempC = Number(statusMatch.groups.tempC);
         const tempF = statusMatch.groups.tempF ? Number(statusMatch.groups.tempF) : undefined;
         const results: SerialParseResult[] = [
@@ -208,7 +204,7 @@ export class MeshtasticNewParser implements SerialProtocolParser {
             lastMessage: payload,
             ...(Number.isFinite(tempC) && { temperatureC: tempC }),
             ...(Number.isFinite(tempF) && { temperatureF: tempF }),
-            hdop,
+            ...(Number.isFinite(hdop) && { hdop }),
           },
         ];
         results.push({
@@ -218,7 +214,7 @@ export class MeshtasticNewParser implements SerialProtocolParser {
           nodeId,
           message: payload,
           raw: rawOriginal,
-          data: { hdop },
+          ...(Number.isFinite(hdop) && { data: { hdop } }),
         });
         return this.dedupe(results);
       }
@@ -486,9 +482,6 @@ export class MeshtasticNewParser implements SerialProtocolParser {
     // If payload contains a colon but matched none of the known patterns, drop it (likely malformed).
     if (
       payload.includes(':') &&
-      // Drop broken HDOP fragments (router sometimes truncates).
-      !/\bHDOP[:=\s]*-?\d/i.test(payload) &&
-      /\bHDOP\b/i.test(payload) &&
       !STATUS_REGEX.test(payload) &&
       !TIME_TEMP_GPS_REGEX.test(payload) &&
       !TARGET_REGEX.test(payload) &&
