@@ -26,6 +26,7 @@ import { canonicalNodeId, type NodeHistoryPoint, type NodeSummary } from '../../
 import type { TargetMarker } from '../../stores/target-store';
 
 const FALLBACK_CENTER: LatLngExpression = [0, 0];
+const FALLBACK_ZOOM = 2;
 const DEFAULT_RADIUS_FALLBACK = 50;
 const COVERAGE_MULTIPLIER = 5;
 type HeatPoint = [number, number, number];
@@ -441,7 +442,13 @@ export function CommandCenterMap({
   }, [drawing]);
 
   return (
-    <MapContainer center={center} zoom={13} className="map-container" scrollWheelZoom preferCanvas>
+    <MapContainer
+      center={center}
+      zoom={nodes.length || drones.length || targets.length ? 13 : FALLBACK_ZOOM}
+      className="map-container"
+      scrollWheelZoom
+      preferCanvas
+    >
       <MapReadyBridge onReady={handleReady} />
       <GeofenceDrawingHandler
         enabled={Boolean(drawing?.enabled)}
