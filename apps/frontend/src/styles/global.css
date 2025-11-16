@@ -1622,7 +1622,11 @@ body.theme-dark .control-chip[disabled] {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  background: linear-gradient(135deg, rgba(var(--color-accent-rgb), 0.35), rgba(14, 165, 233, 0.25));
+  background: linear-gradient(
+    135deg,
+    rgba(var(--color-accent-rgb), 0.35),
+    rgba(14, 165, 233, 0.25)
+  );
   border: 1px solid rgba(var(--color-accent-rgb), 0.45);
   border-radius: 0.65rem;
   padding: 0.55rem 0.7rem;
