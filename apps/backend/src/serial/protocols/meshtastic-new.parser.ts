@@ -7,10 +7,10 @@ import { SerialParseResult, SerialProtocolParser } from '../serial.types';
 const ANSI_REGEX = /\u001b\[[0-9;]*[A-Za-z]/g;
 
 const STATUS_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+)?:?\s*STATUS:.*?Temp[:\s]+(?<tempC>-?\d+(?:\.\d+)?)[cC](?:\/(?<tempF>-?\d+(?:\.\d+)?)[fF])?.*?\bGPS[:\s]+(?<lat>-?\d+(?:\.\d+)?)[,\s]+(?<lon>-?\d+(?:\.\d+)?)/i;
+  /\b(?<id>[A-Za-z0-9_.:-]+)?:?\s*STATUS:[\s\S]*?Temp[:\s]+(?<tempC>-?\d+(?:\.\d+)?)[cC](?:\/(?<tempF>-?\d+(?:\.\d+)?)[fF])?[\s\S]*?\bGPS[:\s]+(?<lat>-?\d+(?:\.\d+)?)[,\s]+(?<lon>-?\d+(?:\.\d+)?)(?:[,\s]+HDOP[:\s]*(?<hdop>-?\d+(?:\.\d+)?))?/i;
 
 const TIME_TEMP_GPS_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+)?\s*Time:[^\s]+\s+Temp[:\s]+(?<tempC>-?\d+(?:\.\d+)?)[cC](?:\/(?<tempF>-?\d+(?:\.\d+)?)[fF])?.*?\bGPS[:\s]+(?<lat>-?\d+(?:\.\d+)?)[,\s]+(?<lon>-?\d+(?:\.\d+)?)/i;
+  /\b(?<id>[A-Za-z0-9_.:-]+)?\s*Time:[^\s]+\s+Temp[:\s]+(?<tempC>-?\d+(?:\.\d+)?)[cC](?:\/(?<tempF>-?\d+(?:\.\d+)?)[fF])?[\s\S]*?\bGPS[:\s]+(?<lat>-?\d+(?:\.\d+)?)[,\s]+(?<lon>-?\d+(?:\.\d+)?)/i;
 
 const DEVICE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+)?:?\s*DEVICE[:\s]+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})(?:\s+(?<band>[A-Za-z0-9]+))?\s+(?<rssi>-?\d+)(?:\s+C(?<channel>\d+))?(?:\s+N:(?<name>.+))?/i;
@@ -34,7 +34,9 @@ const DRONE_ALT_REGEX = /ALT:(?<alt>-?\d+(?:\.\d+)?)/i;
 const DRONE_SPD_REGEX = /SPD:(?<spd>-?\d+(?:\.\d+)?)/i;
 const DRONE_OP_REGEX = /OP:(?<opLat>-?\d+(?:\.\d+)?),\s*(?<opLon>-?\d+(?:\.\d+)?)/i;
 const DRONE_RSSI_REGEX = /\bR(?<rssi>-?\d+)\b/i;
-const GPS_LOG_REGEX = /\bGPS\b.*(power state|LOCK Location|updatePosition LOCAL|HDOP)/i;
+const GPS_ROUTER_LOG_REGEX = /\bGPS\b.*(power state|updatePosition LOCAL)/i;
+const GPS_LOCK_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+)?:?\s*GPS[:\s]+LOCKED\s+Location:(?<lat>-?\d+(?:\.\d+)?),\s*(?<lon>-?\d+(?:\.\d+)?)(?:\s+Satellites:(?<sats>\d+))?(?:\s+HDOP:(?<hdop>\d+(?:\.\d+)?))?/i;
 
 const SOURCE_ID_REGEX = /(?:from=|fr=|node[=:])(?<source>[A-Za-z0-9_.:-]+)/i;
 
@@ -104,7 +106,7 @@ export class MeshtasticNewParser implements SerialProtocolParser {
         ACK_REGEX.test(combined) ||
         DRONE_REGEX.test(combined) ||
         SCAN_DONE_REGEX.test(combined) ||
-        GPS_LOG_REGEX.test(combined) ||
+        GPS_ROUTER_LOG_REGEX.test(combined) ||
         /\bReceived routing\b/i.test(combined) ||
         /\bDeviceTelemetry\b/i.test(combined) ||
         /\bPowerTelemetry\b/i.test(combined) ||
@@ -214,28 +216,59 @@ export class MeshtasticNewParser implements SerialProtocolParser {
       }
     }
 
-    const timeGpsMatch = TIME_TEMP_GPS_REGEX.exec(payload);
-    if (timeGpsMatch?.groups) {
-      const nodeId = this.normalizeNodeId(timeGpsMatch.groups.id) || sourceId;
-      const lat = Number(timeGpsMatch.groups.lat);
-      const lon = Number(timeGpsMatch.groups.lon);
-      if (nodeId && Number.isFinite(lat) && Number.isFinite(lon)) {
-        const tempC = Number(timeGpsMatch.groups.tempC);
-        const tempF = timeGpsMatch.groups.tempF ? Number(timeGpsMatch.groups.tempF) : undefined;
-        return this.dedupe([
-          {
-            kind: 'node-telemetry',
-            nodeId,
-            lat,
-            lon,
-            raw: rawOriginal,
-            lastMessage: payload,
-            ...(Number.isFinite(tempC) && { temperatureC: tempC }),
-            ...(Number.isFinite(tempF) && { temperatureF: tempF }),
-          },
-        ]);
+      const timeGpsMatch = TIME_TEMP_GPS_REGEX.exec(payload);
+      if (timeGpsMatch?.groups) {
+        const nodeId = this.normalizeNodeId(timeGpsMatch.groups.id) || sourceId;
+        const lat = Number(timeGpsMatch.groups.lat);
+        const lon = Number(timeGpsMatch.groups.lon);
+        if (nodeId && Number.isFinite(lat) && Number.isFinite(lon)) {
+          const tempC = Number(timeGpsMatch.groups.tempC);
+          const tempF = timeGpsMatch.groups.tempF ? Number(timeGpsMatch.groups.tempF) : undefined;
+          return this.dedupe([
+            {
+              kind: 'node-telemetry',
+              nodeId,
+              lat,
+              lon,
+              raw: rawOriginal,
+              lastMessage: payload,
+              ...(Number.isFinite(tempC) && { temperatureC: tempC }),
+              ...(Number.isFinite(tempF) && { temperatureF: tempF }),
+            },
+          ]);
+        }
       }
-    }
+
+      const gpsLockMatch = GPS_LOCK_REGEX.exec(payload);
+      if (gpsLockMatch?.groups) {
+        const nodeId = this.normalizeNodeId(gpsLockMatch.groups.id) || sourceId;
+        const lat = Number(gpsLockMatch.groups.lat);
+        const lon = Number(gpsLockMatch.groups.lon);
+        const sats = gpsLockMatch.groups.sats ? Number(gpsLockMatch.groups.sats) : undefined;
+        const hdop = gpsLockMatch.groups.hdop ? Number(gpsLockMatch.groups.hdop) : undefined;
+        if (nodeId && Number.isFinite(lat) && Number.isFinite(lon)) {
+          return this.dedupe([
+            {
+              kind: 'node-telemetry',
+              nodeId,
+              lat,
+              lon,
+              raw: rawOriginal,
+              lastMessage: payload,
+              ...(Number.isFinite(hdop) && { hdop }),
+              ...(Number.isFinite(sats) && { satellites: sats }),
+            },
+            {
+              kind: 'alert',
+              level: 'NOTICE',
+              category: 'status',
+              nodeId,
+              message: payload,
+              raw: rawOriginal,
+            },
+          ]);
+        }
+      }
 
     const targetMatch = TARGET_REGEX.exec(payload);
     if (targetMatch?.groups) {
