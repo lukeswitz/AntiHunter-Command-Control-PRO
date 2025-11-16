@@ -1298,20 +1298,6 @@ function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
     const nodeId = statusMatch.groups.id || sourceId;
     if (Number.isFinite(lat) && Number.isFinite(lon) && nodeId) {
       results.push({
-        kind: 'alert',
-        level: 'NOTICE',
-        category: 'status',
-        nodeId,
-        message: payload,
-        data: {
-          ...(Number.isFinite(tempC) && { tempC }),
-          ...(Number.isFinite(tempF) && { tempF }),
-          lat,
-          lon,
-        },
-        raw: line,
-      });
-      results.push({
         kind: 'node-telemetry',
         nodeId: nodeId ?? 'unknown',
         lat,
