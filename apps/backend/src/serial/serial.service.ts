@@ -1199,8 +1199,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     this.incoming$.next(sanitized);
     try {
       const parsed = this.protocolParser.parseLine(sanitized);
-      const allRaw =
-        parsed.length > 0 && parsed.every((evt) => evt.kind === 'raw' || evt.kind === 'unknown');
+      const allRaw = parsed.length > 0 && parsed.every((evt) => evt.kind === 'raw');
       if (parsed.length > 0 && !allRaw) {
         this.logger.debug({ parsed }, 'Parsed serial events');
         parsed.forEach((event) => this.parsed$.next(event));
@@ -1292,8 +1291,6 @@ function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
         message: payload,
         data: undefined,
         raw: line,
-        lat,
-        lon,
       });
       results.push({
         kind: 'node-telemetry',

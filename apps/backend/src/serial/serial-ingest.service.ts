@@ -324,7 +324,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             nodeId: event.nodeId,
             lat,
             lon,
-            message: sanitizedMessage,
+            message: sanitizedMessage ?? event.message ?? '',
             category: event.category,
             siteId,
             timestamp,
