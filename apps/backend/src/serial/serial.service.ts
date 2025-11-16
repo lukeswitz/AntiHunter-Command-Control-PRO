@@ -1296,12 +1296,12 @@ function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
     const lat = Number(statusMatch.groups.lat);
     const lon = Number(statusMatch.groups.lon);
     const nodeId = statusMatch.groups.id || sourceId;
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    if (Number.isFinite(lat) && Number.isFinite(lon) && nodeId) {
       results.push({
         kind: 'alert',
         level: 'NOTICE',
         category: 'status',
-        nodeId: nodeId ?? undefined,
+        nodeId,
         message: payload,
         data: {
           ...(Number.isFinite(tempC) && { tempC }),
@@ -1324,35 +1324,17 @@ function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
     }
   }
 
-  // Generic telemetry: "Node X telemetry update (lat, lon)"
-  const telemetryMatch =
-    /Node\s+(?<id>[A-Za-z0-9_.:-]+)\s+telemetry update.*\((?<lat>-?\d+(?:\.\d+)?),\s*(?<lon>-?\d+(?:\.\d+)?)\)/i.exec(
+  // Simple time/temp/gps telemetry e.g. "Time:... Temp:57.6C/136F GPS:lat,lon"
+  const timeGpsMatch =
+    /^(?<id>[A-Za-z0-9_.:-]+)?\s*Time:[^\s]+\s+Temp[:\s]+(?<tc>-?\d+(?:\.\d+)?)[cC](?:\/(?<tf>-?\d+(?:\.\d+)?)[fF])?.*?\bGPS[:\s]+(?<lat>-?\d+(?:\.\d+)?)[,\s]+(?<lon>-?\d+(?:\.\d+)?)/i.exec(
       payload,
     );
-  if (telemetryMatch?.groups) {
-    const lat = Number(telemetryMatch.groups.lat);
-    const lon = Number(telemetryMatch.groups.lon);
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      results.push({
-        kind: 'node-telemetry',
-        nodeId: telemetryMatch.groups.id,
-        lat,
-        lon,
-        lastMessage: payload,
-        raw: line,
-      });
-    }
-  }
-
-  // Generic GPS-bearing lines, even without explicit "STATUS"
-  const gpsMatch =
-    /^(?<id>[A-Za-z0-9_.:-]+)?.*?\bGPS[:\s]+(?<lat>-?\d+(?:\.\d+)?)[,\s]+(?<lon>-?\d+(?:\.\d+)?)/i.exec(
-      payload,
-    );
-  if (gpsMatch?.groups) {
-    const lat = Number(gpsMatch.groups.lat);
-    const lon = Number(gpsMatch.groups.lon);
-    const nodeId = gpsMatch.groups.id || sourceId;
+  if (timeGpsMatch?.groups) {
+    const lat = Number(timeGpsMatch.groups.lat);
+    const lon = Number(timeGpsMatch.groups.lon);
+    const nodeId = timeGpsMatch.groups.id || sourceId;
+    const tC = Number(timeGpsMatch.groups.tc);
+    const tF = timeGpsMatch.groups.tf ? Number(timeGpsMatch.groups.tf) : undefined;
     if (Number.isFinite(lat) && Number.isFinite(lon) && nodeId) {
       results.push({
         kind: 'node-telemetry',
@@ -1361,8 +1343,8 @@ function parseFallbackTelemetry(line: string): SerialParseResult[] | null {
         lon,
         lastMessage: payload,
         raw: line,
-        ...(Number.isFinite(tempC) && { temperatureC: tempC }),
-        ...(Number.isFinite(tempF) && { temperatureF: tempF }),
+        ...(Number.isFinite(tC) && { temperatureC: tC }),
+        ...(Number.isFinite(tF) && { temperatureF: tF }),
       });
     }
   }
