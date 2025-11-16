@@ -56,9 +56,7 @@ export class MeshtasticNewParser implements SerialProtocolParser {
   private carryFragment?: string;
 
   parseLine(rawLine: string): SerialParseResult[] {
-    // Deduplicate only within a single incoming line (including bundled splits).
-    this.dedupeSet.clear();
-    this.dedupeQueue = [];
+    // Deduplicate across recent events (queue limited below).
     const sanitized = this.normalize(rawLine);
     if (!sanitized) {
       return [];
@@ -697,6 +695,8 @@ export class MeshtasticNewParser implements SerialProtocolParser {
     }
     // Remove placeholder Fahrenheit fragments.
     cleaned = cleaned.replace(/\/?undefinedf\b/gi, '');
+    // Drop stray leading "0m" artifacts from colorized logs.
+    cleaned = cleaned.replace(/^0m\s+/, '');
     return cleaned.trim();
   }
 
