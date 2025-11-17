@@ -100,7 +100,7 @@ model AppConfig {
   timezone String?
   env      String  @default("DEV")
 
-  protocol        String @default("meshtastic-like")
+  protocol        String @default("meshtastic-rewrite")
   ackTimeoutMs    Int    @default(3000)
   resultTimeoutMs Int    @default(10000)
   maxRetries      Int    @default(2)

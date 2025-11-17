@@ -82,7 +82,7 @@ type SerialConnectPayload = {
 };
 
 const PROTOCOL_OPTIONS = [
-  { value: 'meshtastic-like', label: 'Meshtastic JSON/CBOR' },
+  { value: 'meshtastic-rewrite', label: 'Meshtastic Ingest' },
   { value: 'raw-lines', label: 'Raw Lines' },
   { value: 'nmea-like', label: 'NMEA-like' },
 ];
@@ -1305,7 +1305,7 @@ export function ConfigPage() {
     if (serialConfig.delimiter ?? '') {
       payload.delimiter = serialConfig.delimiter ?? undefined;
     }
-    payload.protocol = appSettings.protocol ?? 'meshtastic-like';
+    payload.protocol = appSettings.protocol ?? 'meshtastic-rewrite';
     return payload;
   };
 

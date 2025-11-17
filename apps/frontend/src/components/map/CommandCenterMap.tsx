@@ -121,6 +121,14 @@ function hexToRgb(hex: string): string {
   return `${r}, ${g}, ${b}`;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function hasValidPosition(lat: unknown, lon: unknown): boolean {
+  return isFiniteNumber(lat) && isFiniteNumber(lon) && !(lat === 0 && lon === 0);
+}
+
 function createNodeIcon(
   node: NodeSummary,
   severity: IndicatorSeverity,
@@ -396,34 +404,45 @@ export function CommandCenterMap({
     [defaultRadius],
   );
 
+  const nodesWithPosition = useMemo(
+    () => nodes.filter((node) => hasValidPosition(node.lat, node.lon)),
+    [nodes],
+  );
+  const dronesWithPosition = useMemo(
+    () => drones.filter((drone) => hasValidPosition(drone.lat, drone.lon)),
+    [drones],
+  );
+  const targetsWithPosition = useMemo(
+    () => targets.filter((target) => hasValidPosition(target.lat, target.lon)),
+    [targets],
+  );
+
   const center = useMemo<LatLngExpression>(() => {
-    if (nodes.length > 0) {
-      const latSum = nodes.reduce((acc, node) => acc + node.lat, 0);
-      const lonSum = nodes.reduce((acc, node) => acc + node.lon, 0);
-      return [latSum / nodes.length, lonSum / nodes.length];
-    }
+    const average = <T extends { lat: number; lon: number }>(
+      items: T[],
+    ): LatLngExpression | null => {
+      if (!items.length) {
+        return null;
+      }
+      const latSum = items.reduce((acc, item) => acc + item.lat, 0);
+      const lonSum = items.reduce((acc, item) => acc + item.lon, 0);
+      return [latSum / items.length, lonSum / items.length];
+    };
 
-    if (drones.length > 0) {
-      const latSum = drones.reduce((acc, drone) => acc + drone.lat, 0);
-      const lonSum = drones.reduce((acc, drone) => acc + drone.lon, 0);
-      return [latSum / drones.length, lonSum / drones.length];
-    }
-
-    if (targets.length > 0) {
-      const latSum = targets.reduce((acc, target) => acc + target.lat, 0);
-      const lonSum = targets.reduce((acc, target) => acc + target.lon, 0);
-      return [latSum / targets.length, lonSum / targets.length];
-    }
-
-    return FALLBACK_CENTER;
-  }, [nodes, drones, targets]);
+    return (
+      average(nodesWithPosition) ??
+      average(dronesWithPosition) ??
+      average(targetsWithPosition) ??
+      FALLBACK_CENTER
+    );
+  }, [nodesWithPosition, dronesWithPosition, targetsWithPosition]);
 
   useEffect(() => {
-    if (mapRef.current && nodes.length > 0 && followEnabled) {
-      const target = nodes[0];
+    if (mapRef.current && nodesWithPosition.length > 0 && followEnabled) {
+      const target = nodesWithPosition[0];
       mapRef.current.panTo([target.lat, target.lon]);
     }
-  }, [followEnabled, nodes]);
+  }, [followEnabled, nodesWithPosition]);
 
   const handleReady = (map: LeafletMap) => {
     mapRef.current = map;
@@ -444,7 +463,11 @@ export function CommandCenterMap({
   return (
     <MapContainer
       center={center}
-      zoom={nodes.length || drones.length || targets.length ? 13 : FALLBACK_ZOOM}
+      zoom={
+        nodesWithPosition.length || dronesWithPosition.length || targetsWithPosition.length
+          ? 13
+          : FALLBACK_ZOOM
+      }
       className="map-container"
       scrollWheelZoom
       preferCanvas

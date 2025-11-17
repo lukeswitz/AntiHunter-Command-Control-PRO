@@ -1,22 +1,16 @@
-import {
-  MeshtasticLikeParser,
-  ensureMeshtasticProtobufs,
-} from './protocols/meshtastic-like.parser';
-import { MeshtasticNewParser } from './protocols/meshtastic-new.parser';
+import { MeshtasticRewriteParser } from './protocols/meshtastic-rewrite.parser';
 import { SerialProtocolParser } from './serial.types';
 
-export type ProtocolKey = 'meshtastic-like' | 'raw-lines' | 'nmea-like';
-
-export { ensureMeshtasticProtobufs };
+export type ProtocolKey = 'meshtastic-rewrite' | 'raw-lines' | 'nmea-like';
 
 export function createParser(protocol: ProtocolKey): SerialProtocolParser {
   switch (protocol) {
     case 'raw-lines':
     case 'nmea-like':
-      // fall back to meshtastic-like for now; extend with dedicated parsers as needed.
-      return new MeshtasticLikeParser();
-    case 'meshtastic-like':
+      // fall back to meshtastic rewrite parser until dedicated implementations exist.
+      return new MeshtasticRewriteParser();
+    case 'meshtastic-rewrite':
     default:
-      return new MeshtasticNewParser();
+      return new MeshtasticRewriteParser();
   }
 }

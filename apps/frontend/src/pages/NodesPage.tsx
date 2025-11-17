@@ -171,9 +171,12 @@ function buildRow(node: {
   const lastSeenRelative = lastSeenDate ? formatRelativeTime(lastSeenDate) : null;
   const online = lastSeenDate ? Date.now() - lastSeenDate.getTime() <= ONLINE_THRESHOLD_MS : true;
 
-  const hasCoords = Number.isFinite(node.lat) && Number.isFinite(node.lon);
-  const lat = hasCoords ? Number(node.lat) : undefined;
-  const lon = hasCoords ? Number(node.lon) : undefined;
+  const latValue = Number(node.lat);
+  const lonValue = Number(node.lon);
+  const hasCoords =
+    Number.isFinite(latValue) && Number.isFinite(lonValue) && !(latValue === 0 && lonValue === 0);
+  const lat = hasCoords ? latValue : undefined;
+  const lon = hasCoords ? lonValue : undefined;
   const location = lat != null && lon != null ? `${lat.toFixed(6)}, ${lon.toFixed(6)}` : undefined;
 
   const temperature = formatTemperature(node);

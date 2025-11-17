@@ -26,6 +26,16 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
       const now = entry.timestamp ?? new Date().toISOString();
       const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
       const nextEntry: TerminalEntry = { ...entry, id, timestamp: now };
+      const last = state.entries[0];
+      if (
+        last &&
+        last.level === nextEntry.level &&
+        last.source === nextEntry.source &&
+        last.siteId === nextEntry.siteId &&
+        last.message === nextEntry.message
+      ) {
+        return state;
+      }
       const next = [nextEntry, ...state.entries].slice(0, state.maxEntries);
       return { entries: next };
     }),

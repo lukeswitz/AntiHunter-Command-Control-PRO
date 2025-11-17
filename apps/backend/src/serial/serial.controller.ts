@@ -28,7 +28,7 @@ export class SerialController {
   @Get('protocols')
   getProtocols() {
     return [
-      { id: 'meshtastic-like', label: 'Meshtastic JSON/CBOR (default)' },
+      { id: 'meshtastic-rewrite', label: 'Meshtastic Ingest (default)' },
       { id: 'raw-lines', label: 'Raw Lines (line-delimited text)' },
       { id: 'nmea-like', label: 'NMEA-like (comma separated)' },
     ];

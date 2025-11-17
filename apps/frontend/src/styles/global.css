@@ -2070,6 +2070,8 @@ body.theme-dark .control-chip[disabled] {
 .terminal-entry__message {
   margin: 0.3rem 0 0;
   font-size: 0.82rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .control-chip--danger {
   color: #ef4444;

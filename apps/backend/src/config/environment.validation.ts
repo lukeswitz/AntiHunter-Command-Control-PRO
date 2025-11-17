@@ -32,7 +32,7 @@ const envSchema = z.object({
     .transform((val) => (val ? Number(val) : undefined))
     .pipe(z.number().int().positive().optional()),
   SERIAL_DELIMITER: z.string().optional(),
-  SERIAL_PROTOCOL: z.enum(['meshtastic-like', 'raw-lines', 'nmea-like']).optional(),
+  SERIAL_PROTOCOL: z.enum(['meshtastic-rewrite', 'raw-lines', 'nmea-like']).optional(),
   SERIAL_PER_TARGET_RATE: z
     .string()
     .optional()

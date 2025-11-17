@@ -38,7 +38,7 @@ export default () => ({
     device: process.env.SERIAL_DEVICE,
     baudRate: process.env.SERIAL_BAUD ? Number(process.env.SERIAL_BAUD) : 115200,
     delimiter: process.env.SERIAL_DELIMITER ?? '\n',
-    protocol: process.env.SERIAL_PROTOCOL ?? 'meshtastic-like',
+    protocol: process.env.SERIAL_PROTOCOL ?? 'meshtastic-rewrite',
     ingestConcurrency: process.env.SERIAL_INGEST_CONCURRENCY
       ? Number(process.env.SERIAL_INGEST_CONCURRENCY)
       : 1,

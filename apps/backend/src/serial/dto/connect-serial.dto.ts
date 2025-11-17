@@ -1,6 +1,6 @@
 import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
-export type SerialProtocol = 'meshtastic-like' | 'raw-lines' | 'nmea-like';
+export type SerialProtocol = 'meshtastic-rewrite' | 'raw-lines' | 'nmea-like';
 
 export class ConnectSerialDto {
   @IsOptional()
@@ -19,6 +19,6 @@ export class ConnectSerialDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['meshtastic-like', 'raw-lines', 'nmea-like'])
+  @IsIn(['meshtastic-rewrite', 'raw-lines', 'nmea-like'])
   protocol?: SerialProtocol;
 }

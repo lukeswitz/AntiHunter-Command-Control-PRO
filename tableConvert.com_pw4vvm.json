@@ -1,0 +1,194 @@
+[
+  {
+    "Detection & RF Attack Alerts": "Alert Type",
+    "": "Example"
+  },
+  {
+    "Detection & RF Attack Alerts": "Target Detected",
+    "": "NODE_ABC: Target: WiFi AA:BB:CC:DD:EE:FF RSSI:-62 Name:Device GPS=40.7128,-74.0060"
+  },
+  {
+    "Detection & RF Attack Alerts": "Device Discovered",
+    "": "NODE_ABC: DEVICE:AA:BB:CC:DD:EE:FF W -65 C6 N:MyRouter"
+  },
+  {
+    "Detection & RF Attack Alerts": "Drone Detected",
+    "": "NODE_ABC: DRONE: AA:BB:CC:DD:EE:FF ID:1234567890ABCDEF R-65 GPS:40.712800,-74.006000 ALT:123.5 SPD:25.5 OP:40.712800,-74.006000"
+  },
+  {
+    "Detection & RF Attack Alerts": "Baseline Anomaly - New",
+    "": "NODE_ABC: ANOMALY-NEW: WiFi AA:BB:CC:DD:EE:FF RSSI:-45 Name:Unknown"
+  },
+  {
+    "Detection & RF Attack Alerts": "Baseline Anomaly - Return",
+    "": "NODE_ABC: ANOMALY-RETURN: BLE AA:BB:CC:DD:EE:FF RSSI:-55"
+  },
+  {
+    "Detection & RF Attack Alerts": "Baseline Anomaly - RSSI",
+    "": "NODE_ABC: ANOMALY-RSSI: WiFi AA:BB:CC:DD:EE:FF Old:-75 New:-45 Delta:30"
+  },
+  {
+    "Detection & RF Attack Alerts": "Deauth Attack (Long)",
+    "": "NODE_ABC: ATTACK: DEAUTH [TARGETED] SRC:AA:BB:CC:DD:EE:FF DST:11:22:33:44:55:66 RSSI:-45dBm CH:6"
+  },
+  {
+    "Detection & RF Attack Alerts": "Deauth Attack (Short)",
+    "": "NODE_ABC: ATTACK: DEAUTH AA:BB:CC:DD:EE:FF->11:22:33:44:55:66 R-45 C6"
+  },
+  {
+    "Detection & RF Attack Alerts": "Identification & Randomization Alerts",
+    "": ""
+  },
+  {
+    "Detection & RF Attack Alerts": "Alert Type",
+    "": "Example"
+  },
+  {
+    "Detection & RF Attack Alerts": "Randomization Identity",
+    "": "AH99: IDENTITY:T-002F W MACs:5 Conf:0.62 Sess:5 Anchor:02:9F:C2:3D:92:CE"
+  },
+  {
+    "Detection & RF Attack Alerts": "Randomization Complete",
+    "": "AH99: RANDOMIZATION_DONE: Identities=14 Sessions=22 TX=14 PEND=0"
+  },
+  {
+    "Detection & RF Attack Alerts": "Tamper, Security & Vibration Alerts",
+    "": ""
+  },
+  {
+    "Detection & RF Attack Alerts": "Alert Type",
+    "": "Example"
+  },
+  {
+    "Detection & RF Attack Alerts": "Vibration Alert",
+    "": "NODE_ABC: VIBRATION: Movement detected at 12:34:56 GPS:40.7128,-74.0060 TAMPER_ERASE_IN:60s"
+  },
+  {
+    "Detection & RF Attack Alerts": "Vibration Setup Mode",
+    "": "NODE_ABC: VIBRATION: Movement in setup mode (active in 45s) GPS:40.7128,-74.0060"
+  },
+  {
+    "Detection & RF Attack Alerts": "Setup Mode Active",
+    "": "NODE_ABC: SETUP_MODE: Auto-erase activates in 120s"
+  },
+  {
+    "Detection & RF Attack Alerts": "Setup Complete",
+    "": "NODE_ABC: SETUP_COMPLETE: Auto-erase activated"
+  },
+  {
+    "Detection & RF Attack Alerts": "Tamper Detected",
+    "": "NODE_ABC: TAMPER_DETECTED: Auto-erase in 60s GPS:40.7128,-74.0060"
+  },
+  {
+    "Detection & RF Attack Alerts": "Tamper Cancelled",
+    "": "NODE_ABC: TAMPER_CANCELLED"
+  },
+  {
+    "Detection & RF Attack Alerts": "Erase Executing",
+    "": "NODE_ABC: ERASE_EXECUTING: Tamper timeout GPS:40.7128,-74.0060"
+  },
+  {
+    "Detection & RF Attack Alerts": "Erase Complete",
+    "": "NODE_ABC: ERASE_ACK:COMPLETE"
+  },
+  {
+    "Detection & RF Attack Alerts": "Erase Cancelled",
+    "": "NODE_ABC: ERASE_ACK:CANCELLED"
+  },
+  {
+    "Detection & RF Attack Alerts": "Status, Sync & System Commands",
+    "": ""
+  },
+  {
+    "Detection & RF Attack Alerts": "Alert Type",
+    "": "Example"
+  },
+  {
+    "Detection & RF Attack Alerts": "Startup Status",
+    "": "NODE_ABC: STARTUP: System initialized GPS:LOCKED TEMP:42.3C SD:OK Status:ONLINE"
+  },
+  {
+    "Detection & RF Attack Alerts": "Status Response",
+    "": "NODE_ABC: STATUS: Mode:WiFi+BLE Scan:YES Hits:142 Targets:5 Unique:87 Temp:42.3C/108.1F Up:03:24:15 GPS=40.712800,-74.006000 HDOP=1.2"
+  },
+  {
+    "Detection & RF Attack Alerts": "Node Heartbeat",
+    "": "[NODE_HB] NODE_ABC Time:2025-10-28_14:32:15 Temp:42.3C GPS:40.7128,-74.0060"
+  },
+  {
+    "Detection & RF Attack Alerts": "GPS Locked",
+    "": "NODE_ABC: GPS: LOCKED Location=40.7128,-74.0060 Satellites=8 HDOP=1.23"
+  },
+  {
+    "Detection & RF Attack Alerts": "GPS Lost",
+    "": "NODE_ABC: GPS: LOST"
+  },
+  {
+    "Detection & RF Attack Alerts": "RTC Sync",
+    "": "NODE_ABC: RTC_SYNC: GPS"
+  },
+  {
+    "Detection & RF Attack Alerts": "Time Sync Request",
+    "": "NODE_ABC: TIME_SYNC_REQ:1725000000:5000:123456:0"
+  },
+  {
+    "Detection & RF Attack Alerts": "Time Sync Response",
+    "": "NODE_ABC: TIME_SYNC_RESP:1725000000:5000:123456:50"
+  },
+  {
+    "Detection & RF Attack Alerts": "Config ACK",
+    "": "NODE_ABC: CONFIG_ACK:CHANNELS:1,6,11"
+  },
+  {
+    "Detection & RF Attack Alerts": "Scan ACK",
+    "": "NODE_ABC: SCAN_ACK:STARTED"
+  },
+  {
+    "Detection & RF Attack Alerts": "Device Scan ACK",
+    "": "NODE_ABC: DEVICE_SCAN_ACK:STARTED"
+  },
+  {
+    "Detection & RF Attack Alerts": "Drone ACK",
+    "": "NODE_ABC: DRONE_ACK:STARTED"
+  },
+  {
+    "Detection & RF Attack Alerts": "Deauth ACK",
+    "": "NODE_ABC: DEAUTH_ACK:STARTED"
+  },
+  {
+    "Detection & RF Attack Alerts": "Randomization ACK",
+    "": "NODE_ABC: RANDOMIZATION_ACK:STARTED"
+  },
+  {
+    "Detection & RF Attack Alerts": "Baseline ACK",
+    "": "NODE_ABC: BASELINE_ACK:STARTED"
+  },
+  {
+    "Detection & RF Attack Alerts": "Baseline Status",
+    "": "NODE_ABC: BASELINE_STATUS: Scanning:YES Established:NO Devices:42 Anomalies:3 Phase1:ACTIVE"
+  },
+  {
+    "Detection & RF Attack Alerts": "Triangulation ACK",
+    "": "NODE_ABC: TRIANGULATE_ACK:AA:BB:CC:DD:EE:FF or NODE_ABC: TRIANGULATE_ACK:T-0001"
+  },
+  {
+    "Detection & RF Attack Alerts": "Triangulation Results",
+    "": "Multi-line result output"
+  },
+  {
+    "Detection & RF Attack Alerts": "Triangulation Stop ACK",
+    "": "NODE_ABC: TRIANGULATE_STOP_ACK"
+  },
+  {
+    "Detection & RF Attack Alerts": "Stop ACK",
+    "": "NODE_ABC: STOP_ACK:OK"
+  },
+  {
+    "Detection & RF Attack Alerts": "Wipe Token",
+    "": "NODE_ABC: WIPE_TOKEN:AH_12AB34CD_56EF78GH_1234567890"
+  },
+  {
+    "Detection & RF Attack Alerts": "Reboot ACK",
+    "": "NODE_ABC: REBOOT_ACK"
+  }
+]

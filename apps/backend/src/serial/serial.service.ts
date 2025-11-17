@@ -14,7 +14,7 @@ import { SerialPortStream } from '@serialport/stream';
 import { randomUUID } from 'crypto';
 import { Observable, Subject } from 'rxjs';
 
-import { createParser, ensureMeshtasticProtobufs, ProtocolKey } from './protocol-registry';
+import { createParser, ProtocolKey } from './protocol-registry';
 import {
   deserializeSerialParseResult,
   serializeSerialParseResult,
@@ -215,7 +215,7 @@ export interface QueueCommandRequest {
 export class SerialService implements OnModuleInit, OnModuleDestroy {
   private port?: SerialPortStream;
   private lineParser?: ReadlineParser;
-  private protocolParser: SerialProtocolParser = createParser('meshtastic-like');
+  private protocolParser: SerialProtocolParser = createParser('meshtastic-rewrite');
   private readonly incoming$ = new Subject<string>();
   private readonly parsed$ = new Subject<SerialParseResult>();
   private readonly logger = new Logger(SerialService.name);
@@ -316,8 +316,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       path: storedConfig.devicePath ?? this.configService.get<string>('serial.device'),
       baudRate: storedConfig.baud ?? this.configService.get<number>('serial.baudRate', 115200),
       delimiter: storedConfig.delimiter ?? this.configService.get<string>('serial.delimiter', '\n'),
-      protocol: (this.configService.get<string>('serial.protocol', 'meshtastic-like') ??
-        'meshtastic-like') as ProtocolKey,
+      protocol: (this.configService.get<string>('serial.protocol', 'meshtastic-rewrite') ??
+        'meshtastic-rewrite') as ProtocolKey,
     });
   }
 
@@ -417,8 +417,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         : [delimiter]
     ).filter((value, index, array) => array.indexOf(value) === index);
     const protocol = (options?.protocol ??
-      this.configService.get<string>('serial.protocol', 'meshtastic-like') ??
-      'meshtastic-like') as ProtocolKey;
+      this.configService.get<string>('serial.protocol', 'meshtastic-rewrite') ??
+      'meshtastic-rewrite') as ProtocolKey;
 
     const candidatePaths = await this.buildCandidatePaths(options?.path);
     if (candidatePaths.length === 0) {
@@ -535,12 +535,12 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       });
       this.consumeRate(this.globalRate, this.globalRateLimit);
       this.consumeRate(this.getTargetCounter(built.target), this.perTargetRateLimit);
-      const protocol = this.connectionOptions?.protocol ?? 'meshtastic-like';
+      const protocol = this.connectionOptions?.protocol ?? 'meshtastic-rewrite';
       const sendMode =
         this.configService.get<string>('serial.sendMode')?.toLowerCase() ?? 'protobuf';
       const hopLimit = this.configService.get<number>('serial.hopLimit');
 
-      if (protocol === 'meshtastic-like') {
+      if (protocol === 'meshtastic-rewrite') {
         if (sendMode === 'plain') {
           await this.writeLine(line);
           return;
@@ -873,9 +873,6 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       this.port.once('error', handleError);
     });
 
-    if (options.protocol === 'meshtastic-like') {
-      await ensureMeshtasticProtobufs();
-    }
     this.protocolParser = createParser(options.protocol);
     this.protocolParser.reset();
 

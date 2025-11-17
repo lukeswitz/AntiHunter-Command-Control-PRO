@@ -2,13 +2,23 @@
 const { ArgumentParser } = require('argparse');
 
 const parser = new ArgumentParser({ description: 'Serial drone telemetry simulator' });
-parser.add_argument('--base-url', { default: 'http://localhost:3000/api', help: 'Backend base URL' });
+parser.add_argument('--base-url', {
+  default: 'http://localhost:3000/api',
+  help: 'Backend base URL',
+});
 parser.add_argument('--token', { help: 'Bearer token (ADMIN)' });
-parser.add_argument('--mesh-prefix', { default: '1722', help: 'Forwarding prefix (e.g. router id)' });
+parser.add_argument('--mesh-prefix', {
+  default: '1722',
+  help: 'Forwarding prefix (e.g. router id)',
+});
 parser.add_argument('--node', { default: 'AH99', help: 'Mesh node (without NODE_ prefix)' });
 parser.add_argument('--node-lat', { type: 'float', default: 40.7138 });
 parser.add_argument('--node-lon', { type: 'float', default: -74.005 });
-parser.add_argument('--start-distance', { type: 'float', default: 1100, help: 'Initial drone distance from node in meters' });
+parser.add_argument('--start-distance', {
+  type: 'float',
+  default: 1100,
+  help: 'Initial drone distance from node in meters',
+});
 parser.add_argument('--start-spread', {
   type: 'float',
   default: 0.35,
@@ -25,14 +35,30 @@ parser.add_argument('--interval', '--message-interval', {
   type: 'int',
   help: 'Legacy single interval (ms) applied to all drones',
 });
-parser.add_argument('--interval-min', { type: 'int', default: 5000, help: 'Minimum per-drone interval (ms)' });
-parser.add_argument('--interval-max', { type: 'int', default: 5000, help: 'Maximum per-drone interval (ms)' });
+parser.add_argument('--interval-min', {
+  type: 'int',
+  default: 5000,
+  help: 'Minimum per-drone interval (ms)',
+});
+parser.add_argument('--interval-max', {
+  type: 'int',
+  default: 5000,
+  help: 'Maximum per-drone interval (ms)',
+});
 parser.add_argument('--speed-kmh', {
   type: 'float',
   help: 'Legacy single approach speed (km/h). Overrides min/max when provided.',
 });
-parser.add_argument('--speed-kmh-min', { type: 'float', default: 50, help: 'Minimum approach speed (km/h)' });
-parser.add_argument('--speed-kmh-max', { type: 'float', default: 70, help: 'Maximum approach speed (km/h)' });
+parser.add_argument('--speed-kmh-min', {
+  type: 'float',
+  default: 50,
+  help: 'Minimum approach speed (km/h)',
+});
+parser.add_argument('--speed-kmh-max', {
+  type: 'float',
+  default: 70,
+  help: 'Maximum approach speed (km/h)',
+});
 parser.add_argument('--altitude', { type: 'float', default: 120 });
 parser.add_argument('--altitude-step', { type: 'float', default: 0.4 });
 parser.add_argument('--speed', { type: 'float', default: 22 });
@@ -73,7 +99,12 @@ async function main() {
     throw new Error('Provide a MAC address via --mac or --macs');
   }
 
-  const intervalRange = resolveRange(args.legacy_interval, args.interval_min, args.interval_max, 5000);
+  const intervalRange = resolveRange(
+    args.legacy_interval,
+    args.interval_min,
+    args.interval_max,
+    5000,
+  );
   const speedRange = resolveRange(args.speed_kmh, args.speed_kmh_min, args.speed_kmh_max, 70);
 
   await scheduleSend(() =>
@@ -254,8 +285,7 @@ async function runDrone(drone, args, endpoint, nodeId, scheduleSend) {
   );
 
   for (let i = 0; i < args.iterations; i += 1) {
-    const metersPerStep =
-      (drone.approachSpeedKmh * 1000) / 3600 * (drone.intervalMs / 1000);
+    const metersPerStep = ((drone.approachSpeedKmh * 1000) / 3600) * (drone.intervalMs / 1000);
     const step = moveToward(drone.lat, drone.lon, args.node_lat, args.node_lon, metersPerStep);
     drone.lat = step.lat;
     drone.lon = step.lon;

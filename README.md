@@ -58,6 +58,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Tracking**: Every detection updates the live map with trails, heading vectors, RSSI pulses, and site-specific coloration. Inventory rows store the location history so you can pivot from console <-> map <-> export seamlessly.
 - **Triangulation**: Multi-node detection events feed the triangulation engine, capturing angle-of-arrival data set by the nodes. Results surface in the Targets module with exports for external tooling (e.g., CSV/GeoJSON) and can be reviewed in the map view as overlays.
 - **Exports & auditing**: Scan logs, triangulation snapshots, and detection histories are exportable from their respective modules, ensuring mission reporting and post-op analysis are one click away.
+
 ### Drone Awareness & FAA Enhancements
 
 #### Drone Tracker & Inventory Drawer
@@ -174,7 +175,7 @@ Each deployment runs its site-local C2 server and still functions if federation 
 
 | Surface             | Protocols & safeguards                                                                                                                     |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Device ingest**   | Serial (USB/UART) -> Meshtastic JSON/CBOR frames; optional signed frame validation; port selection locked behind RBAC.                      |
+| **Device ingest**   | Serial (USB/UART) -> Meshtastic JSON/CBOR frames; optional signed frame validation; port selection locked behind RBAC.                     |
 | **C2 API**          | HTTPS (configurable TLS certificates) + JWT auth; REST/WS share the same bearer token; role-aware guards on every controller.              |
 | **Federation**      | MQTT (mqtt://... mqtts://, ws://... wss://) with per-site client IDs, QoS 1, optional mutual TLS (CA/cert/key). Topics namespaced `ahcc/`. |
 | **Operator UI**     | HTTPS SPA; per-user preferences (theme, time format) stored server-side; alarm sounds served via signed URLs.                              |
@@ -302,7 +303,7 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | `HTTPS_ENABLED`                                                                | auto      | Forces the backend to expect TLS; otherwise inferred from cert paths. |
 | `HTTPS_KEY_PATH` / `HTTPS_CERT_PATH` / `HTTPS_CA_PATH` / `HTTPS_PASSPHRASE`    | _(unset)_ | PEM bundle + optional passphrase for in-process TLS.                  |
 | `HTTP_PREFIX`                                                                  | `api`     | Namespace for REST routes (useful when reverse proxying).             |
-| `HTTP_REDIRECT_PORT`                                                           | _(unset)_ | Enables HTTP->HTTPS redirects when running dual listeners.             |
+| `HTTP_REDIRECT_PORT`                                                           | _(unset)_ | Enables HTTP->HTTPS redirects when running dual listeners.            |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS.        |
 | `SITE_ID`                                                                      | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing.    |
 
@@ -517,7 +518,7 @@ SERIAL_RECONNECT_BASE_MS=1000
 SERIAL_RECONNECT_MAX_MS=15000
 SERIAL_RECONNECT_JITTER=0.2
 SERIAL_RECONNECT_MAX_ATTEMPTS=0
-SERIAL_PROTOCOL=meshtastic-like
+SERIAL_PROTOCOL=meshtastic-rewrite
 
 # Command protections
 ALLOW_FOREVER=true
@@ -526,35 +527,35 @@ ALLOW_ERASE_FORCE=false
 
 Optional environment flags:
 
-| Variable                  | Description                                                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `JWT_SECRET`              | If auth is enabled later                                                                                                     |
-| `SITE_ID`                 | Default site for ingest                                                                                                      |
-| `WS_MAX_CLIENTS`          | Socket.IO connection limit                                                                                                   |
-| `SERIAL_PROTOCOL`         | Parser profile (`meshtastic-like`, `nmea-like`, etc.)                                                                        |
-| `HTTPS_ENABLED`           | `true` to serve the backend over HTTPS                                                                                       |
-| `HTTPS_KEY_PATH`          | PEM private key path when HTTPS is enabled                                                                                   |
-| `HTTPS_CERT_PATH`         | PEM certificate (or chain) path for HTTPS                                                                                    |
-| `HTTPS_CA_PATH`           | Optional comma separated CA bundle paths                                                                                     |
-| `HTTPS_PASSPHRASE`        | Passphrase if the private key is encrypted                                                                                   |
-| `HTTP_REDIRECT_PORT`      | Optional plain HTTP listener that 301-redirects to HTTPS                                                                     |
-| `CLUSTER_WORKERS`         | Number of backend workers for cluster mode (default 1 = single process; leader + replicas when >1)                           |
-| `TAK_ENABLED`             | `true` to boot the TAK bridge automatically                                                                                  |
-| `TAK_PROTOCOL`            | TAK transport (`UDP`, `TCP`, or `HTTPS`)                                                                                     |
-| `TAK_HOST`                | TAK core hostname or IP                                                                                                      |
-| `TAK_PORT`                | Port that matches the TAK protocol (e.g., 6969/8088/8443)                                                                    |
-| `TAK_TLS`                 | `true` when TLS certificates are required                                                                                    |
-| `TAK_USERNAME`            | Optional basic-auth username for TAK gateways                                                                                |
-| `TAK_PASSWORD`            | Optional basic-auth password (otherwise set via UI)                                                                          |
-| `TAK_API_KEY`             | Optional API key for HTTPS-based TAK cores                                                                                   |
-| `TWO_FACTOR_ISSUER`       | Label shown in authenticator apps (default `AntiHunter Command Center`)                                                      |
-| `TWO_FACTOR_TOKEN_EXPIRY` | Lifetime of the temporary two-factor challenge token (default `10m`)                                                         |
-| `TWO_FACTOR_WINDOW`       | Allowed OTP drift window (number of 30s steps, default `1`)                                                                  |
-| `TWO_FACTOR_SECRET_KEY`   | 32+ character passphrase used to encrypt stored authenticator secrets (AES-256-GCM). Leave unset only for local development. |
-| `DRONES_RECORD_INVENTORY` | `true` to auto-create/update inventory entries whenever a drone telemetry frame contains a MAC address + reporting node.    |
-| `FAA_ONLINE_LOOKUP_ENABLED` | Set to `false` to force offline-only FAA lookups (default `true`).                                                         |
-| `FAA_ONLINE_CACHE_TTL_MINUTES` | Minutes to cache positive FAA matches returned from the uasdoc API (default `60`).                                      |
-| `FAA_ONLINE_LOOKUP_COOLDOWN_MINUTES` | Per-RID/MAC cooldown between online lookup attempts (default `10`).                                              |
+| Variable                             | Description                                                                                                                  |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `JWT_SECRET`                         | If auth is enabled later                                                                                                     |
+| `SITE_ID`                            | Default site for ingest                                                                                                      |
+| `WS_MAX_CLIENTS`                     | Socket.IO connection limit                                                                                                   |
+| `SERIAL_PROTOCOL`                    | Parser profile (`meshtastic-rewrite`, `nmea-like`, etc.)                                                                     |
+| `HTTPS_ENABLED`                      | `true` to serve the backend over HTTPS                                                                                       |
+| `HTTPS_KEY_PATH`                     | PEM private key path when HTTPS is enabled                                                                                   |
+| `HTTPS_CERT_PATH`                    | PEM certificate (or chain) path for HTTPS                                                                                    |
+| `HTTPS_CA_PATH`                      | Optional comma separated CA bundle paths                                                                                     |
+| `HTTPS_PASSPHRASE`                   | Passphrase if the private key is encrypted                                                                                   |
+| `HTTP_REDIRECT_PORT`                 | Optional plain HTTP listener that 301-redirects to HTTPS                                                                     |
+| `CLUSTER_WORKERS`                    | Number of backend workers for cluster mode (default 1 = single process; leader + replicas when >1)                           |
+| `TAK_ENABLED`                        | `true` to boot the TAK bridge automatically                                                                                  |
+| `TAK_PROTOCOL`                       | TAK transport (`UDP`, `TCP`, or `HTTPS`)                                                                                     |
+| `TAK_HOST`                           | TAK core hostname or IP                                                                                                      |
+| `TAK_PORT`                           | Port that matches the TAK protocol (e.g., 6969/8088/8443)                                                                    |
+| `TAK_TLS`                            | `true` when TLS certificates are required                                                                                    |
+| `TAK_USERNAME`                       | Optional basic-auth username for TAK gateways                                                                                |
+| `TAK_PASSWORD`                       | Optional basic-auth password (otherwise set via UI)                                                                          |
+| `TAK_API_KEY`                        | Optional API key for HTTPS-based TAK cores                                                                                   |
+| `TWO_FACTOR_ISSUER`                  | Label shown in authenticator apps (default `AntiHunter Command Center`)                                                      |
+| `TWO_FACTOR_TOKEN_EXPIRY`            | Lifetime of the temporary two-factor challenge token (default `10m`)                                                         |
+| `TWO_FACTOR_WINDOW`                  | Allowed OTP drift window (number of 30s steps, default `1`)                                                                  |
+| `TWO_FACTOR_SECRET_KEY`              | 32+ character passphrase used to encrypt stored authenticator secrets (AES-256-GCM). Leave unset only for local development. |
+| `DRONES_RECORD_INVENTORY`            | `true` to auto-create/update inventory entries whenever a drone telemetry frame contains a MAC address + reporting node.     |
+| `FAA_ONLINE_LOOKUP_ENABLED`          | Set to `false` to force offline-only FAA lookups (default `true`).                                                           |
+| `FAA_ONLINE_CACHE_TTL_MINUTES`       | Minutes to cache positive FAA matches returned from the uasdoc API (default `60`).                                           |
+| `FAA_ONLINE_LOOKUP_COOLDOWN_MINUTES` | Per-RID/MAC cooldown between online lookup attempts (default `10`).                                                          |
 
 Frontend currently consumes backend settings via API, so no extra `.env` is needed.
 
@@ -1122,17 +1123,17 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 
 ## Useful Scripts
 
-| Command                                               | Description                                                               |
-| ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| `pnpm AHCC`                                           | Boots the backend + frontend dev servers in parallel (`pnpm -r --parallel dev`). |
-| `pnpm lint`                                           | ESLint across backend + frontend                                          |
-| `pnpm format`                                         | Prettier writes                                                           |
-| `pnpm --filter @command-center/backend prisma:studio` | Inspect DB via Prisma Studio                                              |
-| `pnpm --filter @command-center/backend prisma:seed`   | Reseed config rows                                                        |
-| `pnpm seed`                                           | Shortcut to seed default admin (requires pnpm on host)                    |
-| `pnpm update-db` (or `node scripts/db-update-helper.mjs`) | Auto-detects DB state, baselines existing schemas, removes duplicate CREATE TABLE migrations, runs `prisma migrate deploy`, and surfaces drift guidance |
-| `pnpm --filter @command-center/frontend preview`      | Preview SPA production build                                              |
-| `pnpm exec node scripts/drone-simulator.cjs --token "<JWT>" [options]` | Push simulated mesh lines (node bootstrap + drone telemetry) into `/api/serial/simulate` for end-to-end testing. |
+| Command                                                                | Description                                                                                                                                             |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm AHCC`                                                            | Boots the backend + frontend dev servers in parallel (`pnpm -r --parallel dev`).                                                                        |
+| `pnpm lint`                                                            | ESLint across backend + frontend                                                                                                                        |
+| `pnpm format`                                                          | Prettier writes                                                                                                                                         |
+| `pnpm --filter @command-center/backend prisma:studio`                  | Inspect DB via Prisma Studio                                                                                                                            |
+| `pnpm --filter @command-center/backend prisma:seed`                    | Reseed config rows                                                                                                                                      |
+| `pnpm seed`                                                            | Shortcut to seed default admin (requires pnpm on host)                                                                                                  |
+| `pnpm update-db` (or `node scripts/db-update-helper.mjs`)              | Auto-detects DB state, baselines existing schemas, removes duplicate CREATE TABLE migrations, runs `prisma migrate deploy`, and surfaces drift guidance |
+| `pnpm --filter @command-center/frontend preview`                       | Preview SPA production build                                                                                                                            |
+| `pnpm exec node scripts/drone-simulator.cjs --token "<JWT>" [options]` | Push simulated mesh lines (node bootstrap + drone telemetry) into `/api/serial/simulate` for end-to-end testing.                                        |
 
 ### Drone simulator usage
 
@@ -1167,6 +1168,7 @@ When preparing a gateway node, open the Meshtastic device settings and enable **
 > ```bash
 > docker compose exec backend sh -lc "cd /app && pnpm --filter @command-center/backend prisma:seed"
 > ```
+
 ## Operations & Maintenance
 
 - **Clearing nodes:** The UI invokes `DELETE /nodes`, which now removes rows from `Node`, `NodePosition`, `NodeCoverageOverride`, and `TriangulationResult` tables in addition to clearing the in-memory cache. This prevents stale nodes from reappearing when new telemetry arrives.
@@ -1220,8 +1222,3 @@ THE SOFTWARE IS PROVIDED AS IS AND AS AVAILABLE, WITHOUT WARRANTY OF ANY KIND, E
 You alone are responsible for ensuring your deployment complies with all applicable laws, regulations, licenses, permits, organizational policies, and third-party rights. No advice or information, whether oral or written, obtained from the project or through the Software, creates any warranty or obligation not expressly stated in this disclaimer. Continued use signifies your agreement to indemnify and hold harmless the authors, developers, maintainers, and contributors from claims arising out of or related to your activities with the Software.
 
 If you do not agree to these terms, **do not build, deploy, or run** AntiHunter Command & Control PRO.
-
-
-
-
-
