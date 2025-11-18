@@ -90,6 +90,14 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - `scripts/drone-simulator.cjs` posts fully formatted mesh lines to `/api/serial/simulate`, bootstraps a node, and streams drone telemetry (drone + operator positions) every 5 s. Supply an ADMIN JWT via `--token` to drive end-to-end tests without field hardware—see [Useful Scripts](#useful-scripts) for usage.
 - The simulator supports real RID/MAC lists, adjustable speeds, and node/operator geometry. Because it mirrors the on-air payload format, every downstream parser (inventory, FAA lookup, alarms, MQTT) exercises the exact same code path you get from the live mesh.
 
+### Alert Automation & Integrations
+
+- **Custom Alerts module**: build rules that match MACs, OUI prefixes, SSIDs, channels, RSSI windows, or inventory devices. Each rule controls its own alarm level, optional audible, and map styling (color, icon, blink, label). Promotions from Inventory drop straight into rule criteria so analysts can set up a watch list in seconds.
+- **Alert Event Log**: the Alerts nav rail contains an Event Log page that mirrors Config’s layout—dark rail on the left, stacked cards on the right—so you can filter, search, and acknowledge past alert hits without leaving the module.
+- **Webhook engine**: alert matches, inventory updates, node telemetry, and raw serial traffic can fan out to HTTPS endpoints with optional mutual TLS (CA bundle + client cert/key) and HMAC signatures. Hooks are configured under **Config → Webhooks** with inline testing, per-event subscription toggles, and automatic delivery logging.
+- **Secure runtime**: webhook dispatchers let you disable TLS validation for lab setups or enforce full-chain verification in production. Client certificates and private keys are stored encrypted in the database, and Prisma migrations now cover inventory update events plus serial/raw tap targets.
+- **Operator UX**: the Alerts, Config, and Addons pages now share the same shell (sidebar buttons outside the card, stacked sections within) so the experience is consistent no matter which subsystem you configure.
+
 ### UI Modules at a Glance
 
 Each primary view ships with rich operator context.
