@@ -39,7 +39,7 @@ interface WebhookFormState {
   shareWithEveryone: boolean;
   subscribedEvents: string[];
   verifyTls: boolean;
-  clientCert: string;
+  clientCertificate: string;
   clientKey: string;
   caBundle: string;
 }
@@ -52,7 +52,7 @@ const DEFAULT_FORM_STATE: WebhookFormState = {
   shareWithEveryone: false,
   subscribedEvents: ['ALERT_TRIGGERED'],
   verifyTls: true,
-  clientCert: '',
+  clientCertificate: '',
   clientKey: '',
   caBundle: '',
 };
@@ -117,7 +117,7 @@ export function WebhooksSection() {
         ? webhook.subscribedEvents
         : ['ALERT_TRIGGERED'],
       verifyTls: webhook.verifyTls ?? true,
-      clientCert: webhook.clientCertificate ?? '',
+      clientCertificate: webhook.clientCertificate ?? '',
       clientKey: webhook.clientKey ?? '',
       caBundle: webhook.caBundle ?? '',
     });
@@ -134,7 +134,7 @@ export function WebhooksSection() {
         shareWithEveryone: formState.shareWithEveryone,
         subscribedEvents: formState.subscribedEvents,
         verifyTls: formState.verifyTls,
-        clientCertificate: formState.clientCert,
+        clientCertificate: formState.clientCertificate,
         clientKey: formState.clientKey,
         caBundle: formState.caBundle,
       });
@@ -149,7 +149,7 @@ export function WebhooksSection() {
           shareWithEveryone: formState.shareWithEveryone,
           subscribedEvents: formState.subscribedEvents,
           verifyTls: formState.verifyTls,
-          clientCertificate: formState.clientCert,
+          clientCertificate: formState.clientCertificate,
           clientKey: formState.clientKey,
           caBundle: formState.caBundle,
         },
@@ -350,9 +350,12 @@ export function WebhooksSection() {
                   className="control-input"
                   rows={4}
                   placeholder="-----BEGIN CERTIFICATE-----"
-                  value={formState.clientCert}
+                  value={formState.clientCertificate}
                   onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, clientCert: event.target.value }))
+                    setFormState((prev) => ({
+                      ...prev,
+                      clientCertificate: event.target.value,
+                    }))
                   }
                 />
               </label>

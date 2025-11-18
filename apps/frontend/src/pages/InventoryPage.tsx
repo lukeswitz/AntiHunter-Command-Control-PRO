@@ -524,14 +524,17 @@ function InventoryAnalyticsDialog({ devices, onClose }: InventoryAnalyticsDialog
             <h3>Signal quality snapshot</h3>
           </header>
           <ul className="inventory-analytics__list inventory-analytics__list--inline">
-            {analytics.rssiBuckets.map((bucket) => (
-              <li key={bucket.label}>
-                <span>{bucket.label}</span>
-                <strong>
-                  {bucket.value} ({bucket.percent.toFixed(1)}%)
-                </strong>
-              </li>
-            ))}
+            {analytics.rssiBuckets.map((bucket) => {
+              const percent = typeof bucket.percent === 'number' ? bucket.percent : 0;
+              return (
+                <li key={bucket.label}>
+                  <span>{bucket.label}</span>
+                  <strong>
+                    {bucket.value} ({percent.toFixed(1)}%)
+                  </strong>
+                </li>
+              );
+            })}
           </ul>
         </section>
 

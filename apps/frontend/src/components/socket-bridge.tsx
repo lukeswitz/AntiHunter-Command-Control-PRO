@@ -633,9 +633,11 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
           : typeof (base as { severity?: string }).severity === 'string'
             ? ((base as { severity?: string }).severity as string).toUpperCase()
             : 'ALERT';
+      const ruleName = (base as { ruleName?: string }).ruleName;
+      const ruleId = (base as { ruleId?: string }).ruleId;
       const message =
         base.message ??
-        `Alert rule ${typeof (base as { ruleName?: string }).ruleName === 'string' ? (base as { ruleName?: string }).ruleName : (base.ruleId ?? '')} triggered`;
+        `Alert rule ${typeof ruleName === 'string' ? ruleName : typeof ruleId === 'string' ? ruleId : 'event'} triggered`;
       return {
         message,
         level: alarmLevelToTerminal(severity as AlarmLevel),
