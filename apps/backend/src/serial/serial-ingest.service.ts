@@ -162,8 +162,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           await this.nodesService.upsert({
             id: event.nodeId,
             name: event.nodeId,
-            lat: event.lat,
-            lon: event.lon,
+            lat: event.lat ?? 0,
+            lon: event.lon ?? 0,
             lastMessage: event.lastMessage,
             ts: event.timestamp ?? new Date(),
             lastSeen: event.timestamp ?? new Date(),
@@ -175,8 +175,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           this.gateway.emitEvent({
             type: 'node.telemetry',
             nodeId: event.nodeId,
-            lat: event.lat,
-            lon: event.lon,
+            lat: event.lat ?? 0,
+            lon: event.lon ?? 0,
             raw: event.raw,
             siteId,
             temperatureC: event.temperatureC ?? null,
