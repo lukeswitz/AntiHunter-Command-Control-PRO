@@ -710,7 +710,7 @@ export function CommandCenterMap({
             : null;
         const heading = computeHeadingFromTrail(trailPoints);
         const viewCone =
-          heading !== null ? buildViewCone(drone.lat, drone.lon, heading, 100, 20) : null;
+          heading !== null ? buildViewCone(drone.lat, drone.lon, heading, 500, 20) : null;
         const hasOperator =
           typeof drone.operatorLat === 'number' &&
           Number.isFinite(drone.operatorLat) &&
