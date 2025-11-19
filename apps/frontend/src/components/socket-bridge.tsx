@@ -23,6 +23,7 @@ const NOTIFICATION_CATEGORIES = new Set(['gps', 'status', 'console']);
 const DEVICE_LINE_REGEX =
   /^(?:[A-Za-z0-9_-]+):?\s*DEVICE:(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}(?:\s+[A-Za-z0-9]+)?\s+-?\d+/i;
 const DEVICE_FALLBACK_REGEX = /^[A-Za-z0-9_-]+\s+DEVICE:?$/i;
+const HTTP_LINK_REGEX = /^https?:\/\//i;
 
 type TerminalEntryInput = Omit<TerminalEntry, 'id' | 'timestamp'> & { timestamp?: string };
 
@@ -535,8 +536,8 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
       const levelRaw = typeof base.level === 'string' ? base.level.toUpperCase() : undefined;
       const category = typeof base.category === 'string' ? base.category.toLowerCase() : undefined;
 
-      const message = base.message ?? `Alert from ${base.nodeId ?? 'unknown node'}`;
-      const messageUpper = message.toUpperCase();
+      const baseMessage = base.message ?? `Alert from ${base.nodeId ?? 'unknown node'}`;
+      const messageUpper = baseMessage.toUpperCase();
 
       let terminalLevel = alarmLevelToTerminal(levelRaw as AlarmLevel | undefined);
       let isNotification =
@@ -556,7 +557,7 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
       const deviceTextCandidate =
         (typeof base.raw === 'string' && base.raw) ||
         (typeof base.line === 'string' && base.line) ||
-        message;
+        baseMessage;
       const looksLikeDeviceNotification =
         isNotification &&
         deviceTextCandidate &&
@@ -565,7 +566,7 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
         (!category || category === 'status' || category === 'console');
       if (looksLikeDeviceNotification) {
         return {
-          message: message ?? deviceTextCandidate ?? 'Device event',
+          message: baseMessage ?? deviceTextCandidate ?? 'Device event',
           level: 'info',
           source: 'raw',
           timestamp: typeof base.timestamp === 'string' ? base.timestamp : undefined,
@@ -574,12 +575,19 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
       }
 
       const source = isNotification ? 'notification' : 'alert';
+      const dataRecord =
+        base.data && typeof base.data === 'object' ? (base.data as Record<string, unknown>) : null;
+      const linkCandidate =
+        dataRecord && typeof dataRecord.link === 'string' ? dataRecord.link.trim() : undefined;
+      const link = linkCandidate && HTTP_LINK_REGEX.test(linkCandidate) ? linkCandidate : undefined;
+      const message = link && !baseMessage.includes(link) ? `${baseMessage}\n${link}` : baseMessage;
       return {
         message,
         level: terminalLevel,
         source,
         timestamp: typeof base.timestamp === 'string' ? base.timestamp : undefined,
         siteId: base.siteId,
+        link,
       };
     }
 

@@ -110,7 +110,10 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 
 ### UI Modules at a Glance
 
-Each primary view ships with rich operator context.
+Each primary view ships with rich operator context. The screenshots below were refreshed for the
+November 2025 UI pass, so what you see matches the latest drone cones, triangulation overlays,
+inventory analytics, and addons layout that (a) landed in this repo and (b) shipped with the image
+assets now stored under `images/`.
 
 #### Map
 
@@ -162,7 +165,7 @@ Adjust system defaults (alarms, detection presets, serial ports, site federation
 
 #### Addons
 
-Enable or disable optional modules (Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment.
+Enable or disable optional modules (Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment. The updated capture shows the Addons catalog card, feature summaries, and the new badge callouts for beta-grade modules.
 
 ![Addons management](images/addons.png)
 

@@ -26,6 +26,7 @@ type TerminalEntryInput = {
   level: TerminalLevel;
   source: string;
   timestamp?: string;
+  link?: string;
 };
 
 const defaultCommand = MESH_COMMANDS[0];
@@ -352,11 +353,13 @@ export function CommandConsolePage() {
     return Array.from(dedup.values());
   }, [availableNodes, form.siteId]);
 
+  const singleNodeCommands = useMemo(() => new Set(['CONFIG_NODEID', 'TRIANGULATE_START']), []);
+  const isSingleNodeCommand = singleNodeCommands.has(selectedCommand.name);
+
   const targetOptions = useMemo<NodeCommandOption[]>(() => {
-    const options: NodeCommandOption[] = [
-      { value: '@ALL', label: '@ALL (broadcast)' },
-      ...nodeCommandTargets,
-    ];
+    const options: NodeCommandOption[] = isSingleNodeCommand
+      ? [...nodeCommandTargets]
+      : [{ value: '@ALL', label: '@ALL (broadcast)' }, ...nodeCommandTargets];
 
     if (
       form.target &&
@@ -368,7 +371,7 @@ export function CommandConsolePage() {
     }
 
     return options;
-  }, [nodeCommandTargets, form.target, form.siteId]);
+  }, [nodeCommandTargets, form.target, form.siteId, isSingleNodeCommand]);
   const selectedTargetOption = useMemo(
     () => targetOptions.find((option) => option.value === form.target),
     [targetOptions, form.target],
@@ -384,15 +387,14 @@ export function CommandConsolePage() {
     if (selectedTargetValue) {
       return;
     }
-    setForm((prev) =>
-      prev.target === '@ALL'
-        ? prev
-        : {
-            ...prev,
-            target: '@ALL',
-          },
-    );
-  }, [selectedTargetValue]);
+    setForm((prev) => {
+      if (isSingleNodeCommand) {
+        const fallback = targetOptions[0]?.value ?? '@ALL';
+        return prev.target === fallback ? prev : { ...prev, target: fallback };
+      }
+      return prev.target === '@ALL' ? prev : { ...prev, target: '@ALL' };
+    });
+  }, [selectedTargetValue, isSingleNodeCommand, targetOptions]);
 
   useEffect(() => {
     if (

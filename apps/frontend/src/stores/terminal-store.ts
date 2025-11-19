@@ -9,6 +9,7 @@ export interface TerminalEntry {
   level: TerminalLevel;
   source?: string;
   siteId?: string;
+  link?: string;
 }
 
 interface TerminalStore {
@@ -32,7 +33,8 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
         last.level === nextEntry.level &&
         last.source === nextEntry.source &&
         last.siteId === nextEntry.siteId &&
-        last.message === nextEntry.message
+        last.message === nextEntry.message &&
+        last.link === nextEntry.link
       ) {
         return state;
       }
