@@ -1,4 +1,5 @@
 import classNames from 'clsx';
+import { useEffect, useState } from 'react';
 
 import type { DroneStatus, FaaAircraftSummary } from '../api/types';
 import type { DroneMarker } from '../stores/drone-store';
@@ -31,11 +32,22 @@ export function DroneFloatingCard({
   isStatusUpdating,
   canManage = false,
 }: DroneFloatingCardProps) {
-  if (drones.length === 0) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [frozenDrones, setFrozenDrones] = useState<DroneMarker[]>(drones);
+
+  useEffect(() => {
+    if (!editingId) {
+      setFrozenDrones(drones);
+    }
+  }, [drones, editingId]);
+
+  if (drones.length === 0 && frozenDrones.length === 0) {
     return null;
   }
 
-  const statusCounts = drones.reduce<Record<DroneStatus, number>>(
+  const displayDrones = editingId ? frozenDrones : drones;
+
+  const statusCounts = displayDrones.reduce<Record<DroneStatus, number>>(
     (acc, drone) => {
       acc[drone.status] = (acc[drone.status] ?? 0) + 1;
       return acc;
@@ -48,7 +60,7 @@ export function DroneFloatingCard({
     },
   );
 
-  const sortedDrones = [...drones].sort(
+  const sortedDrones = [...displayDrones].sort(
     (a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime(),
   );
 
@@ -63,7 +75,7 @@ export function DroneFloatingCard({
         <div>
           <h3>Drone Tracker & Inventory</h3>
           <p className="muted">
-            {drones.length} detected / Updated{' '}
+            {displayDrones.length} detected / Updated{' '}
             {freshestDrone ? formatRelativeTime(freshestDrone.lastSeen, 'short') : 'unknown'}
           </p>
         </div>
@@ -125,9 +137,19 @@ export function DroneFloatingCard({
                             className="control-input drone-floating-card__status-select"
                             value={drone.status}
                             onClick={(event) => event.stopPropagation()}
-                            onChange={(event) =>
-                              onStatusChange(drone.id, event.target.value as DroneStatus)
+                            onFocus={() => setEditingId(drone.id)}
+                            onBlur={() =>
+                              setEditingId((current) => (current === drone.id ? null : current))
                             }
+                            onChange={(event) => {
+                              const nextStatus = event.target.value as DroneStatus;
+                              setFrozenDrones((prev) =>
+                                prev.map((item) =>
+                                  item.id === drone.id ? { ...item, status: nextStatus } : item,
+                                ),
+                              );
+                              onStatusChange(drone.id, nextStatus);
+                            }}
                             disabled={isStatusUpdating?.(drone.id)}
                           >
                             {statusOptions.map((option) => (
