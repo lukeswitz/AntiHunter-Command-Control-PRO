@@ -19,6 +19,7 @@ type InventorySortKey =
   | 'maxRssi'
   | 'minRssi'
   | 'avgRssi'
+  | 'site'
   | 'lastNode'
   | 'lastLat';
 
@@ -55,6 +56,24 @@ export function InventoryPage() {
     queryKey: ['sites'],
     queryFn: async () => apiClient.get<SiteSummary[]>('/sites'),
   });
+  const siteLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    (sitesData ?? []).forEach((site) => {
+      if (site.id) {
+        map.set(site.id, site.name ?? site.id);
+      }
+    });
+    return map;
+  }, [sitesData]);
+  const resolveSiteLabel = useCallback(
+    (siteId?: string | null) => {
+      if (!siteId) {
+        return 'Unassigned';
+      }
+      return siteLookup.get(siteId) ?? siteId;
+    },
+    [siteLookup],
+  );
 
   useEffect(() => {
     const hasResults = Array.isArray(data) && data.length > 0;
@@ -125,10 +144,10 @@ export function InventoryPage() {
     }
     const multiplier = sortDirection === 'asc' ? 1 : -1;
     return [...data].sort((a, b) => {
-      const result = compareInventoryDevices(a, b, sortKey);
+      const result = compareInventoryDevices(a, b, sortKey, siteLookup);
       return result * multiplier;
     });
-  }, [data, sortDirection, sortKey]);
+  }, [data, sortDirection, sortKey, siteLookup]);
 
   const handleSort = (key: InventorySortKey) => {
     if (sortKey === key) {
@@ -309,6 +328,15 @@ export function InventoryPage() {
                     Last Node {renderSortIcon('lastNode')}
                   </button>
                 </th>
+                <th aria-sort={ariaSort('site')}>
+                  <button
+                    type="button"
+                    className="table-sort"
+                    onClick={() => handleSort('site')}
+                  >
+                    Site {renderSortIcon('site')}
+                  </button>
+                </th>
                 <th aria-sort={ariaSort('lastLat')}>
                   <button
                     type="button"
@@ -346,6 +374,7 @@ export function InventoryPage() {
                         .join(' / ') || 'N/A'}
                     </td>
                     <td>{device.lastNodeId ?? 'N/A'}</td>
+                    <td>{resolveSiteLabel(device.siteId)}</td>
                     <td>
                       {locationKnown
                         ? `${device.lastLat!.toFixed(5)}, ${device.lastLon!.toFixed(5)}`
@@ -933,7 +962,12 @@ function computeInventoryAnalytics(devices: InventoryDevice[]) {
     siteStats,
   };
 }
-function compareInventoryDevices(a: InventoryDevice, b: InventoryDevice, key: InventorySortKey) {
+function compareInventoryDevices(
+  a: InventoryDevice,
+  b: InventoryDevice,
+  key: InventorySortKey,
+  siteLookup?: Map<string, string>,
+) {
   switch (key) {
     case 'mac':
       return compareStrings(a.mac, b.mac);
@@ -958,6 +992,11 @@ function compareInventoryDevices(a: InventoryDevice, b: InventoryDevice, key: In
       return compareNumbers(a.minRSSI, b.minRSSI);
     case 'avgRssi':
       return compareNumbers(a.avgRSSI ?? null, b.avgRSSI ?? null);
+    case 'site': {
+      const labelA = resolveSiteSortLabel(a.siteId, siteLookup);
+      const labelB = resolveSiteSortLabel(b.siteId, siteLookup);
+      return compareStrings(labelA, labelB);
+    }
     case 'lastNode':
       return compareStrings(a.lastNodeId, b.lastNodeId);
     case 'lastLat':
@@ -965,6 +1004,13 @@ function compareInventoryDevices(a: InventoryDevice, b: InventoryDevice, key: In
     default:
       return 0;
   }
+}
+
+function resolveSiteSortLabel(siteId?: string | null, siteLookup?: Map<string, string>) {
+  if (!siteId) {
+    return 'Unassigned';
+  }
+  return siteLookup?.get(siteId) ?? siteId;
 }
 
 function compareStrings(a?: string | null, b?: string | null): number {

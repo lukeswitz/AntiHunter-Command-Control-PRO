@@ -18,6 +18,7 @@ import type { GeofenceEvent } from '../stores/geofence-store';
 import { canonicalNodeId, NodeDiffPayload, NodeSummary, useNodeStore } from '../stores/node-store';
 import { TerminalEntry, TerminalLevel, useTerminalStore } from '../stores/terminal-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
+import { useTriangulationStore } from '../stores/triangulation-store';
 
 const NOTIFICATION_CATEGORIES = new Set(['gps', 'status', 'console']);
 const DEVICE_LINE_REGEX =
@@ -582,6 +583,13 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
         dataRecord && typeof dataRecord.link === 'string' ? dataRecord.link.trim() : undefined;
       const link = linkCandidate && HTTP_LINK_REGEX.test(linkCandidate) ? linkCandidate : undefined;
       const message = link && !baseMessage.includes(link) ? `${baseMessage}\n${link}` : baseMessage;
+
+      if (category === 'triangulation' && dataRecord) {
+        const mac = typeof dataRecord.mac === 'string' ? dataRecord.mac.toUpperCase() : undefined;
+        const lat = typeof dataRecord.lat === 'number' ? dataRecord.lat : undefined;
+        const lon = typeof dataRecord.lon === 'number' ? dataRecord.lon : undefined;
+        useTriangulationStore.getState().complete({ mac, lat, lon, link });
+      }
       return {
         message,
         level: terminalLevel,

@@ -6,6 +6,8 @@ import type { CommandRequest, InventoryDevice, Target } from '../api/types';
 import { useAuthStore } from '../stores/auth-store';
 import { useTargetStore } from '../stores/target-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
+import { useTriangulationStore } from '../stores/triangulation-store';
+import { useTrackingBannerStore } from '../stores/tracking-banner-store';
 
 const DEFAULT_TRIANGULATION_DURATION = 300;
 const DEFAULT_SCAN_DURATION = 60;
@@ -74,6 +76,8 @@ export function TargetsPage() {
   const trackingTimeouts = useRef<Record<string, number>>({});
   const [triangulateLocked, setTriangulateLocked] = useState(false);
   const triangulateCooldownRef = useRef<number | null>(null);
+  const startTriangulationCountdown = useTriangulationStore((state) => state.setCountdown);
+  const startTrackingCountdown = useTrackingBannerStore((state) => state.setCountdown);
   useEffect(() => {
     return () => {
       Object.values(trackingTimeouts.current).forEach((timeoutId) => {
@@ -174,16 +178,23 @@ export function TargetsPage() {
       if (!target.mac) {
         throw new Error('Target MAC unknown');
       }
+      const commandTarget = normalizeNodeTarget(target.firstNodeId);
+      if (!commandTarget || commandTarget === '@ALL') {
+        throw new Error('First detecting node unknown; cannot start remote tracking.');
+      }
+      const siteId = target.siteId ?? undefined;
       await sendCommand({
-        target: '@ALL',
+        target: commandTarget,
         name: 'CONFIG_TARGETS',
         params: [target.mac],
+        siteId,
       });
       await new Promise((resolve) => setTimeout(resolve, 2000));
       await sendCommand({
-        target: '@ALL',
+        target: commandTarget,
         name: 'SCAN_START',
         params: ['2', String(duration), '1,6,11'],
+        siteId,
       });
     },
     onSuccess: (_result, variables) => {
@@ -196,6 +207,7 @@ export function TargetsPage() {
           label: variables.target.name ?? variables.target.mac ?? variables.target.id,
           duration,
         });
+        startTrackingCountdown(variables.target.mac, duration);
       }
       scheduleAutoStop(variables.target, duration);
     },
@@ -228,7 +240,11 @@ export function TargetsPage() {
       return;
     }
     const duration = Math.max(30, Math.min(1800, Math.round(parsed)));
-    triangulateMutation.mutate({ target, duration });
+    triangulateMutation.mutate(
+      { target, duration },
+      { onSuccess: (res) => startTriangulationCountdown(target.mac!, duration) },
+    );
+    // fallback if mutate doesn't call onSuccess (e.g., network error handled by mutation)
     beginTriangulateCooldown();
   };
 

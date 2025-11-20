@@ -13,6 +13,7 @@ import { useAuthStore } from '../stores/auth-store';
 import { NodeSummary, useNodeStore } from '../stores/node-store';
 import { useTemplateStore, CommandTemplate } from '../stores/template-store';
 import { TerminalLevel, useTerminalStore } from '../stores/terminal-store';
+import { useTriangulationStore } from '../stores/triangulation-store';
 
 type CommandFormState = {
   target: string;
@@ -235,6 +236,8 @@ export function CommandConsolePage() {
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [triangulateLocked, setTriangulateLocked] = useState(false);
   const triangulateCooldownRef = useRef<number | null>(null);
+  const startTriangulationCountdown = useTriangulationStore((state) => state.setCountdown);
+  const pendingTriangulation = useRef<{ mac?: string; duration?: number } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -352,6 +355,17 @@ export function CommandConsolePage() {
         source: 'command',
       };
       addEntry(entry);
+      if (
+        data.name === 'TRIANGULATE_START' &&
+        pendingTriangulation.current?.mac &&
+        Number.isFinite(pendingTriangulation.current?.duration)
+      ) {
+        startTriangulationCountdown(
+          pendingTriangulation.current.mac,
+          pendingTriangulation.current.duration as number,
+        );
+      }
+      pendingTriangulation.current = null;
     },
     onError: (error: unknown) => {
       const entry: TerminalEntryInput = {
@@ -544,6 +558,10 @@ export function CommandConsolePage() {
 
     if (isTriangulateCommand) {
       beginTriangulateCooldown();
+      const macParam =
+        paramsForCommand.length > 0 ? paramsForCommand[0].toUpperCase().trim() : undefined;
+      const durationParam = paramsForCommand.length > 1 ? Number(paramsForCommand[1]) : undefined;
+      pendingTriangulation.current = { mac: macParam, duration: durationParam };
     }
     mutation.mutate({
       target: trimmedTarget,

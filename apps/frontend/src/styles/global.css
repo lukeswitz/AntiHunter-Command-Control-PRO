@@ -4856,3 +4856,23 @@ body.theme-dark .strategy-table__row--selected {
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.7);
 }
+.app-header__triangulation {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: center;
+  flex: 1;
+  color: #9ca3af;
+  font-weight: 600;
+}
+.app-header__triangulation-label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.app-header__triangulation-countdown {
+  background: rgba(156, 163, 175, 0.15);
+  border: 1px solid rgba(156, 163, 175, 0.4);
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
