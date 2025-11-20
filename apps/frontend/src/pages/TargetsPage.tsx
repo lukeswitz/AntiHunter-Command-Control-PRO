@@ -77,7 +77,7 @@ export function TargetsPage() {
   const [triangulateLocked, setTriangulateLocked] = useState(false);
   const triangulateCooldownRef = useRef<number | null>(null);
   const startTriangulationCountdown = useTriangulationStore((state) => state.setCountdown);
-  const startTrackingCountdown = useTrackingBannerStore((state) => state.setCountdown);
+  const requestTrackingCountdown = useTrackingBannerStore((state) => state.requestCountdown);
   useEffect(() => {
     return () => {
       Object.values(trackingTimeouts.current).forEach((timeoutId) => {
@@ -207,7 +207,7 @@ export function TargetsPage() {
           label: variables.target.name ?? variables.target.mac ?? variables.target.id,
           duration,
         });
-        startTrackingCountdown(variables.target.mac, duration);
+        requestTrackingCountdown(variables.target.mac, duration);
       }
       scheduleAutoStop(variables.target, duration);
     },

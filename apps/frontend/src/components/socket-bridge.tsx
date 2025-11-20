@@ -19,6 +19,7 @@ import { canonicalNodeId, NodeDiffPayload, NodeSummary, useNodeStore } from '../
 import { TerminalEntry, TerminalLevel, useTerminalStore } from '../stores/terminal-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
 import { useTriangulationStore } from '../stores/triangulation-store';
+import { useTrackingBannerStore } from '../stores/tracking-banner-store';
 
 const NOTIFICATION_CATEGORIES = new Set(['gps', 'status', 'console']);
 const DEVICE_LINE_REGEX =
@@ -349,6 +350,19 @@ export function SocketBridge() {
       addEntry(entry);
       if (status === 'ERROR') {
         play('ALERT');
+      }
+
+      // Start tracking banner countdown only after SCAN_START is acknowledged
+      const normalizedName = (name ?? '').toString().toUpperCase();
+      if (normalizedName === 'SCAN_START') {
+        if (status === 'SENT' || status === 'OK') {
+          const store = useTrackingBannerStore.getState();
+          if (store.pendingMac && typeof store.pendingDuration === 'number') {
+            store.setCountdown(store.pendingMac, store.pendingDuration);
+          }
+        } else if (status === 'ERROR') {
+          useTrackingBannerStore.getState().fail();
+        }
       }
     };
 
