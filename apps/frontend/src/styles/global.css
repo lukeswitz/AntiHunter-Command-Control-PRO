@@ -78,7 +78,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--color-bg);
+  background: var(--color-panel);
   color: var(--color-text);
   transition:
     background 0.25s ease,
@@ -294,7 +294,7 @@ a {
 .app-main {
   padding: 1.5rem;
   overflow-y: auto;
-  background: var(--color-bg);
+  background: var(--color-panel);
 }
 .panel {
   background: var(--color-panel);
@@ -1811,7 +1811,7 @@ body.theme-dark .control-chip[disabled] {
   width: 100%;
   border: 1px solid var(--color-panel-border);
   border-radius: 0.6rem;
-  background: var(--color-bg);
+  background: var(--color-panel);
   padding: 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
@@ -2263,7 +2263,7 @@ body.theme-dark .control-chip[disabled] {
 .preview-line {
   display: inline-block;
   padding: 0.45rem 0.7rem;
-  background: var(--color-bg);
+  background: var(--color-panel);
   border-radius: 0.5rem;
   border: 1px solid var(--color-panel-border);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
@@ -2603,7 +2603,7 @@ body.theme-dark .control-chip[disabled] {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  background: var(--color-bg);
+  background: var(--color-panel);
 }
 .config-value {
   display: flex;
