@@ -318,6 +318,14 @@ The `/config/firewall` API (and Config UI) manages allow/deny policies, geo filt
 | `failWindowSeconds`                     | `300`                             | Time window used when counting failures.                                      |
 | `banDurationSeconds`                    | `3600`                            | Temporary ban length applied to abusive IPs.                                  |
 
+**Before you enable the firewall:**  
+- Seed trusted IPs first: add `127.0.0.1` and `::1` (and your office/VPN CIDRs) to `ipAllowList` so you cannot lock yourself out during testing.  
+- Keep `defaultPolicy=ALLOW` until you have confirmed allow lists and geo rules are correct; then switch to `DENY` if needed.  
+- If you use geo filtering, double-check ISO country codes and start in `BLOCK_LIST` mode with a small pilot blocklist.  
+- Leave `failThreshold`/`banDurationSeconds` at defaults initially; tune only after you see real login volumes in the firewall logs.  
+- Know the recovery path: you can always clear bans or re-open access by updating `FirewallConfig` and removing rows from `FirewallRule`/`FirewallLog` (see Troubleshooting).  
+- Test from two networks (or one console + one private window) before turning this on in production to verify the allow list works as expected.  
+
 ### Transport & Secrets
 
 Keep certificates, mail credentials, and site identifiers in environment variables—never in source control. When terminating TLS inside NestJS, provide PEM paths via the variables below.

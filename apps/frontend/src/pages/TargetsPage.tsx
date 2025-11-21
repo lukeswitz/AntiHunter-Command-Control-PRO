@@ -228,7 +228,7 @@ export function TargetsPage() {
       return;
     }
     const input = window.prompt(
-      'Enter triangulation duration in seconds (30-1800)',
+      'Enter triangulation duration in seconds (60-300)',
       String(DEFAULT_TRIANGULATION_DURATION),
     );
     if (input == null) {
@@ -239,7 +239,7 @@ export function TargetsPage() {
       window.alert('Invalid duration.');
       return;
     }
-    const duration = Math.max(30, Math.min(1800, Math.round(parsed)));
+    const duration = Math.max(60, Math.min(300, Math.round(parsed)));
     triangulateMutation.mutate(
       { target, duration },
       { onSuccess: () => startTriangulationCountdown(target.mac!, duration) },
