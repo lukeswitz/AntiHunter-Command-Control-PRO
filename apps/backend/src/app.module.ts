@@ -15,6 +15,7 @@ import { ExportsModule } from './exports/exports.module';
 import { FaaModule } from './faa/faa.module';
 import { FirewallMiddleware } from './firewall/firewall.middleware';
 import { FirewallModule } from './firewall/firewall.module';
+import { ChatModule } from './chat/chat.module';
 import { GeofencesModule } from './geofences/geofences.module';
 import { HealthModule } from './health/health.module';
 import { IngestModule } from './ingest/ingest.module';
@@ -77,6 +78,7 @@ import { WsModule } from './ws/ws.module';
     InventoryModule,
     CommandsModule,
     EventsModule,
+    ChatModule,
     WsModule,
     IngestModule,
     AlarmsModule,

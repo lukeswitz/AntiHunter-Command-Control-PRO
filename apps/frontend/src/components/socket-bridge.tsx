@@ -7,11 +7,15 @@ import type {
   DroneStatus,
   FaaAircraftSummary,
   Geofence,
+  ChatMessage,
   Target,
 } from '../api/types';
+import { decryptText } from '../utils/chat-crypto';
 import { useAlarm } from '../providers/alarm-provider';
 import { useSocket } from '../providers/socket-provider';
 import { useAlertStore } from '../stores/alert-store';
+import { useChatKeyStore } from '../stores/chat-key-store';
+import { useChatStore } from '../stores/chat-store';
 import { useDroneStore } from '../stores/drone-store';
 import { useGeofenceStore } from '../stores/geofence-store';
 import type { GeofenceEvent } from '../stores/geofence-store';
@@ -42,6 +46,7 @@ export function SocketBridge() {
   const appendDroneTrail = useDroneStore((state) => state.appendTrailPoint);
   const removeDrone = useDroneStore((state) => state.remove);
   const setDroneStatus = useDroneStore((state) => state.setStatus);
+  const addChatIncoming = useChatStore((state) => state.addIncoming);
 
   useEffect(() => {
     if (!socket) {
@@ -101,7 +106,48 @@ export function SocketBridge() {
       }
     };
 
+    const handleChatEvent = async (payload: unknown) => {
+      if (!isChatMessage(payload)) {
+        return;
+      }
+      const siteKey =
+        payload.siteId && typeof payload.siteId === 'string'
+          ? useChatKeyStore.getState().getKey(payload.siteId)
+          : undefined;
+      let text = payload.text ?? '';
+      let decryptError = false;
+      if (payload.encrypted) {
+        if (payload.cipherText && siteKey) {
+          try {
+            text = await decryptText(siteKey, payload.cipherText);
+          } catch {
+            decryptError = true;
+            text = payload.text ?? '[Encrypted]';
+          }
+        } else {
+          decryptError = true;
+          text = payload.text ?? '[Encrypted]';
+        }
+      }
+      const ts = Date.parse(payload.ts);
+      addChatIncoming({
+        id: payload.id,
+        text,
+        from: payload.fromDisplayName ?? payload.fromEmail ?? 'Operator',
+        role: payload.fromRole,
+        siteId: payload.siteId,
+        ts: Number.isFinite(ts) ? ts : Date.now(),
+        encrypted: payload.encrypted,
+        cipherText: payload.cipherText,
+        decryptError,
+      });
+    };
+
     const handleEvent = (payload: unknown) => {
+      if (isChatMessage(payload)) {
+        void handleChatEvent(payload);
+        return;
+      }
       if (isDroneTelemetryEvent(payload)) {
         const timestamp = payload.timestamp ?? new Date().toISOString();
         upsertDrone({
@@ -987,6 +1033,14 @@ function extractAlertDetails(payload: unknown): AlertDetails | null {
     lon: toNumber(base.lon ?? (data as Record<string, unknown>).lon),
     timestamp: typeof base.timestamp === 'string' ? base.timestamp : undefined,
   };
+}
+
+function isChatMessage(payload: unknown): payload is ChatMessage {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const base = payload as Partial<ChatMessage>;
+  return base.type === 'chat.message' && typeof base.id === 'string';
 }
 
 function toNumber(value: unknown): number | undefined {

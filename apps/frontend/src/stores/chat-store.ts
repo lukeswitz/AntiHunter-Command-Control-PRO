@@ -18,7 +18,15 @@ type ChatState = {
   messages: ChatMessage[];
   popupEnabled: boolean;
   addIncoming: (message: Omit<ChatMessage, 'origin' | 'id'> & { id?: string }) => void;
-  sendLocal: (text: string, from: string, siteId?: string, role?: string) => void;
+  sendLocal: (
+    text: string,
+    from: string,
+    siteId?: string,
+    role?: string,
+    status?: ChatMessage['status'],
+    idOverride?: string,
+  ) => string;
+  updateStatus: (id: string, status: ChatMessage['status'], newId?: string, ts?: number) => void;
   setPopupEnabled: (enabled: boolean) => void;
 };
 
@@ -32,20 +40,23 @@ export const useChatStore = create<ChatState>((set, _get) => ({
   popupEnabled: true,
   addIncoming: (message) => {
     const id = message.id ?? makeId();
-    set((state) => ({
-      messages: [
-        ...state.messages,
-        {
-          ...message,
-          id,
-          origin: 'remote',
-          status: 'sent',
-        },
-      ].slice(-200),
-    }));
+    set((state) => {
+      if (state.messages.some((existing) => existing.id === id)) {
+        return { messages: state.messages };
+      }
+      const next: ChatMessage = {
+        ...message,
+        id,
+        origin: 'remote',
+        status: 'sent',
+      };
+      return {
+        messages: [...state.messages, next].slice(-200),
+      };
+    });
   },
-  sendLocal: (text, from, siteId, role) => {
-    const id = makeId();
+  sendLocal: (text, from, siteId, role, status = 'pending', idOverride) => {
+    const id = idOverride ?? makeId();
     const now = Date.now();
     set((state) => ({
       messages: [
@@ -57,11 +68,25 @@ export const useChatStore = create<ChatState>((set, _get) => ({
           siteId,
           role,
           ts: now,
-          origin: 'self',
-          status: 'sent',
+          origin: 'self' as const,
+          status,
         },
       ].slice(-200),
     }));
+    return id;
   },
+  updateStatus: (id, status, newId, ts) =>
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.id === id
+          ? ({
+              ...msg,
+              id: newId ?? msg.id,
+              status,
+              ts: ts ?? msg.ts,
+            } as ChatMessage)
+          : msg,
+      ),
+    })),
   setPopupEnabled: (enabled) => set({ popupEnabled: enabled }),
 }));

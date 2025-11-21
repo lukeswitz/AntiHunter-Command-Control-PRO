@@ -29,6 +29,21 @@ export interface CommandResponse {
   status: string;
 }
 
+export type ChatMessage = {
+  type: 'chat.message';
+  id: string;
+  siteId: string;
+  originSiteId: string;
+  fromUserId?: string;
+  fromEmail?: string;
+  fromRole?: string;
+  fromDisplayName?: string | null;
+  encrypted: boolean;
+  text?: string;
+  cipherText?: string;
+  ts: string;
+};
+
 export type AlarmLevel = 'INFO' | 'NOTICE' | 'ALERT' | 'CRITICAL';
 
 export interface AlarmConfig {

@@ -1,52 +1,14 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
+import { sendChatMessage } from '../api/chat';
 import { useAuthStore } from '../stores/auth-store';
 import { useChatKeyStore } from '../stores/chat-key-store';
 import { useChatStore } from '../stores/chat-store';
-
-async function encryptText(keyBase64: string, plaintext: string): Promise<string> {
-  const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(plaintext);
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, encoded);
-  const ivB64 = btoa(String.fromCharCode(...iv));
-  const ctB64 = btoa(String.fromCharCode(...new Uint8Array(ct)));
-  return `${ivB64}:${ctB64}`;
-}
-
-async function decryptText(keyBase64: string, payload: string): Promise<string> {
-  const [ivPart, ctPart] = payload.split(':');
-  if (!ivPart || !ctPart) throw new Error('Invalid payload');
-  const iv = Uint8Array.from(atob(ivPart), (c) => c.charCodeAt(0));
-  const ct = Uint8Array.from(atob(ctPart), (c) => c.charCodeAt(0));
-  const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt']);
-  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ct);
-  return new TextDecoder().decode(plainBuf);
-}
-
-function parseKeyInput(input: string): string {
-  const trimmed = input.trim();
-  if (!trimmed) throw new Error('Enter a key.');
-  // Accept hex or base64; normalize to base64
-  const isHex = /^[0-9a-fA-F]+$/.test(trimmed);
-  if (isHex) {
-    if (trimmed.length !== 64) throw new Error('Hex key must be 64 characters (32 bytes).');
-    const bytes = trimmed.match(/.{1,2}/g)?.map((pair) => parseInt(pair, 16)) ?? [];
-    return btoa(String.fromCharCode(...bytes));
-  }
-  // Otherwise treat as base64
-  const bytes = Uint8Array.from(atob(trimmed), (c) => c.charCodeAt(0));
-  if (bytes.length !== 32) {
-    throw new Error('Base64 key must decode to 32 bytes.');
-  }
-  return trimmed;
-}
+import { encryptText, parseKeyInput } from '../utils/chat-crypto';
 
 export function ChatPage() {
   const user = useAuthStore((state) => state.user);
-  const { messages, sendLocal, addIncoming, popupEnabled, setPopupEnabled } = useChatStore();
+  const { messages, sendLocal, popupEnabled, setPopupEnabled, updateStatus } = useChatStore();
   const { getKey, setKey } = useChatKeyStore();
   const [text, setText] = useState('');
   const [keyInput, setKeyInput] = useState('');
@@ -61,51 +23,40 @@ export function ChatPage() {
     }
   }, [sortedMessages.length]);
 
-  const currentSiteId = user?.siteId ?? undefined;
+  const currentSiteId = user?.siteAccess?.[0]?.siteId ?? undefined;
   const activeKey = currentSiteId ? getKey(currentSiteId) : undefined;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = text.trim();
     if (!trimmed || !user) return;
-    const siteId = user.siteId ?? undefined;
+    const siteId = currentSiteId;
     const role = user.role;
     const useKey = activeKey;
     try {
+      setKeyError(null);
       let cipherText: string | undefined;
       if (useKey) {
         cipherText = await encryptText(useKey, trimmed);
       }
-      sendLocal(trimmed, user.email ?? 'me', siteId, role);
+      const tempId = sendLocal(trimmed, user.email ?? 'me', siteId, role, 'pending');
       setText('');
-      // Stub for remote echo to demonstrate popup/decrypt; replace with MQTT receive.
-      window.setTimeout(async () => {
-        try {
-          const decrypted = useKey ? await decryptText(useKey, cipherText ?? '') : trimmed;
-          addIncoming({
-            text: decrypted,
-            from: 'Echo Bot',
-            ts: Date.now(),
-            role: 'SYSTEM',
-            siteId,
-            cipherText,
-            encrypted: Boolean(useKey),
-          });
-        } catch {
-          addIncoming({
-            text: trimmed,
-            from: 'Echo Bot',
-            ts: Date.now(),
-            role: 'SYSTEM',
-            siteId,
-            cipherText,
-            encrypted: Boolean(useKey),
-            decryptError: true,
-          });
-        }
-      }, 300);
+      const response = await sendChatMessage({
+        siteId,
+        encrypted: Boolean(useKey),
+        cipherText,
+        text: useKey ? undefined : trimmed,
+      });
+
+      const ts = Date.parse(response.ts);
+      updateStatus(tempId, 'sent', response.id, Number.isFinite(ts) ? ts : undefined);
     } catch (error) {
-      setKeyError(error instanceof Error ? error.message : 'Encryption failed');
+      setKeyError(error instanceof Error ? error.message : 'Failed to send message');
+      const now = Date.now();
+      const lastId = messages[messages.length - 1]?.id;
+      if (lastId) {
+        updateStatus(lastId, 'failed', undefined, now);
+      }
     }
   };
 
