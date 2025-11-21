@@ -1316,6 +1316,7 @@ body.theme-dark .control-chip[disabled] {
   margin-bottom: 0.35rem;
   background: rgba(180, 150, 60, 0.15);
   max-width: 92%;
+  width: fit-content;
   align-self: flex-start;
 }
 .chat-message--self {
