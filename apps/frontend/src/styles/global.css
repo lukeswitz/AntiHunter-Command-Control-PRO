@@ -2935,6 +2935,12 @@ body.theme-dark .control-chip[disabled] {
 .targets-table tbody tr {
   border-bottom: 1px solid var(--color-panel-border);
 }
+.targets-table tbody tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--color-panel) 94%, rgba(255, 255, 255, 0.08));
+}
+.targets-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--color-panel) 88%, rgba(255, 255, 255, 0.12));
+}
 .targets-table tbody tr:last-child td:first-child {
   border-bottom-left-radius: 0.8rem;
 }
@@ -5033,4 +5039,23 @@ body.theme-dark .strategy-table__row--selected {
   padding: 0.1rem 0.35rem;
   border-radius: 6px;
   font-variant-numeric: tabular-nums;
+}
+
+
+.geofence-table table tbody tr:nth-child(odd),
+.nodes-table table tbody tr:nth-child(odd),
+.inventory-table table tbody tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--color-panel) 94%, rgba(255, 255, 255, 0.08));
+}
+
+.geofence-table table tbody tr:nth-child(even),
+.nodes-table table tbody tr:nth-child(even),
+.inventory-table table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--color-panel) 88%, rgba(255, 255, 255, 0.12));
+}
+
+.geofence-table table tbody tr:hover,
+.nodes-table table tbody tr:hover,
+.inventory-table table tbody tr:hover {
+  background: rgba(var(--color-accent-rgb), 0.08);
 }
