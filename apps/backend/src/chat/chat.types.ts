@@ -12,3 +12,10 @@ export type ChatMessageEvent = {
   cipherText?: string;
   ts: string;
 };
+
+export type ChatClearEvent = {
+  type: 'chat.clear';
+  originSiteId: string;
+  target: 'all' | string;
+  ts: string;
+};

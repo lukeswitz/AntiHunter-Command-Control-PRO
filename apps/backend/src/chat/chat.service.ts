@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 
-import { ChatMessageEvent } from './chat.types';
+import { ChatClearEvent, ChatMessageEvent } from './chat.types';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
 import { AuthTokenPayload } from '../auth/auth.types';
 import { MqttService } from '../mqtt/mqtt.service';
@@ -66,8 +66,35 @@ export class ChatService {
     return message;
   }
 
+  async clearAll(auth?: AuthTokenPayload, target: 'all' | string = 'all'): Promise<ChatClearEvent> {
+    if (auth?.role !== 'ADMIN') {
+      throw new Error('Only ADMIN can clear chat history for all sites');
+    }
+    const event: ChatClearEvent = {
+      type: 'chat.clear',
+      originSiteId: this.localSiteId,
+      target,
+      ts: new Date().toISOString(),
+    };
+    this.gateway.emitEvent(event, { skipBus: true });
+    try {
+      await this.mqttService.publishToAll(this.buildClearTopic(target), JSON.stringify(event));
+    } catch (error) {
+      this.logger.warn(
+        `Failed to publish chat clear event on ${this.buildClearTopic(target)}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    }
+    return event;
+  }
+
   private buildTopic(siteId: string): string {
     return `ahcc/${siteId}/chat`;
+  }
+
+  private buildClearTopic(target: 'all' | string): string {
+    return target === 'all' ? 'ahcc/+/chat' : this.buildTopic(target);
   }
 
   private buildDisplayName(auth?: AuthTokenPayload): string | null {

@@ -27,6 +27,8 @@ type ChatState = {
     idOverride?: string,
   ) => string;
   updateStatus: (id: string, status: ChatMessage['status'], newId?: string, ts?: number) => void;
+  clearLocal: () => void;
+  clearAllRemote: () => void;
   setPopupEnabled: (enabled: boolean) => void;
 };
 
@@ -88,5 +90,7 @@ export const useChatStore = create<ChatState>((set, _get) => ({
           : msg,
       ),
     })),
+  clearLocal: () => set({ messages: [] }),
+  clearAllRemote: () => set({ messages: [] }),
   setPopupEnabled: (enabled) => set({ popupEnabled: enabled }),
 }));

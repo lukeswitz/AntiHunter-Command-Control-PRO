@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Post, Req, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Request } from 'express';
 
@@ -16,5 +16,11 @@ export class ChatController {
   @Roles(Role.ADMIN, Role.OPERATOR, Role.ANALYST, Role.VIEWER)
   async send(@Req() req: Request, @Body() dto: SendChatMessageDto) {
     return this.chatService.sendMessage(dto, req.auth);
+  }
+
+  @Delete('messages')
+  @Roles(Role.ADMIN)
+  async clearAll(@Req() req: Request) {
+    return this.chatService.clearAll(req.auth, 'all');
   }
 }

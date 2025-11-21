@@ -8,12 +8,14 @@ import { encryptText, parseKeyInput } from '../utils/chat-crypto';
 
 export function ChatPage() {
   const user = useAuthStore((state) => state.user);
-  const { messages, sendLocal, popupEnabled, setPopupEnabled, updateStatus } = useChatStore();
+  const { messages, sendLocal, popupEnabled, setPopupEnabled, updateStatus, clearLocal } =
+    useChatStore();
   const { getKey, setKey } = useChatKeyStore();
   const [text, setText] = useState('');
   const [keyInput, setKeyInput] = useState('');
   const [keyError, setKeyError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const [targetSiteId, setTargetSiteId] = useState<string>('local');
 
   const sortedMessages = useMemo(() => [...messages].sort((a, b) => a.ts - b.ts), [messages]);
 
@@ -23,14 +25,17 @@ export function ChatPage() {
     }
   }, [sortedMessages.length]);
 
-  const currentSiteId = user?.siteAccess?.[0]?.siteId ?? undefined;
+  const siteOptions =
+    user?.siteAccess?.map((s) => ({ id: s.siteId, label: s.siteName ?? s.siteId })) ?? [];
+  const currentSiteId = siteOptions[0]?.id;
   const activeKey = currentSiteId ? getKey(currentSiteId) : undefined;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = text.trim();
     if (!trimmed || !user) return;
-    const siteId = currentSiteId;
+    const siteId =
+      targetSiteId === 'all' ? '@ALL' : targetSiteId === 'local' ? currentSiteId : targetSiteId;
     const role = user.role;
     const useKey = activeKey;
     try {
@@ -70,6 +75,21 @@ export function ChatPage() {
           </p>
         </div>
         <div className="chat-controls">
+          <div className="chat-targets">
+            <select
+              className="control-input"
+              value={targetSiteId}
+              onChange={(e) => setTargetSiteId(e.target.value)}
+            >
+              <option value="local">This site ({currentSiteId ?? 'n/a'})</option>
+              <option value="all">@ALL (broadcast)</option>
+              {siteOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <label className="control-chip">
             <input
               type="checkbox"
@@ -103,6 +123,13 @@ export function ChatPage() {
               }}
             >
               Save Key
+            </button>
+            <button
+              type="button"
+              className="control-chip control-chip--danger"
+              onClick={clearLocal}
+            >
+              Clear local
             </button>
           </div>
           {keyError ? <span className="form-error">{keyError}</span> : null}

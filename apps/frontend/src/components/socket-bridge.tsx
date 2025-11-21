@@ -9,6 +9,7 @@ import type {
   Geofence,
   ChatMessage,
   Target,
+  ChatClearEvent,
 } from '../api/types';
 import { useAlarm } from '../providers/alarm-provider';
 import { useSocket } from '../providers/socket-provider';
@@ -144,6 +145,10 @@ export function SocketBridge() {
     };
 
     const handleEvent = (payload: unknown) => {
+      if (isChatClearEvent(payload)) {
+        useChatStore.getState().clearAllRemote();
+        return;
+      }
       if (isChatMessage(payload)) {
         void handleChatEvent(payload);
         return;
@@ -1042,6 +1047,14 @@ function isChatMessage(payload: unknown): payload is ChatMessage {
   }
   const base = payload as Partial<ChatMessage>;
   return base.type === 'chat.message' && typeof base.id === 'string';
+}
+
+function isChatClearEvent(payload: unknown): payload is ChatClearEvent {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const base = payload as Partial<ChatClearEvent>;
+  return base.type === 'chat.clear';
 }
 
 function toNumber(value: unknown): number | undefined {
