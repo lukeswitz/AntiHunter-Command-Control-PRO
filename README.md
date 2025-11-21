@@ -1137,14 +1137,6 @@ pnpm tool:sniffer -- --port /dev/ttyUSB0 --baud 921600
 
 The sniffer is a zero-dependency TypeScript script that mirrors frames to stdout and a log file for parser development.
 
-### Meshtastic firmware configuration
-
-When preparing a gateway node, open the Meshtastic device settings and enable **Override console serial port** so the mesh firmware exposes the command channel on the USB/serial interface used by the Command Center. The screenshot below shows the required toggle.
-
-> **Note:** On the iOS and macOS Meshtastic apps this toggle may be missing. If you cannot enable it from the firmware UI, leave the device in its default state and specify the correct serial path/baud in the Command Center **Config -> Serial** card instead.
-
-![Meshtastic override console serial settings](images/meshtasticsettings.png)
-
 ## Useful Scripts
 
 | Command                                                                | Description                                                                                                                                             |
