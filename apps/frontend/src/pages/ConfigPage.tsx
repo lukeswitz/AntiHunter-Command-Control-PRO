@@ -997,11 +997,33 @@ export function ConfigPage() {
       apiClient.post<SerialState>('/serial/connect', payload),
     onSuccess: (state) => {
       queryClient.setQueryData(['serialState'], state);
-      setConfigNotice({ type: 'success', text: 'Serial connection established.' });
+      if (state.connected) {
+        const pathLabel = state.path ?? 'device';
+        const baudLabel = state.baudRate ? ` @ ${state.baudRate} baud` : '';
+        setConfigNotice({
+          type: 'success',
+          text: `Serial connection established. (${pathLabel}${baudLabel})`,
+        });
+      } else {
+        setConfigNotice({
+          type: 'error',
+          text: state.lastError ?? 'Unable to connect to serial device.',
+        });
+      }
       void serialConfigQuery.refetch();
       void serialStateQuery.refetch();
     },
     onError: (error) => {
+      const currentState = serialStateQuery.data;
+      if (currentState?.connected) {
+        const pathLabel = currentState.path ?? 'device';
+        const baudLabel = currentState.baudRate ? ` @ ${currentState.baudRate} baud` : '';
+        setConfigNotice({
+          type: 'info',
+          text: `Serial already connected (${pathLabel}${baudLabel}). Disconnect first if you need to switch devices.`,
+        });
+        return;
+      }
       const message =
         error instanceof Error ? error.message : 'Unable to connect to serial device.';
       setConfigNotice({ type: 'error', text: message });
