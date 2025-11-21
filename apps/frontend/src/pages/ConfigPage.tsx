@@ -38,6 +38,8 @@ import {
 } from '../constants/theme';
 import { useAlarm } from '../providers/alarm-provider';
 import { useAuthStore } from '../stores/auth-store';
+import { useChatKeyStore } from '../stores/chat-key-store';
+import { useChatStore } from '../stores/chat-store';
 import { useNodeStore } from '../stores/node-store';
 
 type AppSettingsUpdate = Partial<AppSettings> & { mailPassword?: string };
@@ -210,6 +212,7 @@ type ConfigSectionId =
   | 'serial'
   | 'tak'
   | 'mqtt'
+  | 'chat'
   | 'detection'
   | 'map'
   | 'oui'
@@ -231,6 +234,7 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: 
   { id: 'serial', label: 'Serial Connection', description: 'Device path and protocol' },
   { id: 'tak', label: 'TAK Bridge', description: 'Cursor-on-Target relay' },
   { id: 'mqtt', label: 'MQTT Federation', description: 'Remote site replication' },
+  { id: 'chat', label: 'Chat', description: 'Encrypted operator chat keys' },
   { id: 'detection', label: 'Detection Defaults', description: 'Scan and alert presets' },
   { id: 'webhooks', label: 'Webhooks', description: 'External alert destinations' },
   { id: 'map', label: 'Map & Coverage', description: 'Map viewport and coverage rings' },
@@ -286,6 +290,10 @@ export function ConfigPage() {
     queryKey: ['mqttSites'],
     queryFn: () => apiClient.get<MqttSiteConfig[]>('/mqtt/sites'),
   });
+  useEffect(() => {
+    if (!sitesQuery.data || sitesQuery.data.length === 0) return;
+    setChatSelectedSiteId((prev) => prev ?? sitesQuery.data?.[0]?.id);
+  }, [sitesQuery.data]);
 
   const mqttStatusQuery = useQuery({
     queryKey: ['mqttStatus'],
@@ -354,6 +362,12 @@ export function ConfigPage() {
     type: 'success' | 'error' | 'info';
     text: string;
   } | null>(null);
+  const { getKey: getChatKey, setKey: setChatKey } = useChatKeyStore();
+  const chatPopupEnabled = useChatStore((state) => state.popupEnabled);
+  const setChatPopupEnabled = useChatStore((state) => state.setPopupEnabled);
+  const [chatSelectedSiteId, setChatSelectedSiteId] = useState<string | undefined>(undefined);
+  const [chatKeyNotice, setChatKeyNotice] = useState<string | null>(null);
+  const [chatKeyError, setChatKeyError] = useState<string | null>(null);
   const [takSendPayload, setTakSendPayload] = useState('');
   const [firewallForm, setFirewallForm] = useState<FirewallFormState | null>(null);
   const [firewallMessage, setFirewallMessage] = useState<string | null>(null);
@@ -1078,6 +1092,11 @@ export function ConfigPage() {
     const next = { ...appSettings, ...patch };
     setAppSettings(next);
     updateAppSettingsMutation.mutate(patch);
+  };
+
+  const generateChatKey = () => {
+    const buf = crypto.getRandomValues(new Uint8Array(32));
+    return btoa(String.fromCharCode(...buf));
   };
 
   const handleDefaultRadiusChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -3537,6 +3556,137 @@ export function ConfigPage() {
                     </div>
                   );
                 })
+              )}
+            </div>
+          </section>
+          <section className={cardClass('chat')}>
+            <header>
+              <h2>Chat</h2>
+              <p>Manage encrypted operator chat keys per site.</p>
+            </header>
+            <div className="config-card__body">
+              {sitesQuery.isLoading ? (
+                <div>Loading sites...</div>
+              ) : sitesQuery.isError || !sitesQuery.data || sitesQuery.data.length === 0 ? (
+                <div className="form-error">Unable to load sites. Chat keys are per-site.</div>
+              ) : (
+                <>
+                  <div className="config-row">
+                    <span className="config-label">Site</span>
+                    <div className="config-value">
+                      <select
+                        className="control-input"
+                        value={chatSelectedSiteId ?? ''}
+                        onChange={(event) => setChatSelectedSiteId(event.target.value || undefined)}
+                      >
+                        {sitesQuery.data.map((site) => (
+                          <option key={site.id} value={site.id}>
+                            {site.name ?? site.id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="config-row">
+                    <span className="config-label">Chat key</span>
+                    <div className="config-value chat-key-controls">
+                      <input
+                        className="control-input"
+                        type="text"
+                        readOnly
+                        value={(chatSelectedSiteId ? getChatKey(chatSelectedSiteId) : '') ?? ''}
+                        placeholder="No key set"
+                      />
+                      <div className="controls-row">
+                        <button
+                          type="button"
+                          className="control-chip"
+                          onClick={() => {
+                            if (!chatSelectedSiteId) return;
+                            const key = generateChatKey();
+                            setChatKey(chatSelectedSiteId, key);
+                            setChatKeyNotice('New chat key generated.');
+                            setChatKeyError(null);
+                          }}
+                        >
+                          Generate
+                        </button>
+                        <button
+                          type="button"
+                          className="control-chip"
+                          onClick={() => {
+                            if (!chatSelectedSiteId) return;
+                            const key = getChatKey(chatSelectedSiteId);
+                            if (!key) {
+                              setChatKeyError('No key to copy.');
+                              return;
+                            }
+                            void navigator.clipboard.writeText(key);
+                            setChatKeyNotice('Chat key copied to clipboard.');
+                            setChatKeyError(null);
+                          }}
+                        >
+                          Copy
+                        </button>
+                        <button
+                          type="button"
+                          className="control-chip"
+                          onClick={() => {
+                            if (!chatSelectedSiteId) return;
+                            const key = getChatKey(chatSelectedSiteId);
+                            if (!key) {
+                              setChatKeyError('No key to download.');
+                              return;
+                            }
+                            const blob = new Blob([key], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `chat-key-${chatSelectedSiteId}.txt`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            setChatKeyNotice('Chat key downloaded.');
+                            setChatKeyError(null);
+                          }}
+                        >
+                          Download
+                        </button>
+                        <button
+                          type="button"
+                          className="control-chip control-chip--danger"
+                          onClick={() => {
+                            if (!chatSelectedSiteId) return;
+                            setChatKey(chatSelectedSiteId, '');
+                            setChatKeyNotice('Chat key cleared.');
+                            setChatKeyError(null);
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="controls-row">
+                        <button
+                          type="button"
+                          className="control-chip"
+                          onClick={() => {
+                            setChatPopupEnabled(!chatPopupEnabled);
+                            setChatKeyNotice(
+                              `Pop-ups ${!chatPopupEnabled ? 'enabled' : 'disabled'} by default.`,
+                            );
+                          }}
+                        >
+                          {chatPopupEnabled ? 'Disable pop-ups' : 'Enable pop-ups'}
+                        </button>
+                      </div>
+                      {chatKeyError ? <div className="form-error">{chatKeyError}</div> : null}
+                      {chatKeyNotice ? <div className="config-hint">{chatKeyNotice}</div> : null}
+                      <div className="config-hint">
+                        Keys are 32-byte random values, delivered outside MQTT. Share securely per
+                        site.
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </section>
