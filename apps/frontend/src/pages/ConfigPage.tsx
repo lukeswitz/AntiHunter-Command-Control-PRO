@@ -290,6 +290,8 @@ export function ConfigPage() {
     queryKey: ['mqttSites'],
     queryFn: () => apiClient.get<MqttSiteConfig[]>('/mqtt/sites'),
   });
+  const chatAddonEnabled =
+    useAuthStore((state) => state.user?.preferences?.notifications?.addons?.chat ?? false) ?? false;
   useEffect(() => {
     if (!sitesQuery.data || sitesQuery.data.length === 0) return;
     setChatSelectedSiteId((prev) => prev ?? sitesQuery.data?.[0]?.id);
@@ -380,8 +382,6 @@ export function ConfigPage() {
   const [firewallError, setFirewallError] = useState<string | null>(null);
   const [firewallDirty, setFirewallDirty] = useState(false);
   const [activeSection, setActiveSection] = useState<ConfigSectionId>('alarms');
-  const chatAddonEnabled =
-    useAuthStore((state) => state.user?.preferences?.notifications?.addons?.chat ?? false) ?? false;
   const visibleSections = useMemo(
     () => (chatAddonEnabled ? CONFIG_SECTIONS : CONFIG_SECTIONS.filter((s) => s.id !== 'chat')),
     [chatAddonEnabled],
