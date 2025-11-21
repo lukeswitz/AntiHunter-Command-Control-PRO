@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MdEventNote, MdHub, MdNotificationsActive } from 'react-icons/md';
+import { MdChat, MdEventNote, MdHub, MdNotificationsActive } from 'react-icons/md';
 
 import {
   ALERTS_ADDON_EVENT,
@@ -8,10 +8,14 @@ import {
   SCHEDULER_ADDON_STORAGE_KEY,
   STRATEGY_ADDON_EVENT,
   STRATEGY_ADDON_STORAGE_KEY,
+  CHAT_ADDON_EVENT,
+  CHAT_ADDON_STORAGE_KEY,
   getAlertsAddonEnabled,
+  getChatAddonEnabled,
   getSchedulerAddonEnabled,
   getStrategyAddonEnabled,
   setAlertsAddonEnabled,
+  setChatAddonEnabled,
   setSchedulerAddonEnabled,
   setStrategyAddonEnabled,
 } from '../constants/addons';
@@ -22,11 +26,13 @@ export function AddonPage() {
   const [schedulerEnabled, setSchedulerEnabled] = useState<boolean>(() =>
     getSchedulerAddonEnabled(),
   );
+  const [chatEnabled, setChatEnabled] = useState<boolean>(() => getChatAddonEnabled());
 
   useEffect(() => {
     const syncStrategy = () => setStrategyEnabled(getStrategyAddonEnabled());
     const syncAlerts = () => setAlertsEnabled(getAlertsAddonEnabled());
     const syncScheduler = () => setSchedulerEnabled(getSchedulerAddonEnabled());
+    const syncChat = () => setChatEnabled(getChatAddonEnabled());
     const handleStorage = (event: StorageEvent) => {
       if (event.key === STRATEGY_ADDON_STORAGE_KEY) {
         syncStrategy();
@@ -37,16 +43,21 @@ export function AddonPage() {
       if (event.key === SCHEDULER_ADDON_STORAGE_KEY) {
         syncScheduler();
       }
+      if (event.key === CHAT_ADDON_STORAGE_KEY) {
+        syncChat();
+      }
     };
     window.addEventListener('storage', handleStorage);
     window.addEventListener(STRATEGY_ADDON_EVENT, syncStrategy);
     window.addEventListener(ALERTS_ADDON_EVENT, syncAlerts);
     window.addEventListener(SCHEDULER_ADDON_EVENT, syncScheduler);
+    window.addEventListener(CHAT_ADDON_EVENT, syncChat);
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener(STRATEGY_ADDON_EVENT, syncStrategy);
       window.removeEventListener(ALERTS_ADDON_EVENT, syncAlerts);
       window.removeEventListener(SCHEDULER_ADDON_EVENT, syncScheduler);
+      window.removeEventListener(CHAT_ADDON_EVENT, syncChat);
     };
   }, []);
 
@@ -66,6 +77,12 @@ export function AddonPage() {
     const next = !schedulerEnabled;
     setSchedulerAddonEnabled(next);
     setSchedulerEnabled(next);
+  };
+
+  const handleChatToggle = () => {
+    const next = !chatEnabled;
+    setChatAddonEnabled(next);
+    setChatEnabled(next);
   };
 
   return (
@@ -121,6 +138,22 @@ export function AddonPage() {
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleSchedulerToggle}>
               {schedulerEnabled ? 'Deactivate add-on' : 'Activate add-on'}
+            </button>
+          </div>
+        </article>
+
+        <article className="config-card addon-card">
+          <div className="addon-card__logo">
+            <MdChat size={42} />
+          </div>
+          <h2>Operator Chat</h2>
+          <p>Secure, encrypted operator chat over MQTT between sites.</p>
+          <p className="form-hint">
+            Toggle to show/hide chat in the navigation. Keys are managed in Config → Chat.
+          </p>
+          <div className="addon-card__actions">
+            <button type="button" className="control-chip" onClick={handleChatToggle}>
+              {chatEnabled ? 'Deactivate add-on' : 'Activate add-on'}
             </button>
           </div>
         </article>

@@ -20,11 +20,14 @@ import { NavLink } from 'react-router-dom';
 import {
   ALERTS_ADDON_EVENT,
   ALERTS_ADDON_STORAGE_KEY,
+  CHAT_ADDON_EVENT,
+  CHAT_ADDON_STORAGE_KEY,
   SCHEDULER_ADDON_EVENT,
   SCHEDULER_ADDON_STORAGE_KEY,
   STRATEGY_ADDON_EVENT,
   STRATEGY_ADDON_STORAGE_KEY,
   getAlertsAddonEnabled,
+  getChatAddonEnabled,
   getSchedulerAddonEnabled,
   getStrategyAddonEnabled,
 } from '../constants/addons';
@@ -59,11 +62,13 @@ export function SidebarNav() {
   const [schedulerEnabled, setSchedulerEnabled] = useState<boolean>(() =>
     getSchedulerAddonEnabled(),
   );
+  const [chatEnabled, setChatEnabled] = useState<boolean>(() => getChatAddonEnabled());
 
   useEffect(() => {
     const syncStrategy = () => setStrategyEnabled(getStrategyAddonEnabled());
     const syncAlerts = () => setAlertsEnabled(getAlertsAddonEnabled());
     const syncScheduler = () => setSchedulerEnabled(getSchedulerAddonEnabled());
+    const syncChat = () => setChatEnabled(getChatAddonEnabled());
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key === STRATEGY_ADDON_STORAGE_KEY) {
@@ -75,18 +80,23 @@ export function SidebarNav() {
       if (event.key === SCHEDULER_ADDON_STORAGE_KEY) {
         syncScheduler();
       }
+      if (event.key === CHAT_ADDON_STORAGE_KEY) {
+        syncChat();
+      }
     };
 
     window.addEventListener('storage', handleStorage);
     window.addEventListener(STRATEGY_ADDON_EVENT, syncStrategy);
     window.addEventListener(ALERTS_ADDON_EVENT, syncAlerts);
     window.addEventListener(SCHEDULER_ADDON_EVENT, syncScheduler);
+    window.addEventListener(CHAT_ADDON_EVENT, syncChat);
 
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener(STRATEGY_ADDON_EVENT, syncStrategy);
       window.removeEventListener(ALERTS_ADDON_EVENT, syncAlerts);
       window.removeEventListener(SCHEDULER_ADDON_EVENT, syncScheduler);
+      window.removeEventListener(CHAT_ADDON_EVENT, syncChat);
     };
   }, []);
 
@@ -101,9 +111,12 @@ export function SidebarNav() {
       if (item.to === '/scheduler') {
         return schedulerEnabled;
       }
+      if (item.to === '/chat') {
+        return chatEnabled;
+      }
       return true;
     });
-  }, [strategyEnabled, alertsEnabled, schedulerEnabled]);
+  }, [strategyEnabled, alertsEnabled, schedulerEnabled, chatEnabled]);
 
   return (
     <aside className="sidebar">

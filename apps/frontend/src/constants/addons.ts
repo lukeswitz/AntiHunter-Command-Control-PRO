@@ -4,6 +4,8 @@ const ALERTS_ADDON_STORAGE_KEY = 'feature.alerts.enabled';
 const ALERTS_ADDON_EVENT = 'alerts-addon-change';
 const SCHEDULER_ADDON_STORAGE_KEY = 'feature.scheduler.enabled';
 const SCHEDULER_ADDON_EVENT = 'scheduler-addon-change';
+const CHAT_ADDON_STORAGE_KEY = 'feature.chat.enabled';
+const CHAT_ADDON_EVENT = 'chat-addon-change';
 
 function getBooleanFlag(key: string, fallback: boolean): boolean {
   if (typeof window === 'undefined') {
@@ -52,6 +54,14 @@ export function setSchedulerAddonEnabled(enabled: boolean): void {
   setBooleanFlag(SCHEDULER_ADDON_STORAGE_KEY, SCHEDULER_ADDON_EVENT, enabled);
 }
 
+export function getChatAddonEnabled(): boolean {
+  return getBooleanFlag(CHAT_ADDON_STORAGE_KEY, false);
+}
+
+export function setChatAddonEnabled(enabled: boolean): void {
+  setBooleanFlag(CHAT_ADDON_STORAGE_KEY, CHAT_ADDON_EVENT, enabled);
+}
+
 export {
   STRATEGY_ADDON_EVENT,
   STRATEGY_ADDON_STORAGE_KEY,
@@ -59,4 +69,6 @@ export {
   ALERTS_ADDON_STORAGE_KEY,
   SCHEDULER_ADDON_EVENT,
   SCHEDULER_ADDON_STORAGE_KEY,
+  CHAT_ADDON_EVENT,
+  CHAT_ADDON_STORAGE_KEY,
 };
