@@ -405,8 +405,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
   private async connectInternal(options?: Partial<SerialConnectionOptions>): Promise<void> {
     if (this.port) {
-      this.logger.warn('Serial port already connected');
-      return;
+      throw new BadRequestException(
+        'Serial port already connected to this backend; if another service has the port locked, restart the backend.',
+      );
     }
 
     this.clearReconnectTimer();
