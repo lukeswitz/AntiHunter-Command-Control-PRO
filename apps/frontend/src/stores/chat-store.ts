@@ -9,6 +9,9 @@ export type ChatMessage = {
   ts: number;
   origin: 'self' | 'remote';
   status?: 'pending' | 'sent' | 'failed';
+  encrypted?: boolean;
+  cipherText?: string;
+  decryptError?: boolean;
 };
 
 type ChatState = {
