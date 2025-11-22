@@ -333,6 +333,21 @@ export function SocketBridge() {
           });
         }
 
+        if (
+          targetDetails.mac &&
+          typeof targetDetails.lat === 'number' &&
+          typeof targetDetails.lon === 'number' &&
+          Number.isFinite(targetDetails.lat) &&
+          Number.isFinite(targetDetails.lon)
+        ) {
+          useTriangulationStore.getState().complete({
+            mac: targetDetails.mac,
+            lat: targetDetails.lat,
+            lon: targetDetails.lon,
+            link: undefined,
+          });
+        }
+
         const nodeState = useNodeStore.getState();
         const node = targetDetails.nodeId
           ? nodeState.nodes[canonicalNodeId(targetDetails.nodeId)]

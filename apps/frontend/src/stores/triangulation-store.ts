@@ -54,12 +54,14 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
   },
   complete: ({ mac, lat, lon, link }) => {
     const stateMac = get().targetMac;
-    if (stateMac && mac && stateMac !== mac.toUpperCase()) {
+    const incomingMac = mac ? mac.toUpperCase() : undefined;
+    if (stateMac && incomingMac && stateMac !== incomingMac) {
       return;
     }
     const success = Boolean(link) || (lat != null && lon != null);
     set({
       status: success ? 'success' : 'failed',
+      targetMac: incomingMac ?? stateMac,
       link,
       lat,
       lon,
