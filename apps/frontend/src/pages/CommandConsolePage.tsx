@@ -412,11 +412,14 @@ export function CommandConsolePage() {
     return Array.from(dedup.values());
   }, [availableNodes, form.siteId]);
 
-  const singleNodeCommands = useMemo(() => new Set(['CONFIG_NODEID', 'TRIANGULATE_START']), []);
+  const singleNodeCommands = useMemo(() => new Set(['CONFIG_NODEID']), []);
   const isSingleNodeCommand = singleNodeCommands.has(selectedCommand.name);
   const isTriangulateCommand = selectedCommand.name === 'TRIANGULATE_START';
 
   const targetOptions = useMemo<NodeCommandOption[]>(() => {
+    if (isTriangulateCommand) {
+      return [{ value: '@ALL', label: '@ALL (broadcast)' }];
+    }
     const options: NodeCommandOption[] = isSingleNodeCommand
       ? [...nodeCommandTargets]
       : [{ value: '@ALL', label: '@ALL (broadcast)' }, ...nodeCommandTargets];
@@ -432,7 +435,7 @@ export function CommandConsolePage() {
     }
 
     return options;
-  }, [nodeCommandTargets, form.target, form.siteId, isSingleNodeCommand]);
+  }, [nodeCommandTargets, form.target, form.siteId, isSingleNodeCommand, isTriangulateCommand]);
   const selectedTargetOption = useMemo(
     () => targetOptions.find((option) => option.value === form.target),
     [targetOptions, form.target],
@@ -497,6 +500,8 @@ export function CommandConsolePage() {
     setForm((prev) => ({
       ...createFormState(command, preset),
       siteId: prev.siteId,
+      target:
+        command.name === 'TRIANGULATE_START' ? '@ALL' : createFormState(command, preset).target,
     }));
     setParamErrors({});
     setTargetError(null);
