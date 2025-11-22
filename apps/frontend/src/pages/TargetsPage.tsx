@@ -243,12 +243,10 @@ export function TargetsPage() {
     }
     const duration = Math.max(60, Math.min(300, Math.round(parsed)));
     beginTriangulateCooldown();
-    void triangulateMutation
-      .mutateAsync({ target, duration })
-      .catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
-        window.alert(message);
-      });
+    void triangulateMutation.mutateAsync({ target, duration }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
+      window.alert(message);
+    });
   };
 
   const handleTrackRequest = (target: Target) => {
