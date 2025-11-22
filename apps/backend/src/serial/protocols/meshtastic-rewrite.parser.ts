@@ -329,7 +329,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       return [
         {
           kind: 'alert',
-          level: 'NOTICE',
+          level: 'INFO',
           category: 'randomization',
           nodeId: nodeId ?? id.groups.id,
           message: payload,
