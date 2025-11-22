@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { MdChat, MdEventNote, MdHub, MdNotificationsActive } from 'react-icons/md';
 
 import { apiClient } from '../api/client';
@@ -104,7 +104,7 @@ export function AddonPage() {
           <h2>Operator Chat</h2>
           <p>Secure, encrypted operator chat over MQTT between sites.</p>
           <p className="form-hint">
-            Toggle to show/hide chat in the navigation. Keys are managed in Config -> Chat.
+            Toggle to show/hide chat in the navigation. Keys are managed in Config &rarr; Chat.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleChatToggle}>
