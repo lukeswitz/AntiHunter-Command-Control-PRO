@@ -2,7 +2,7 @@ import classNames from 'clsx';
 import type { LatLngExpression, LatLngTuple, Map as LeafletMap, TileLayerOptions } from 'leaflet';
 import { DivIcon, divIcon } from 'leaflet';
 import * as L from 'leaflet';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import {
   Circle,
   LayersControl,
@@ -10,7 +10,6 @@ import {
   Marker,
   Polygon,
   Polyline,
-  Popup,
   TileLayer,
   Tooltip,
   useMap,
@@ -388,17 +387,6 @@ export function CommandCenterMap({
   onNodeCommand,
   trackingOverlays = [],
 }: CommandCenterMapProps) {
-  const [stickyNodeId, setStickyNodeId] = useState<string | null>(null);
-  const stickyTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (stickyTimerRef.current) {
-        window.clearTimeout(stickyTimerRef.current);
-      }
-    };
-  }, []);
-
   const mapRef = useRef<LeafletMap | null>(null);
   const baseLayerKeys = useMemo(() => BASE_LAYERS.map((layer) => layer.key), []);
   const activeBaseLayerKey = useMemo(() => {
@@ -606,19 +594,6 @@ export function CommandCenterMap({
             key={siteScopedKey}
             position={position}
             icon={createNodeIcon(node, indicator, alertColors)}
-            eventHandlers={
-              onNodeCommand
-                ? {
-                    click: () => {
-                      setStickyNodeId(node.id);
-                      if (stickyTimerRef.current) {
-                        window.clearTimeout(stickyTimerRef.current);
-                      }
-                      stickyTimerRef.current = window.setTimeout(() => setStickyNodeId(null), 2000);
-                    },
-                  }
-                : undefined
-            }
           >
             <Tooltip direction="top" offset={[0, -12]} opacity={0.9}>
               <div className="node-tooltip">
@@ -641,33 +616,6 @@ export function CommandCenterMap({
                 ) : null}
               </div>
             </Tooltip>
-            {onNodeCommand && stickyNodeId === node.id ? (
-              <Popup
-                autoClose={false}
-                closeButton={false}
-                closeOnClick={false}
-                closeOnEscapeKey={false}
-                className="node-popup"
-              >
-                <div className="node-tooltip">
-                  <strong>{formatNodeLabel(node)}</strong>
-                  {node.siteName || node.siteId ? (
-                    <div className="muted">{node.siteName ?? node.siteId}</div>
-                  ) : null}
-                  <div>
-                    Last seen: {node.lastSeen ? new Date(node.lastSeen).toLocaleString() : 'N/A'}
-                  </div>
-                  {node.lastMessage && <div>Last message: {node.lastMessage}</div>}
-                  <button
-                    type="button"
-                    className="control-chip control-chip--ghost"
-                    onClick={() => onNodeCommand(node)}
-                  >
-                    Send command
-                  </button>
-                </div>
-              </Popup>
-            ) : null}
 
             {showRadius ? (
               <Circle
