@@ -3580,9 +3580,20 @@ export function ConfigPage() {
                     <input
                       className="control-input"
                       type={chatKeyHidden ? 'password' : 'text'}
-                      readOnly
                       value={getChatKey() ?? ''}
                       placeholder="No key set"
+                      onChange={(event) => {
+                        const value = event.target.value.trim();
+                        if (value.length === 0) {
+                          clearChatKey();
+                          setChatKeyNotice('Chat key cleared.');
+                          setChatKeyError(null);
+                          return;
+                        }
+                        setChatKey(value);
+                        setChatKeyNotice('Chat key updated.');
+                        setChatKeyError(null);
+                      }}
                     />
                     <div className="controls-row">
                       <button
