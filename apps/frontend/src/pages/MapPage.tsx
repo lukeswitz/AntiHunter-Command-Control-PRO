@@ -14,6 +14,7 @@ import {
   MdBookmarkAdd,
   MdClose,
 } from 'react-icons/md';
+import { useNavigate } from 'react-router-dom';
 
 import { apiClient } from '../api/client';
 import type {
@@ -58,6 +59,7 @@ const DRONE_STATUS_OPTIONS: { value: DroneStatus; label: string }[] = [
 
 export function MapPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { nodes, order, histories } = useNodeStore((state) => ({
     nodes: state.nodes,
     order: state.order,
@@ -80,6 +82,7 @@ export function MapPage() {
   const pendingTarget = useMapCommandStore((state) => state.target);
   const consumeTarget = useMapCommandStore((state) => state.consume);
   const goto = useMapCommandStore((state) => state.goto);
+  const setPreferredTarget = useMapCommandStore((state) => state.setPreferredTarget);
 
   const savedViews = useMapViewsStore((state) => state.views);
   const addView = useMapViewsStore((state) => state.addView);
@@ -717,6 +720,10 @@ export function MapPage() {
               setMapReady(true);
             }}
             onDroneSelect={handleDroneSelect}
+            onNodeCommand={(node) => {
+              setPreferredTarget(`@${canonicalNodeId(node.id)}`);
+              navigate('/console');
+            }}
           />
         </div>
         <footer className="map-footer">

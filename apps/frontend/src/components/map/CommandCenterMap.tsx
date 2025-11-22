@@ -359,6 +359,7 @@ interface CommandCenterMapProps {
   onReady?: (map: LeafletMap) => void;
   onMapStyleChange?: (style: string) => void;
   onDroneSelect?: (droneId: string) => void;
+  onNodeCommand?: (node: NodeSummary) => void;
   trackingOverlays?: TrackingEstimate[];
 }
 
@@ -383,6 +384,7 @@ export function CommandCenterMap({
   onReady,
   onMapStyleChange,
   onDroneSelect,
+  onNodeCommand,
   trackingOverlays = [],
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
@@ -603,6 +605,15 @@ export function CommandCenterMap({
                   Last seen: {node.lastSeen ? new Date(node.lastSeen).toLocaleString() : 'N/A'}
                 </div>
                 {node.lastMessage && <div>Last message: {node.lastMessage}</div>}
+                {onNodeCommand ? (
+                  <button
+                    type="button"
+                    className="control-chip control-chip--ghost"
+                    onClick={() => onNodeCommand(node)}
+                  >
+                    Send command
+                  </button>
+                ) : null}
               </div>
             </Tooltip>
 

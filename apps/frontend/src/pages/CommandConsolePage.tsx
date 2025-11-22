@@ -10,6 +10,7 @@ import {
   MESH_COMMANDS,
 } from '../data/mesh-commands';
 import { useAuthStore } from '../stores/auth-store';
+import { useMapCommandStore } from '../stores/map-command-store';
 import { NodeSummary, useNodeStore } from '../stores/node-store';
 import { useTemplateStore, CommandTemplate } from '../stores/template-store';
 import { TerminalLevel, useTerminalStore } from '../stores/terminal-store';
@@ -238,6 +239,7 @@ export function CommandConsolePage() {
   const triangulateCooldownRef = useRef<number | null>(null);
   const startTriangulationCountdown = useTriangulationStore((state) => state.setCountdown);
   const pendingTriangulation = useRef<{ mac?: string; duration?: number } | null>(null);
+  const consumePreferredTarget = useMapCommandStore((state) => state.consumePreferredTarget);
 
   useEffect(() => {
     return () => {
@@ -261,6 +263,13 @@ export function CommandConsolePage() {
       return { ...prev, siteId: defaultSiteId };
     });
   }, [sites, user]);
+
+  useEffect(() => {
+    const preferred = consumePreferredTarget();
+    if (preferred) {
+      setForm((prev) => ({ ...prev, target: normalizeTarget(preferred) }));
+    }
+  }, [consumePreferredTarget]);
 
   const menuRef = useRef<HTMLDivElement | null>(null);
   const selectorRef = useRef<HTMLButtonElement | null>(null);
