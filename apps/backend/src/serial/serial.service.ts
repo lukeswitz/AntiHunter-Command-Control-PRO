@@ -1277,6 +1277,13 @@ function sanitizeLine(value: string): string {
   const markerMatch = channelMarker.exec(cleaned);
   if (markerMatch?.[1]) {
     cleaned = markerMatch[1];
+  } else {
+    // Some firmwares prefix text frames with a single-letter marker like "C :" or "P :". Strip it.
+    const alphaMarker = /^\s*[A-Za-z]\s*:\s*(.+)$/;
+    const alphaMatch = alphaMarker.exec(cleaned);
+    if (alphaMatch?.[1]) {
+      cleaned = alphaMatch[1];
+    }
   }
 
   // Remove router hop prefixes like "0c58:" that precede the real node id.
