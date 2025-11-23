@@ -69,6 +69,7 @@ export function AppHeader() {
 
   let bannerText: string | null = null;
   let bannerCountdown: string | null = null;
+  let bannerDetails: string | null = null;
   const triBannerEnabled = false;
 
   const triExpired =
@@ -97,10 +98,19 @@ export function AppHeader() {
     const seconds = (remainingSec % 60).toString().padStart(2, '0');
     bannerText = 'Tracking in progress';
     bannerCountdown = `${minutes}:${seconds}`;
+    if (trackingBanner.targetMac) {
+      bannerDetails = `Target: ${trackingBanner.targetMac}`;
+    }
   } else if (trackingBanner.status === 'success' && !trackingExpired) {
     bannerText = 'Tracking completed';
+    if (trackingBanner.targetMac) {
+      bannerDetails = `Target: ${trackingBanner.targetMac}`;
+    }
   } else if (trackingBanner.status === 'failed' && !trackingExpired) {
     bannerText = 'Tracking failed';
+    if (trackingBanner.targetMac) {
+      bannerDetails = `Target: ${trackingBanner.targetMac}`;
+    }
   } else if (!triExpired && triBannerEnabled) {
     if (triangulation.status === 'running' && triangulation.endsAt) {
       const remainingMs = Math.max(0, triangulation.endsAt - clock);
@@ -111,12 +121,37 @@ export function AppHeader() {
       const seconds = (remainingSec % 60).toString().padStart(2, '0');
       bannerText = 'Triangulation in progress';
       bannerCountdown = `${minutes}:${seconds}`;
+      if (triangulation.targetMac) {
+        bannerDetails = `Target: ${triangulation.targetMac}`;
+      }
     } else if (triangulation.status === 'processing') {
       bannerText = 'Triangulation processing…';
+      if (triangulation.targetMac) {
+        bannerDetails = `Target: ${triangulation.targetMac}`;
+      }
     } else if (triangulation.status === 'failed') {
       bannerText = 'Triangulation failed';
+      if (triangulation.targetMac) {
+        bannerDetails = `Target: ${triangulation.targetMac}`;
+      }
     } else if (triangulation.status === 'success') {
       bannerText = 'Triangulation succeeded';
+      const details: string[] = [];
+      if (triangulation.targetMac) {
+        details.push(`Target: ${triangulation.targetMac}`);
+      }
+      if (triangulation.confidence != null) {
+        details.push(`Confidence: ${triangulation.confidence.toFixed(1)}%`);
+      }
+      if (triangulation.uncertainty != null) {
+        details.push(`Uncertainty: ±${triangulation.uncertainty.toFixed(1)}m`);
+      }
+      if (triangulation.coordinatingNode) {
+        details.push(`Coord: ${triangulation.coordinatingNode}`);
+      }
+      if (details.length > 0) {
+        bannerDetails = details.join(' | ');
+      }
     }
   }
 
@@ -138,7 +173,10 @@ export function AppHeader() {
 
       {bannerText ? (
         <div className="app-header__triangulation">
-          <div className="app-header__triangulation-label">{bannerText}</div>
+          <div className="app-header__triangulation-label">
+            {bannerText}
+            {bannerDetails ? <div style={{ fontSize: '0.85em', opacity: 0.9 }}>{bannerDetails}</div> : null}
+          </div>
           {bannerCountdown ? (
             <div className="app-header__triangulation-countdown">{bannerCountdown}</div>
           ) : null}
