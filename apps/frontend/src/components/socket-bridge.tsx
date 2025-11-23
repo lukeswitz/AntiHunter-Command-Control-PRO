@@ -684,7 +684,13 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
         const mac = typeof dataRecord.mac === 'string' ? dataRecord.mac.toUpperCase() : undefined;
         const lat = typeof dataRecord.lat === 'number' ? dataRecord.lat : undefined;
         const lon = typeof dataRecord.lon === 'number' ? dataRecord.lon : undefined;
-        useTriangulationStore.getState().complete({ mac, lat, lon, link });
+        const confidence = typeof dataRecord.confidence === 'number' ? dataRecord.confidence : undefined;
+        const uncertainty = typeof dataRecord.uncertainty === 'number' ? dataRecord.uncertainty : undefined;
+        const coordinatingNode =
+          typeof dataRecord.coordinatingNode === 'string' ? dataRecord.coordinatingNode : undefined;
+        useTriangulationStore
+          .getState()
+          .complete({ mac, lat, lon, link, confidence, uncertainty, coordinatingNode });
       }
       return {
         message,

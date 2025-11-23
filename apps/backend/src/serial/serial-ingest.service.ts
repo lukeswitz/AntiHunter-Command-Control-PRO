@@ -395,7 +395,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             event.category?.toLowerCase() === 'triangulation' &&
             typeof event.data === 'object' &&
             event.data !== null &&
-            (event.data as { stage?: unknown }).stage === 'complete';
+            ((event.data as { stage?: unknown }).stage === 'complete' ||
+              (event.data as { stage?: unknown }).stage === 'final');
           const macFromData =
             typeof event.data === 'object' &&
             event.data !== null &&
