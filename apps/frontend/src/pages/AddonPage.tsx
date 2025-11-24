@@ -70,8 +70,10 @@ export function AddonPage() {
           </div>
           <h2>Alerts</h2>
           <p>Manage alert rules, routing, and webhook notifications for target detections.</p>
+          <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Toggle this add-on if you want to temporarily hide alert tooling from the interface.
+            Configure the alert engine, routing, and webhooks; disable only if you want a quieter
+            UI.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleAlertsToggle}>
@@ -86,9 +88,10 @@ export function AddonPage() {
           </div>
           <h2>Scheduler</h2>
           <p>Plan commands days in advance and automatically dispatch sequences based on time.</p>
+          <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Enable the scheduler when you need recurring tasks; disable it to keep the interface
-            lightweight.
+            Use for timed or recurring command sequences; turn off when you prefer purely manual
+            control.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleSchedulerToggle}>
@@ -103,8 +106,10 @@ export function AddonPage() {
           </div>
           <h2>Operator Chat</h2>
           <p>Secure, encrypted operator chat over MQTT between sites.</p>
+          <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Toggle to show/hide chat in the navigation. Keys are managed in Config &rarr; Chat.
+            Encrypted operator chat across sites; keys are generated and managed in Config &rarr;
+            Chat.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleChatToggle}>
