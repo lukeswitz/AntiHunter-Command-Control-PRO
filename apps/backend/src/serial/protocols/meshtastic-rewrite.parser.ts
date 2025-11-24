@@ -772,7 +772,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             lat,
             lon,
             confidence,
-            uncertainty
+            uncertainty,
           },
         },
       ];

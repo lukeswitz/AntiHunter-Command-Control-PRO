@@ -414,7 +414,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             void this.targetsService
               .applyTrackingEstimate(macString, lat, lon, siteId, {
                 confidence,
-                uncertainty
+                uncertainty,
               })
               .catch((error) =>
                 this.logger.warn(

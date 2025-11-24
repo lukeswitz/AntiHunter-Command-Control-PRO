@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { MqttService, SiteMqttContext } from './mqtt.service';
 import { DronesService } from '../drones/drones.service';
 import { EventBusService, CommandCenterEvent } from '../events/event-bus.service';
+import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
 type EventBroadcastMessage = {
@@ -56,8 +57,11 @@ export class MqttEventsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MqttEventsService.name);
   private readonly localSiteId: string;
   private readonly enabled: boolean;
+  private readonly processRemoteAlerts: boolean;
   private subscription?: Subscription;
   private readonly inboundHandlers = new Map<string, (topic: string, payload: Buffer) => void>();
+  private readonly seenAlertIds = new Map<string, number>();
+  private static readonly ALERT_DEDUPE_MS = 5 * 60 * 1000;
 
   constructor(
     configService: ConfigService,
@@ -65,9 +69,11 @@ export class MqttEventsService implements OnModuleInit, OnModuleDestroy {
     private readonly mqttService: MqttService,
     private readonly gateway: CommandCenterGateway,
     private readonly dronesService: DronesService,
+    private readonly webhookDispatcher: WebhookDispatcherService,
   ) {
     this.localSiteId = configService.get<string>('site.id', 'default');
     this.enabled = configService.get<boolean>('mqtt.enabled', true);
+    this.processRemoteAlerts = configService.get<boolean>('mqtt.processRemoteAlerts', true);
   }
 
   onModuleInit(): void {
@@ -182,6 +188,7 @@ export class MqttEventsService implements OnModuleInit, OnModuleDestroy {
     const event = {
       ...message.payload,
       siteId: message.payload.siteId ?? originSiteId,
+      originSiteId,
     };
 
     if (isDroneTelemetryEvent(event)) {
@@ -250,6 +257,56 @@ export class MqttEventsService implements OnModuleInit, OnModuleDestroy {
           }`,
         );
       }
+    } else if (event.type === 'event.alert') {
+      if (!this.processRemoteAlerts) {
+        this.gateway.emitEvent(event, { skipBus: true });
+        return;
+      }
+
+      // Deduplicate remote alerts
+      const alertId =
+        typeof (event as { id?: unknown }).id === 'string'
+          ? (event as { id: string }).id
+          : `${originSiteId}-${event.nodeId ?? 'unknown'}-${event.timestamp ?? Date.now()}-${
+              event.message ?? ''
+            }`;
+      const now = Date.now();
+      this.seenAlertIds.forEach((ts, key) => {
+        if (now - ts > MqttEventsService.ALERT_DEDUPE_MS) {
+          this.seenAlertIds.delete(key);
+        }
+      });
+      if (this.seenAlertIds.has(alertId)) {
+        return;
+      }
+      this.seenAlertIds.set(alertId, now);
+
+      // Emit to UI
+      this.gateway.emitEvent(event, { skipBus: true });
+
+      // Fire local webhooks/subscribers as if local (without rebroadcast)
+      try {
+        await this.webhookDispatcher.dispatchExternalAlert({
+          event: 'alert.remote',
+          eventType: 'ALERT_TRIGGERED',
+          timestamp: event.timestamp ? new Date(event.timestamp as string) : new Date(),
+          message: typeof event.message === 'string' ? event.message : undefined,
+          severity:
+            typeof (event as { level?: unknown }).level === 'string'
+              ? ((event as { level?: string }).level as string)
+              : undefined,
+          siteId: originSiteId,
+          nodeId: typeof event.nodeId === 'string' ? event.nodeId : null,
+          payload: (event as { data?: Record<string, unknown> }).data ?? undefined,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to process remote alert ${alertId} from ${originSiteId}: ${
+            error instanceof Error ? error.message : error
+          }`,
+        );
+      }
+      return;
     }
 
     this.gateway.emitEvent(event, { skipBus: true });

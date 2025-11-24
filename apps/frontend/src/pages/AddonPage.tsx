@@ -55,8 +55,7 @@ export function AddonPage() {
           <p>Generate high-level coverage plans and mission overlays using current target data.</p>
           <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Provides planning and overlay tools for commanders; enable to expose the Strategy
-            Advisor in the main navigation.
+            Activating this feature reveals the Strategy Advisor entry in the main navigation.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleStrategyToggle}>
@@ -71,10 +70,8 @@ export function AddonPage() {
           </div>
           <h2>Alerts</h2>
           <p>Manage alert rules, routing, and webhook notifications for target detections.</p>
-          <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Defines alert rules, destinations, and webhooks for detections; leave enabled to keep
-            notifications flowing.
+            Toggle this add-on if you want to temporarily hide alert tooling from the interface.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleAlertsToggle}>
@@ -89,10 +86,9 @@ export function AddonPage() {
           </div>
           <h2>Scheduler</h2>
           <p>Plan commands days in advance and automatically dispatch sequences based on time.</p>
-          <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Use for timed or recurring command sequences; turn off when you prefer purely manual
-            control.
+            Enable the scheduler when you need recurring tasks; disable it to keep the interface
+            lightweight.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleSchedulerToggle}>
@@ -107,10 +103,8 @@ export function AddonPage() {
           </div>
           <h2>Operator Chat</h2>
           <p>Secure, encrypted operator chat over MQTT between sites.</p>
-          <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Encrypted operator chat across sites; keys are generated and managed in Config &rarr;
-            Chat.
+            Toggle to show/hide chat in the navigation. Keys are managed in Config &rarr; Chat.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleChatToggle}>

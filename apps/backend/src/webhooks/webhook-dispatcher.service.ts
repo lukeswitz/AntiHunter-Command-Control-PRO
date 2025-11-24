@@ -66,6 +66,10 @@ export class WebhookDispatcherService {
     );
   }
 
+  async dispatchExternalAlert(context: WebhookDispatchContext): Promise<void> {
+    await this.dispatchToSubscribers(WebhookEventType.ALERT_TRIGGERED, context);
+  }
+
   async dispatchInventoryUpdate(device: InventoryDevice): Promise<void> {
     const payload = {
       mac: device.mac,
