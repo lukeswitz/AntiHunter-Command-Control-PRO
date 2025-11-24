@@ -55,7 +55,8 @@ export function AddonPage() {
           <p>Generate high-level coverage plans and mission overlays using current target data.</p>
           <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Activating this feature reveals the Strategy Advisor entry in the main navigation.
+            Provides planning and overlay tools for commanders; enable to expose the Strategy
+            Advisor in the main navigation.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleStrategyToggle}>
@@ -72,8 +73,8 @@ export function AddonPage() {
           <p>Manage alert rules, routing, and webhook notifications for target detections.</p>
           <div className="addon-card__notice">This addon is under active development.</div>
           <p className="form-hint">
-            Configure the alert engine, routing, and webhooks; disable only if you want a quieter
-            UI.
+            Defines alert rules, destinations, and webhooks for detections; leave enabled to keep
+            notifications flowing.
           </p>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleAlertsToggle}>
