@@ -156,20 +156,11 @@ export function MapPage() {
       Date.now() - triangulationState.lastUpdated < 10_000
         ? triangulationState.targetMac.toUpperCase()
         : null;
-
-    const validTargets = targetsQuery.data.filter((target) => {
-      if (typeof target.lat !== 'number' || typeof target.lon !== 'number') {
-        return false;
-      }
-      return !(target.lat === 0 && target.lon === 0);
-    });
-
-    return validTargets.map<TargetMarker>((target) => {
+    return targetsQuery.data.map<TargetMarker>((target) => {
       const trackingEntry = trackingMap[target.id];
       const comment = commentMap[target.id];
       const lastSeen = target.updatedAt ?? target.createdAt;
       const targetMacUpper = target.mac ? target.mac.toUpperCase() : null;
-
       return {
         id: target.id,
         mac: target.mac ?? undefined,
@@ -291,41 +282,20 @@ export function MapPage() {
     if (!mapReady || !mapRef.current) {
       return false;
     }
-
-    const positions: [number, number][] = [];
-
-    // Nodes
-    nodeList.forEach((node) => {
-      if (
-        typeof node.lat === 'number' &&
-        typeof node.lon === 'number' &&
-        Number.isFinite(node.lat) &&
-        Number.isFinite(node.lon)
-      ) {
-        positions.push([node.lat, node.lon]);
-      }
-    });
-
-    // Targets
-    targetMarkers.forEach((target) => {
-      if (
-        typeof target.lat === 'number' &&
-        typeof target.lon === 'number' &&
-        Number.isFinite(target.lat) &&
-        Number.isFinite(target.lon)
-      ) {
-        positions.push([target.lat, target.lon]);
-      }
-    });
-
+    const positions = nodeList
+      .map((node) =>
+        typeof node.lat === 'number' && typeof node.lon === 'number'
+          ? ([node.lat, node.lon] as [number, number])
+          : null,
+      )
+      .filter((value): value is [number, number] => value !== null);
     if (positions.length === 0) {
       return false;
     }
-
     const bounds = latLngBounds(positions);
     mapRef.current.fitBounds(bounds.pad(0.25));
     return true;
-  }, [mapReady, nodeList, targetMarkers]);
+  }, [mapReady, nodeList]);
 
   const handleFitClick = () => {
     if (fitEnabled) {
@@ -425,7 +395,7 @@ export function MapPage() {
       return;
     }
     performFit();
-  }, [fitEnabled, performFit, nodeList.length, targetMarkers.length, mapReady]);
+  }, [fitEnabled, performFit, nodeList.length, mapReady]);
 
   useEffect(() => {
     if (!pendingTarget || !mapReady || !mapRef.current) {

@@ -61,8 +61,6 @@ const TRI_RESULTS_START_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS
 const TRI_RESULTS_END_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_END/i;
 const TRI_COMPLETE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_COMPLETE:\s*(?:MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+)?Nodes=(?<nodes>\d+)\s*(?<rest>.+)?$/i;
-const TRI_FINAL_REGEX =
-  /^(?<id>[A-Za-z0-9]{2,5}):\s*TRIANGULATION_FINAL:\s*MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)\s+CONF=(?<conf>\d+(?:\.\d+)?)\s+UNC=(?<unc>\d+(?:\.\d+)?)(?:\s+COORD=(?<coord>[A-Za-z0-9_-]+))?$/i;
 const RTC_SYNC_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*RTC_SYNC:(?<source>\S+)/i;
 const TIME_SYNC_REQ_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*TIME_SYNC_REQ:(?<time>\d+):(?<window>\d+):(?<seq>\d+):(?<offset>-?\d+)/i;
@@ -746,33 +744,6 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             lat,
             lon,
             link: complete.groups.rest?.trim(),
-          },
-        },
-      ];
-    }
-    const final = TRI_FINAL_REGEX.exec(payload);
-    if (final?.groups) {
-      const mac = final.groups.mac?.toUpperCase();
-      const lat = Number(final.groups.lat);
-      const lon = Number(final.groups.lon);
-      const confidence = Number(final.groups.conf);
-      const uncertainty = Number(final.groups.unc);
-
-      return [
-        {
-          kind: 'alert',
-          level: 'NOTICE',
-          category: 'triangulation',
-          nodeId: id,
-          message: payload,
-          raw,
-          data: {
-            stage: 'final',
-            mac,
-            lat,
-            lon,
-            confidence,
-            uncertainty,
           },
         },
       ];

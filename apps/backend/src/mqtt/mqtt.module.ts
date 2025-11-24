@@ -17,8 +17,6 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { NodesModule } from '../nodes/nodes.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { TargetsModule } from '../targets/targets.module';
-import { WebhooksModule } from '../webhooks/webhooks.module';
-import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 import { WsModule } from '../ws/ws.module';
 
 @Module({
@@ -32,7 +30,6 @@ import { WsModule } from '../ws/ws.module';
     GeofencesModule,
     WsModule,
     DronesModule,
-    WebhooksModule,
   ],
   providers: [
     MqttService,
@@ -43,8 +40,6 @@ import { WsModule } from '../ws/ws.module';
     MqttGeofencesService,
     MqttEventsService,
     MqttDronesService,
-    // Included here to ensure availability for MQTT event handling even if module resolution is cached
-    WebhookDispatcherService,
   ],
   controllers: [MqttController],
   exports: [MqttService],

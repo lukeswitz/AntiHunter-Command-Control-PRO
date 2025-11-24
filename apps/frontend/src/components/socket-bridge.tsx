@@ -284,6 +284,7 @@ export function SocketBridge() {
 
       const targetDetails = extractTargetDetails(payload);
       if (targetDetails) {
+        let targetChanged = false;
         if (
           targetDetails.mac &&
           typeof targetDetails.lat === 'number' &&
@@ -319,6 +320,7 @@ export function SocketBridge() {
                 updatedAt !== target.updatedAt
               ) {
                 changed = true;
+                targetChanged = true;
                 return {
                   ...target,
                   lat,
@@ -346,6 +348,9 @@ export function SocketBridge() {
             lon: targetDetails.lon,
             link: undefined,
           });
+          if (targetChanged) {
+            void queryClient.invalidateQueries({ queryKey: ['targets'] });
+          }
         }
 
         const nodeState = useNodeStore.getState();
@@ -679,11 +684,7 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
         const mac = typeof dataRecord.mac === 'string' ? dataRecord.mac.toUpperCase() : undefined;
         const lat = typeof dataRecord.lat === 'number' ? dataRecord.lat : undefined;
         const lon = typeof dataRecord.lon === 'number' ? dataRecord.lon : undefined;
-        const confidence = typeof dataRecord.confidence === 'number' ? dataRecord.confidence : undefined;
-        const uncertainty = typeof dataRecord.uncertainty === 'number' ? dataRecord.uncertainty : undefined;
-        useTriangulationStore
-          .getState()
-          .complete({ mac, lat, lon, link, confidence, uncertainty});
+        useTriangulationStore.getState().complete({ mac, lat, lon, link });
       }
       return {
         message,
@@ -935,96 +936,35 @@ function extractTargetDetails(payload: unknown): TargetEventDetails | null {
     confidence?: number;
     tracking?: { confidence?: number };
     channel?: number | string | null;
-    category?: string;
-    data?: Record<string, unknown> | null;
   };
 
-  // 1) Normal event.target from backend
-  if (base.type === 'event.target') {
-    const trackingConfidence =
-      typeof base.confidence === 'number'
-        ? base.confidence
-        : typeof base.tracking?.confidence === 'number'
-          ? base.tracking.confidence
-          : undefined;
-
-    return {
-      mac: base.mac,
-      nodeId: base.nodeId,
-      rssi: toNumber(base.rssi),
-      deviceType: base.deviceType,
-      channel: toNumber(base.channel),
-      lat: toNumber(base.lat),
-      lon: toNumber(base.lon),
-      detectedAt:
-        typeof base.timestamp === 'string'
-          ? base.timestamp
-          : typeof base.ts === 'string'
-            ? base.ts
-            : undefined,
-      confidence: typeof trackingConfidence === 'number' ? trackingConfidence : undefined,
-    };
+  if (base.type !== 'event.target') {
+    return null;
   }
 
-  // 2) Triangulation alert treated as a target update
-  if (base.type === 'event.alert') {
-    const category =
-      typeof base.category === 'string' ? base.category.toLowerCase() : '';
-    if (category !== 'triangulation') {
-      return null;
-    }
+  const trackingConfidence =
+    typeof base.confidence === 'number'
+      ? base.confidence
+      : typeof base.tracking?.confidence === 'number'
+        ? base.tracking.confidence
+        : undefined;
 
-    const data =
-      base.data && typeof base.data === 'object'
-        ? (base.data as Record<string, unknown>)
-        : {};
-
-    const mac =
-      typeof data.mac === 'string'
-        ? data.mac
-        : typeof base.mac === 'string'
-          ? base.mac
-          : undefined;
-
-    if (!mac) {
-      return null;
-    }
-
-    // Prefer top‑level lat/lon
-    const lat = toNumber(base.lat ?? data.lat);
-    const lon = toNumber(base.lon ?? data.lon);
-    if (typeof lat !== 'number' || typeof lon !== 'number') {
-      return null;
-    }
-
-    const rssi = toNumber(data.rssi);
-    const confidence = toNumber(
-      (data.confidence as number | string | undefined) ??
-        (data.CONF as number | string | undefined),
-    );
-
-    return {
-      mac,
-      nodeId: base.nodeId,
-      rssi,
-      deviceType:
-        typeof data.type === 'string'
-          ? (data.type as string)
-          : base.deviceType ?? 'target',
-      channel: toNumber(data.channel),
-      lat,
-      lon,
-      detectedAt:
-        typeof base.timestamp === 'string'
-          ? base.timestamp
-          : typeof base.ts === 'string'
-            ? base.ts
-            : undefined,
-      confidence: typeof confidence === 'number' ? confidence : undefined,
-    };
-  }
-
-  return null;
+  return {
+    mac: base.mac,
+    nodeId: base.nodeId,
+    rssi: toNumber(base.rssi),
+    deviceType: base.deviceType,
+    channel: toNumber(base.channel),
+    lat: toNumber(base.lat),
+    lon: toNumber(base.lon),
+    detectedAt:
+      typeof base.timestamp === 'string'
+        ? base.timestamp
+        : typeof base.ts === 'string'
+          ? base.ts
+          : undefined,
+    confidence: typeof trackingConfidence === 'number' ? trackingConfidence : undefined,
+  };
 }
 
 function extractServerTrackingEstimate(payload: unknown): TrackingEstimatePayload | null {

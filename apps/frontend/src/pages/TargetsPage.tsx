@@ -482,7 +482,6 @@ export function TargetsPage() {
                     Location {renderSortIcon('lat')}
                   </button>
                 </th>
-                <th>Triangulation</th>
                 <th aria-sort={ariaSort('updated')}>
                   <button
                     type="button"
@@ -522,21 +521,6 @@ export function TargetsPage() {
                     <td>{statusLabel}</td>
                     <td>{firstNode}</td>
                     <td>{location}</td>
-                    <td>
-                      {target.trackingConfidence != null ||
-                      target.uncertainty != null ? (
-                        <div style={{ fontSize: '0.85em', whiteSpace: 'nowrap' }}>
-                          {target.trackingConfidence != null && (
-                            <div>Conf: {target.trackingConfidence.toFixed(1)}%</div>
-                          )}
-                          {target.uncertainty != null && (
-                            <div>Unc: ±{target.uncertainty.toFixed(1)}m</div>
-                          )}
-                        </div>
-                      ) : (
-                        'N/A'
-                      )}
-                    </td>
                     <td>{new Date(target.updatedAt).toLocaleString()}</td>
                     <td>
                       <textarea

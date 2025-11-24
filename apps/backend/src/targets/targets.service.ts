@@ -202,10 +202,6 @@ export class TargetsService {
     lat: number,
     lon: number,
     siteId?: string | null,
-    options?: {
-      confidence?: number;
-      uncertainty?: number;
-    },
   ): Promise<boolean> {
     let normalizedMac: string;
     try {
@@ -220,13 +216,6 @@ export class TargetsService {
       lon,
       updatedAt: new Date(),
     };
-
-    if (options?.confidence !== undefined) {
-      data.trackingConfidence = options.confidence;
-    }
-    if (options?.uncertainty !== undefined) {
-      data.uncertainty = options.uncertainty;
-    }
 
     const where: Prisma.TargetWhereInput = { mac: normalizedMac };
     if (siteId !== undefined) {

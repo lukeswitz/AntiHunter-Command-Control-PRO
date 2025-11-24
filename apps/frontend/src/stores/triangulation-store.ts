@@ -10,19 +10,10 @@ interface TriangulationState {
   link?: string;
   lat?: number;
   lon?: number;
-  confidence?: number;
-  uncertainty?: number;
   lastUpdated?: number;
   setCountdown: (mac: string, durationSec: number) => void;
   setProcessing: () => void;
-  complete: (params: {
-    mac?: string;
-    lat?: number;
-    lon?: number;
-    link?: string;
-    confidence?: number;
-    uncertainty?: number;
-  }) => void;
+  complete: (params: { mac?: string; lat?: number; lon?: number; link?: string }) => void;
   fail: () => void;
   reset: () => void;
 }
@@ -41,8 +32,6 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       link: undefined,
       lat: undefined,
       lon: undefined,
-      confidence: undefined,
-      uncertainty: undefined,
       lastUpdated: now,
     });
     // auto-transition to processing when countdown elapses
@@ -63,7 +52,7 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       set({ status: 'processing', lastUpdated: Date.now() });
     }
   },
-  complete: ({ mac, lat, lon, link, confidence, uncertainty}) => {
+  complete: ({ mac, lat, lon, link }) => {
     const stateMac = get().targetMac;
     const incomingMac = mac ? mac.toUpperCase() : undefined;
     if (stateMac && incomingMac && stateMac !== incomingMac) {
@@ -76,8 +65,6 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       link,
       lat,
       lon,
-      confidence,
-      uncertainty,
       lastUpdated: Date.now(),
     });
   },
@@ -91,8 +78,6 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       link: undefined,
       lat: undefined,
       lon: undefined,
-      confidence: undefined,
-      uncertainty: undefined,
       lastUpdated: undefined,
     }),
 }));

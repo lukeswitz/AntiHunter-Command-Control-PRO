@@ -664,7 +664,7 @@ export function CommandCenterMap({
                       Location: {target.lat.toFixed(5)}, {target.lon.toFixed(5)}
                     </div>
                     {typeof target.trackingConfidence === 'number' && (
-                      <div>Confidence: {target.trackingConfidence.toFixed(1)}%</div>
+                      <div>Confidence: {(target.trackingConfidence * 100).toFixed(0)}%</div>
                     )}
                     <div>Last seen: {new Date(target.lastSeen).toLocaleString()}</div>
                     {target.tracking ? (

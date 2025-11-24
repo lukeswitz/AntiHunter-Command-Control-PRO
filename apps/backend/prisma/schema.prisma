@@ -253,23 +253,21 @@ model NodePosition {
 }
 
 model Target {
-  id                 String       @id @default(cuid())
-  siteId             String?
-  name               String?
-  mac                String?
-  deviceType         String?
-  firstNodeId        String?
-  lat                Float
-  lon                Float
-  url                String?
-  notes              String?
-  tags               String[]     @default([])
-  status             TargetStatus @default(ACTIVE)
-  createdBy          String?
-  trackingConfidence Float?
-  uncertainty        Float?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  id          String       @id @default(cuid())
+  siteId      String?
+  name        String?
+  mac         String?
+  deviceType  String?
+  firstNodeId String?
+  lat         Float
+  lon         Float
+  url         String?
+  notes       String?
+  tags        String[]     @default([])
+  status      TargetStatus @default(ACTIVE)
+  createdBy   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   site Site? @relation(fields: [siteId], references: [id])
 
