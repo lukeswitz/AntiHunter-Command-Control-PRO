@@ -42,6 +42,9 @@ const COMMAND_HANDLERS: Record<string, CommandHandler> = {
   ERASE_REQUEST: expectNoParams,
   ERASE_FORCE: handleEraseForce,
   ERASE_CANCEL: expectNoParams,
+  AUTOERASE_ENABLE: handleAutoEraseEnable,
+  AUTOERASE_DISABLE: expectNoParams,
+  AUTOERASE_STATUS: expectNoParams,
 };
 
 const SINGLE_NODE_COMMANDS = new Set<string>(['CONFIG_NODEID']);
@@ -244,6 +247,50 @@ function handleEraseForce(params: string[]): string[] {
     );
   }
   return [token];
+}
+
+function handleAutoEraseEnable(params: string[]): string[] {
+  if (params.length === 0) {
+    return [];
+  }
+  if (params.length !== 5) {
+    throw new BadRequestException(
+      'AUTOERASE_ENABLE expects either no parameters (uses defaults) or all 5 parameters (setupDelay:eraseDelay:vibs:window:cooldown).',
+    );
+  }
+
+  const setupDelay = Number.parseInt(params[0].trim(), 10);
+  if (!Number.isFinite(setupDelay) || setupDelay < 30 || setupDelay > 600) {
+    throw new BadRequestException('Setup delay must be between 30 and 600 seconds.');
+  }
+
+  const eraseDelay = Number.parseInt(params[1].trim(), 10);
+  if (!Number.isFinite(eraseDelay) || eraseDelay < 10 || eraseDelay > 300) {
+    throw new BadRequestException('Erase delay must be between 10 and 300 seconds.');
+  }
+
+  const vibrationsRequired = Number.parseInt(params[2].trim(), 10);
+  if (!Number.isFinite(vibrationsRequired) || vibrationsRequired < 2 || vibrationsRequired > 5) {
+    throw new BadRequestException('Vibrations required must be between 2 and 5.');
+  }
+
+  const detectionWindow = Number.parseInt(params[3].trim(), 10);
+  if (!Number.isFinite(detectionWindow) || detectionWindow < 10 || detectionWindow > 60) {
+    throw new BadRequestException('Detection window must be between 10 and 60 seconds.');
+  }
+
+  const autoEraseCooldown = Number.parseInt(params[4].trim(), 10);
+  if (!Number.isFinite(autoEraseCooldown) || autoEraseCooldown < 300 || autoEraseCooldown > 3600) {
+    throw new BadRequestException('Auto-erase cooldown must be between 300 and 3600 seconds.');
+  }
+
+  return [
+    setupDelay.toString(),
+    eraseDelay.toString(),
+    vibrationsRequired.toString(),
+    detectionWindow.toString(),
+    autoEraseCooldown.toString(),
+  ];
 }
 
 function normalizeMode(value: string): string {
