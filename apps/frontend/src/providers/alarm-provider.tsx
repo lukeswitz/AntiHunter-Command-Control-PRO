@@ -147,7 +147,7 @@ export function AlarmProvider({ children }: PropsWithChildren) {
       console.log('Alarm mutation called with:', body);
       return apiClient.put<AlarmSettingsResponse>('/alarms', body);
     },
-    onMutate: async (body: AlarmConfig) => {
+    onMutate: async (_body: AlarmConfig) => {
       const previous = queryClient.getQueryData<AlarmSettingsResponse>(['alarms']);
       // Don't do optimistic updates - wait for server confirmation
       return { previous };

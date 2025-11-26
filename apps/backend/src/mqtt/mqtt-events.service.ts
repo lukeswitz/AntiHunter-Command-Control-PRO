@@ -6,8 +6,8 @@ import { Subscription } from 'rxjs';
 import { MqttService, SiteMqttContext } from './mqtt.service';
 import { DronesService } from '../drones/drones.service';
 import { EventBusService, CommandCenterEvent } from '../events/event-bus.service';
-import { CommandCenterGateway } from '../ws/command-center.gateway';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
+import { CommandCenterGateway } from '../ws/command-center.gateway';
 
 type EventBroadcastMessage = {
   type: 'event.broadcast';
@@ -40,6 +40,16 @@ type DroneStatusEvent = CommandCenterEvent & {
   type: 'drone.status';
   droneId?: string;
   status?: string;
+};
+
+type AlertEvent = CommandCenterEvent & {
+  type: 'event.alert';
+  id?: string;
+  nodeId?: string;
+  message?: string;
+  level?: AlarmLevel;
+  timestamp?: string | Date;
+  data?: Record<string, unknown>;
 };
 
 const EVENT_TOPIC_PATTERN = 'ahcc/+/events/+';
@@ -257,18 +267,17 @@ export class MqttEventsService implements OnModuleInit, OnModuleDestroy {
           }`,
         );
       }
-    } else if (event.type === 'event.alert') {
+    } else if (isAlertEvent(event)) {
       if (!this.processRemoteAlerts) {
         this.gateway.emitEvent(event, { skipBus: true });
         return;
       }
 
-      const eventAny = event as any;
       const alertId =
-        typeof eventAny.id === 'string'
-          ? eventAny.id
-          : `${originSiteId}-${eventAny.nodeId ?? 'unknown'}-${eventAny.timestamp ?? Date.now()}-${
-              eventAny.message ?? ''
+        typeof event.id === 'string'
+          ? event.id
+          : `${originSiteId}-${event.nodeId ?? 'unknown'}-${event.timestamp ?? Date.now()}-${
+              event.message ?? ''
             }`;
 
       const now = Date.now();
@@ -288,15 +297,12 @@ export class MqttEventsService implements OnModuleInit, OnModuleDestroy {
         await this.webhookDispatcher.dispatchExternalAlert({
           event: 'alert.remote',
           eventType: 'ALERT_TRIGGERED',
-          timestamp: eventAny.timestamp ? new Date(eventAny.timestamp as string) : new Date(),
-          message: typeof eventAny.message === 'string' ? eventAny.message : undefined,
-          severity:
-            typeof eventAny.level === 'string'
-              ? (eventAny.level as AlarmLevel)
-              : undefined,
+          timestamp: event.timestamp ? new Date(event.timestamp as string) : new Date(),
+          message: typeof event.message === 'string' ? event.message : undefined,
+          severity: typeof event.level === 'string' ? event.level : undefined,
           siteId: originSiteId,
-          nodeId: typeof eventAny.nodeId === 'string' ? eventAny.nodeId : null,
-          payload: eventAny.data as Record<string, unknown> | undefined,
+          nodeId: typeof event.nodeId === 'string' ? event.nodeId : null,
+          payload: event.data,
         });
       } catch (error) {
         this.logger.warn(
@@ -323,6 +329,10 @@ function isDroneTelemetryEvent(event: CommandCenterEvent): event is DroneTelemet
 
 function isDroneStatusEvent(event: CommandCenterEvent): event is DroneStatusEvent {
   return event.type === 'drone.status';
+}
+
+function isAlertEvent(event: CommandCenterEvent): event is AlertEvent {
+  return event.type === 'event.alert';
 }
 
 function isDroneStatus(value: unknown): value is DroneStatus {

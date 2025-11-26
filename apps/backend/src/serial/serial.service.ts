@@ -255,7 +255,10 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   >();
   private clusterMessageListener?: (message: unknown) => void;
   private replicaState: SerialState = { connected: false };
-  private readonly recentMessageCache = new Map<string, { timestamp: number; content: string; rawLine: string }>(); // dedupe key -> {timestamp, content, rawLine}
+  private readonly recentMessageCache = new Map<
+    string,
+    { timestamp: number; content: string; rawLine: string }
+  >(); // dedupe key -> {timestamp, content, rawLine}
   private readonly MESSAGE_CACHE_TTL_MS = 15000; // 15 seconds for mesh rebroadcasts
   private readonly MESSAGE_DEDUPE_WAIT_MS = 250; // Wait 250ms for better version before emitting
 
@@ -1251,7 +1254,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       }
 
       case 'TARGET': {
-        const mac = /(?:Target:\s*)?(?:[A-Z]+\s+)?((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] || '';
+        const mac =
+          /(?:Target:\s*)?(?:[A-Z]+\s+)?((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] || '';
         const type = /Type:([^\s]+)/i.exec(content)?.[1] || '';
         return `${nodeId}:TARGET:${mac.toUpperCase()}:${type}`;
       }
@@ -1276,10 +1280,16 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
       case 'ATTACK': {
         const kind = /ATTACK:\s*(DEAUTH|DISASSOC)/i.exec(content)?.[1] || '';
-        const src = /SRC:((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] ||
-                    /([0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2})->/i.exec(content)?.[1] || '';
-        const dst = /DST:((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] ||
-                    /->((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] || '';
+        const src =
+          /SRC:((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] ||
+          /([0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2})->/i.exec(
+            content,
+          )?.[1] ||
+          '';
+        const dst =
+          /DST:((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] ||
+          /->((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] ||
+          '';
         const chan = /C(?:H:|hannel:)?(\d+)/i.exec(content)?.[1] || '';
         return `${nodeId}:ATTACK:${kind}:${src.toUpperCase()}:${dst.toUpperCase()}:${chan}`;
       }
@@ -1387,17 +1397,24 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
         // Store this message in the cache to prevent duplicates
         if (dedupeKey) {
-          this.recentMessageCache.set(dedupeKey, { timestamp: now, content: coreContent, rawLine: part });
+          this.recentMessageCache.set(dedupeKey, {
+            timestamp: now,
+            content: coreContent,
+            rawLine: part,
+          });
         }
 
         // Log STATUS messages with full details for debugging
         if (coreContent.includes('STATUS:')) {
-          this.logger.log({
-            rawLine: part,
-            coreContent,
-            hasHdop: /HDOP[:=]/.test(coreContent),
-            parsed: parsed.map(p => ({ kind: p.kind, data: 'data' in p ? p.data : null }))
-          }, 'STATUS message parsed');
+          this.logger.log(
+            {
+              rawLine: part,
+              coreContent,
+              hasHdop: /HDOP[:=]/.test(coreContent),
+              parsed: parsed.map((p) => ({ kind: p.kind, data: 'data' in p ? p.data : null })),
+            },
+            'STATUS message parsed',
+          );
         }
 
         this.logger.debug({ parsed }, 'Parsed serial events');

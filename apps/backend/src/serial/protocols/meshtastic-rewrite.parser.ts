@@ -96,8 +96,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       (/\[(Router|SerialConsole)\]/i.test(sanitized) ||
         /^textmessage\s+msg=/i.test(sanitized) ||
         /\btextmessage\s+msg=/i.test(sanitized)) &&
-      (/Received text msg/i.test(sanitized) ||
-        /textmessage/i.test(sanitized));
+      (/Received text msg/i.test(sanitized) || /textmessage/i.test(sanitized));
 
     // Extract payload: for Mesh echoes, get text after msg=; otherwise use msg= content or full line
     let payloadRaw: string;
