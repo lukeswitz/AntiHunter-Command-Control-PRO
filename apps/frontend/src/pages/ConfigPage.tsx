@@ -382,6 +382,16 @@ export function ConfigPage() {
   const [firewallMessage, setFirewallMessage] = useState<string | null>(null);
   const [firewallError, setFirewallError] = useState<string | null>(null);
   const [firewallDirty, setFirewallDirty] = useState(false);
+  const volumeKeys: Array<keyof AlarmConfig> = [
+    'volumeInfo',
+    'volumeNotice',
+    'volumeAlert',
+    'volumeCritical',
+    'volumeDroneGeofence',
+    'volumeDroneTelemetry',
+  ];
+  const [muteAllAlarms, setMuteAllAlarms] = useState(false);
+  const savedVolumesRef = useRef<Partial<AlarmConfig>>({});
 
   const appSettings = appSettingsState ?? appSettingsQuery.data ?? null;
   const serialConfig = serialConfigState ?? serialConfigQuery.data ?? null;
@@ -502,6 +512,37 @@ export function ConfigPage() {
       isAlarmInitializedRef.current = true;
     }
   }, [alarmSettings?.config]);
+
+  const setVolumes = (nextVolumes: Partial<AlarmConfig>) => {
+    setLocalAlarm((prev) => {
+      if (!prev) return prev;
+      return { ...prev, ...nextVolumes };
+    });
+  };
+
+  const handleToggleMuteAll = () => {
+    if (!localAlarm) return;
+    if (!muteAllAlarms) {
+      const snapshot: Partial<AlarmConfig> = {};
+      volumeKeys.forEach((key) => {
+        snapshot[key] = localAlarm[key];
+      });
+      savedVolumesRef.current = snapshot;
+      const muted = volumeKeys.reduce(
+        (acc, key) => ({ ...acc, [key]: 0 }),
+        {} as Partial<AlarmConfig>,
+      );
+      setVolumes(muted);
+      setMuteAllAlarms(true);
+    } else {
+      const restored = volumeKeys.reduce((acc, key) => {
+        const value = savedVolumesRef.current[key] ?? DEFAULT_ALARM_CONFIG[key];
+        return { ...acc, [key]: value };
+      }, {} as Partial<AlarmConfig>);
+      setVolumes(restored);
+      setMuteAllAlarms(false);
+    }
+  };
 
   // Debounce alarm config updates to prevent race conditions when sliding
   useEffect(() => {
@@ -1662,6 +1703,15 @@ export function ConfigPage() {
             <header>
               <h2>Alarm Profiles</h2>
               <p>Adjust volume, rate limit, and audio tone for each alarm level.</p>
+              <div className="controls-row">
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={muteAllAlarms} onChange={handleToggleMuteAll} />
+                  Mute all alarms
+                </label>
+                <span className="config-hint" style={{ marginLeft: 8 }}>
+                  Temporarily set all alarm volumes to 0; unmute restores previous levels.
+                </span>
+              </div>
             </header>
             <div className="config-card__body">
               <div className="config-row">

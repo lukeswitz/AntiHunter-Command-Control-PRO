@@ -4,6 +4,7 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsIP,
   IsIn,
   IsInt,
   IsOptional,
@@ -65,6 +66,7 @@ export class UpdateFirewallConfigDto {
   @ArrayUnique()
   @ArrayMaxSize(500)
   @IsString({ each: true })
+  @IsIP(undefined, { each: true })
   ipAllowList?: string[];
 
   @IsOptional()
@@ -72,5 +74,6 @@ export class UpdateFirewallConfigDto {
   @ArrayUnique()
   @ArrayMaxSize(500)
   @IsString({ each: true })
+  @IsIP(undefined, { each: true })
   ipBlockList?: string[];
 }
