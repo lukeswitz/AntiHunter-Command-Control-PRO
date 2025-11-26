@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
-import { MdAdd, MdDelete, MdRefresh } from 'react-icons/md';
+import { MdDelete, MdRefresh } from 'react-icons/md';
 import { NavLink } from 'react-router-dom';
 
 import {
@@ -175,13 +175,6 @@ export function AlertsPage() {
     setFormMode('edit');
     setFormState(buildFormState(rule));
   };
-
-  const handleNewRule = () => {
-    setSelectedRuleId(null);
-    setFormMode('create');
-    setFormState(createDefaultFormState());
-  };
-
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const payload = buildPayload(formState);
@@ -336,16 +329,15 @@ export function AlertsPage() {
                 onChange={(event) => setSearch(event.target.value)}
               />
             </label>
-            <button
-              type="button"
-              className="control-chip control-chip--ghost"
-              onClick={() => rulesQuery.refetch()}
-            >
-              <MdRefresh /> Refresh
-            </button>
-            <button type="button" className="control-chip" onClick={handleNewRule}>
-              <MdAdd /> New alert
-            </button>
+            <div className="alerts-header__actions">
+              <button
+                type="button"
+                className="control-chip control-chip--ghost"
+                onClick={() => rulesQuery.refetch()}
+              >
+                <MdRefresh /> Refresh
+              </button>
+            </div>
           </div>
         </header>
 
@@ -354,6 +346,15 @@ export function AlertsPage() {
             <header>
               <h2>Alert rules</h2>
               <p>Select an existing rule to edit or create a new one.</p>
+              <div className="alerts-rules-actions">
+                <button
+                  type="button"
+                  className="control-chip control-chip--ghost"
+                  onClick={() => rulesQuery.refetch()}
+                >
+                  <MdRefresh /> Refresh
+                </button>
+              </div>
             </header>
             <div className="config-menu alerts-rules-list">
               {visibleRules.map((rule) => (

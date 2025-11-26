@@ -1,4 +1,4 @@
-﻿import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { MdNotificationsActive, MdRefresh } from 'react-icons/md';
 import { NavLink } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { listAlertRuleEvents, listAlertRules } from '../api/alert-rules';
 import type { AlertRule, AlertRuleEvent } from '../api/types';
 
 export function AlertsEventLogPage() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
 
@@ -32,6 +33,11 @@ export function AlertsEventLogPage() {
     : null;
   const recentEvents: AlertRuleEvent[] = eventsQuery.data ?? [];
   const menuEmpty = visibleRules.length === 0;
+  const enableScroll = recentEvents.length > 30;
+
+  const handleClearEvents = () => {
+    queryClient.setQueryData(['alert-rule-events', selectedRuleId ?? 'all'], []);
+  };
 
   return (
     <div className="config-shell alerts-shell">
@@ -138,6 +144,13 @@ export function AlertsEventLogPage() {
               )}
             </header>
             <div className="alerts-events__actions">
+              <button
+                type="button"
+                className="control-chip control-chip--ghost"
+                onClick={handleClearEvents}
+              >
+                Clear
+              </button>
               <button type="button" onClick={() => eventsQuery.refetch()}>
                 <MdRefresh /> Refresh
               </button>
@@ -145,40 +158,44 @@ export function AlertsEventLogPage() {
             {eventsQuery.isLoading ? (
               <p className="empty-state">Loading events.</p>
             ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Severity</th>
-                    <th>Rule</th>
-                    <th>Node / Target</th>
-                    <th>Message</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentEvents.length === 0 ? (
+              <div
+                className={`alerts-events__table${enableScroll ? ' alerts-events__table--scroll' : ''}`}
+              >
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan={5}>
-                        <div className="empty-state">No alert events yet.</div>
-                      </td>
+                      <th>Time</th>
+                      <th>Severity</th>
+                      <th>Rule</th>
+                      <th>Node / Target</th>
+                      <th>Message</th>
                     </tr>
-                  ) : (
-                    recentEvents.map((event) => (
-                      <tr key={event.id}>
-                        <td>{formatTimestamp(event.triggeredAt)}</td>
-                        <td>
-                          <span className={`chip chip--${event.severity.toLowerCase()}`}>
-                            {event.severity}
-                          </span>
+                  </thead>
+                  <tbody>
+                    {recentEvents.length === 0 ? (
+                      <tr>
+                        <td colSpan={5}>
+                          <div className="empty-state">No alert events yet.</div>
                         </td>
-                        <td>{event.ruleName}</td>
-                        <td>{event.nodeId || event.mac || event.ssid || '-'}</td>
-                        <td>{event.message ?? event.matchedCriteria?.join(', ') ?? '-'}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      recentEvents.map((event) => (
+                        <tr key={event.id}>
+                          <td>{formatTimestamp(event.triggeredAt)}</td>
+                          <td>
+                            <span className={`chip chip--${event.severity.toLowerCase()}`}>
+                              {event.severity}
+                            </span>
+                          </td>
+                          <td>{event.ruleName}</td>
+                          <td>{event.nodeId || event.mac || event.ssid || '-'}</td>
+                          <td>{event.message ?? event.matchedCriteria?.join(', ') ?? '-'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         </div>

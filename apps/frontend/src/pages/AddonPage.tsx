@@ -52,11 +52,16 @@ export function AddonPage() {
             <MdHub size={42} />
           </div>
           <h2>Strategy Advisor</h2>
-          <p>Generate high-level coverage plans and mission overlays using current target data.</p>
-          <div className="addon-card__notice">This addon is under active development.</div>
-          <p className="form-hint">
-            Activating this feature reveals the Strategy Advisor entry in the main navigation.
-          </p>
+          <div className="addon-card__body">
+            <p>
+              Generate high-level coverage plans and mission overlays using current target data.
+            </p>
+            <div className="addon-card__notice">This addon is under development.</div>
+            <p className="form-hint">
+              Provides planning and overlay tools for commanders; visible in the main navigation
+              when enabled.
+            </p>
+          </div>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleStrategyToggle}>
               {strategyEnabled ? 'Deactivate add-on' : 'Activate add-on'}
@@ -69,10 +74,13 @@ export function AddonPage() {
             <MdNotificationsActive size={42} />
           </div>
           <h2>Alerts</h2>
-          <p>Manage alert rules, routing, and webhook notifications for target detections.</p>
-          <p className="form-hint">
-            Toggle this add-on if you want to temporarily hide alert tooling from the interface.
-          </p>
+          <div className="addon-card__body">
+            <p>Manage alert rules, routing, and webhook notifications for target detections.</p>
+            <div className="addon-card__notice">This addon is under development.</div>
+            <p className="form-hint">
+              Configure alert rules, destinations, and webhooks for detections across sites.
+            </p>
+          </div>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleAlertsToggle}>
               {alertsEnabled ? 'Deactivate add-on' : 'Activate add-on'}
@@ -85,11 +93,14 @@ export function AddonPage() {
             <MdEventNote size={42} />
           </div>
           <h2>Scheduler</h2>
-          <p>Plan commands days in advance and automatically dispatch sequences based on time.</p>
-          <p className="form-hint">
-            Enable the scheduler when you need recurring tasks; disable it to keep the interface
-            lightweight.
-          </p>
+          <div className="addon-card__body">
+            <p>Plan commands days in advance and automatically dispatch sequences based on time.</p>
+            <div className="addon-card__notice">This addon is under development.</div>
+            <p className="form-hint">
+              Use for timed or recurring command sequences; keep it off when operating purely
+              manually.
+            </p>
+          </div>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleSchedulerToggle}>
               {schedulerEnabled ? 'Deactivate add-on' : 'Activate add-on'}
@@ -102,10 +113,14 @@ export function AddonPage() {
             <MdChat size={42} />
           </div>
           <h2>Operator Chat</h2>
-          <p>Secure, encrypted operator chat over MQTT between sites.</p>
-          <p className="form-hint">
-            Toggle to show/hide chat in the navigation. Keys are managed in Config &rarr; Chat.
-          </p>
+          <div className="addon-card__body">
+            <p>Secure, encrypted operator chat over MQTT between sites.</p>
+            <div className="addon-card__notice">This addon is under development.</div>
+            <p className="form-hint">
+              Encrypted operator chat; keys are managed in Config &rarr; Chat and messages broadcast
+              to all sites.
+            </p>
+          </div>
           <div className="addon-card__actions">
             <button type="button" className="control-chip" onClick={handleChatToggle}>
               {chatEnabled ? 'Deactivate add-on' : 'Activate add-on'}

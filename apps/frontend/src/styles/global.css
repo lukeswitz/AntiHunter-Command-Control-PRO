@@ -5076,3 +5076,49 @@ body.theme-dark .strategy-table__row--selected {
 .inventory-table table tbody tr:hover {
   background: rgba(var(--color-accent-rgb), 0.08);
 }
+.addon-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 12rem;
+}
+.alerts-header__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.alerts-rules-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1rem;
+  align-items: start;
+}
+
+.alerts-actions .config-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.alerts-rules-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.alerts-rules-card__header h2 {
+  margin: 0;
+}
+
+.alerts-rules-card__header p {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.alerts-rules-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
