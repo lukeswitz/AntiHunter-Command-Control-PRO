@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { clearInterval as clearIntervalSafe, setInterval as setIntervalSafe } from 'node:timers';
 
 import type { AdsbStatus, AdsbTrack } from './adsb.types';
+import { CommandCenterGateway } from '../ws/command-center.gateway';
 
 interface Dump1090Aircraft {
   hex?: string;
@@ -35,7 +36,10 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   private lastError: string | null = null;
   private tracks: Map<string, AdsbTrack> = new Map();
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly gateway: CommandCenterGateway,
+  ) {
     this.enabled = this.configService.get<boolean>('adsb.enabled', false) ?? false;
     this.feedUrl =
       this.configService.get<string>('adsb.feedUrl', 'http://127.0.0.1:8080/data/aircraft.json') ??
@@ -62,6 +66,10 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       lastError: this.lastError,
       trackCount: this.tracks.size,
     };
+  }
+
+  getFeedUrl(): string {
+    return this.feedUrl;
   }
 
   getTracks(): AdsbTrack[] {
@@ -144,5 +152,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     this.tracks = nextTracks;
     this.lastPollAt = new Date().toISOString();
     this.lastError = null;
+    this.gateway.emitEvent(
+      { type: 'adsb.tracks', tracks: Array.from(this.tracks.values()) },
+      { skipBus: true },
+    );
   }
 }

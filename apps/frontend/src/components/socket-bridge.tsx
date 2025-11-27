@@ -10,6 +10,7 @@ import type {
   ChatMessage,
   Target,
   ChatClearEvent,
+  AdsbTrack,
 } from '../api/types';
 import { useAlarm } from '../providers/alarm-provider';
 import { useSocket } from '../providers/socket-provider';
@@ -154,6 +155,10 @@ export function SocketBridge() {
     };
 
     const handleEvent = (payload: unknown) => {
+      if (isAdsbTracksEvent(payload)) {
+        queryClient.setQueryData(['adsb', 'tracks'], payload.tracks);
+        return;
+      }
       if (isChatClearEvent(payload)) {
         useChatStore.getState().clearAllRemote();
         return;
@@ -1094,6 +1099,16 @@ function isChatClearEvent(payload: unknown): payload is ChatClearEvent {
   }
   const base = payload as Partial<ChatClearEvent>;
   return base.type === 'chat.clear';
+}
+
+function isAdsbTracksEvent(
+  payload: unknown,
+): payload is { type: 'adsb.tracks'; tracks: AdsbTrack[] } {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const base = payload as { type?: string; tracks?: unknown };
+  return base.type === 'adsb.tracks' && Array.isArray(base.tracks);
 }
 
 function toNumber(value: unknown): number | undefined {

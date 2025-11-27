@@ -8,6 +8,7 @@ interface MapPreferencesState {
   followEnabled: boolean;
   targetsEnabled: boolean;
   coverageEnabled: boolean;
+  adsbEnabled: boolean;
   mapStyle: string;
   setFitEnabled: (value: boolean) => void;
   toggleTrails: () => void;
@@ -15,6 +16,7 @@ interface MapPreferencesState {
   toggleFollow: () => void;
   toggleTargets: () => void;
   toggleCoverage: () => void;
+  toggleAdsb: () => void;
   setMapStyle: (style: string) => void;
 }
 
@@ -25,6 +27,7 @@ const DEFAULT_STATE: Pick<
   | 'followEnabled'
   | 'targetsEnabled'
   | 'coverageEnabled'
+  | 'adsbEnabled'
   | 'mapStyle'
   | 'fitEnabled'
 > = {
@@ -34,6 +37,7 @@ const DEFAULT_STATE: Pick<
   followEnabled: false,
   targetsEnabled: true,
   coverageEnabled: false,
+  adsbEnabled: false,
   mapStyle: 'osm',
 };
 
@@ -47,6 +51,7 @@ export const useMapPreferences = create<MapPreferencesState>()(
       toggleFollow: () => set((state) => ({ followEnabled: !state.followEnabled })),
       toggleTargets: () => set((state) => ({ targetsEnabled: !state.targetsEnabled })),
       toggleCoverage: () => set((state) => ({ coverageEnabled: !state.coverageEnabled })),
+      toggleAdsb: () => set((state) => ({ adsbEnabled: !state.adsbEnabled })),
       setMapStyle: (style) => set({ mapStyle: style }),
     }),
     {
@@ -59,6 +64,7 @@ export const useMapPreferences = create<MapPreferencesState>()(
         followEnabled: state.followEnabled,
         targetsEnabled: state.targetsEnabled,
         coverageEnabled: state.coverageEnabled,
+        adsbEnabled: state.adsbEnabled,
         mapStyle: state.mapStyle,
       }),
     },

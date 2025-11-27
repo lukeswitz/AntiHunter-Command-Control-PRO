@@ -17,7 +17,7 @@ import {
 } from 'react-leaflet';
 import 'leaflet.heat';
 
-import type { Geofence, GeofenceVertex, DroneStatus } from '../../api/types';
+import type { AdsbTrack, Geofence, GeofenceVertex, DroneStatus } from '../../api/types';
 import controllerMarkerIcon from '../../assets/drone-controller.svg';
 import droneMarkerIcon from '../../assets/drone-marker.svg';
 import type { AlertColorConfig } from '../../constants/alert-colors';
@@ -163,6 +163,17 @@ function createTargetIcon(target: TargetMarker): DivIcon {
     className: 'target-marker-wrapper',
     iconSize: [30, 30],
     iconAnchor: [15, 15],
+  });
+}
+
+function createAdsbIcon(track: AdsbTrack): DivIcon {
+  const label = escapeHtml(track.callsign ?? track.icao);
+  const color = '#06b6d4';
+  return divIcon({
+    html: `<div class="adsb-marker" style="--adsb-color:${color};"><span>${label}</span></div>`,
+    className: 'adsb-marker-wrapper',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   });
 }
 
@@ -343,6 +354,7 @@ interface CommandCenterMapProps {
   showTargets: boolean;
   followEnabled: boolean;
   showCoverage: boolean;
+  adsbTracks?: { lat: number; lon: number; icao: string; callsign?: string | null; id: string }[];
   geofences: Geofence[];
   geofenceHighlights: Record<string, number>;
   mapStyle: string;
@@ -383,6 +395,7 @@ export function CommandCenterMap({
   onDroneSelect,
   onNodeCommand,
   trackingOverlays = [],
+  adsbTracks = [],
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const baseLayerKeys = useMemo(() => BASE_LAYERS.map((layer) => layer.key), []);
@@ -429,6 +442,13 @@ export function CommandCenterMap({
     () => targets.filter((target) => hasValidPosition(target.lat, target.lon)),
     [targets],
   );
+  const adsbWithPosition = useMemo(
+    () =>
+      adsbTracks.filter(
+        (track): track is AdsbTrack => Number.isFinite(track.lat) && Number.isFinite(track.lon),
+      ),
+    [adsbTracks],
+  );
 
   const center = useMemo<LatLngExpression>(() => {
     const average = <T extends { lat: number; lon: number }>(
@@ -446,9 +466,10 @@ export function CommandCenterMap({
       average(nodesWithPosition) ??
       average(dronesWithPosition) ??
       average(targetsWithPosition) ??
+      average(adsbWithPosition) ??
       FALLBACK_CENTER
     );
-  }, [nodesWithPosition, dronesWithPosition, targetsWithPosition]);
+  }, [nodesWithPosition, dronesWithPosition, targetsWithPosition, adsbWithPosition]);
 
   useEffect(() => {
     if (mapRef.current && nodesWithPosition.length > 0 && followEnabled) {
@@ -685,6 +706,26 @@ export function CommandCenterMap({
             </Fragment>
           );
         })}
+      {adsbWithPosition.map((track) => {
+        const position: LatLngExpression = [track.lat, track.lon];
+        return (
+          <Marker key={`adsb-${track.id}`} position={position} icon={createAdsbIcon(track)}>
+            <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
+              <div className="drone-tooltip">
+                <strong>{track.callsign ?? track.icao}</strong>
+                <div className="muted">{track.icao}</div>
+                <div>
+                  Location: {track.lat.toFixed(5)}, {track.lon.toFixed(5)}
+                </div>
+                {track.alt != null ? <div>Altitude: {track.alt.toFixed(0)} ft</div> : null}
+                {track.speed != null ? <div>Speed: {track.speed.toFixed(0)} kt</div> : null}
+                {track.heading != null ? <div>Heading: {track.heading.toFixed(0)}&deg;</div> : null}
+                <div>Last seen: {new Date(track.lastSeen).toLocaleTimeString()}</div>
+              </div>
+            </Tooltip>
+          </Marker>
+        );
+      })}
       {trackingOverlays.map((overlay) => {
         const contributorLines =
           overlay.contributors?.filter(

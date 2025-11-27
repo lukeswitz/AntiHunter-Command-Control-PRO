@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { WebhooksSection } from './WebhooksSection';
+import { getAdsbStatus, updateAdsbConfig } from '../api/adsb';
 import { apiClient } from '../api/client';
 import type {
   AlarmConfig,
@@ -26,6 +27,7 @@ import type {
   FirewallGeoMode,
   FirewallLog,
   FirewallRule,
+  AdsbStatus,
   FaaRegistryStatusResponse,
   StartFaaSyncResponse,
 } from '../api/types';
@@ -219,7 +221,8 @@ type ConfigSectionId =
   | 'oui'
   | 'firewall'
   | 'webhooks'
-  | 'faa';
+  | 'faa'
+  | 'adsb';
 
 const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: string }> = [
   { id: 'alarms', label: 'Alarms', description: 'Audio profiles & cooldowns' },
@@ -239,6 +242,7 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: 
   { id: 'detection', label: 'Detection Defaults', description: 'Scan and alert presets' },
   { id: 'webhooks', label: 'Webhooks', description: 'External alert destinations' },
   { id: 'map', label: 'Map & Coverage', description: 'Map viewport and coverage rings' },
+  { id: 'adsb', label: 'ADS-B', description: 'dump1090/readsb feed' },
   { id: 'oui', label: 'OUI Resolver', description: 'Vendor cache imports & exports' },
   { id: 'faa', label: 'FAA Registry', description: 'Aircraft registry enrichment' },
 ];
@@ -328,6 +332,21 @@ export function ConfigPage() {
     staleTime: 60_000,
   });
 
+  const adsbStatusQuery = useQuery({
+    queryKey: ['adsb', 'status'],
+    queryFn: () => getAdsbStatus(),
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    if (adsbStatusQuery.data) {
+      setAdsbStatus(adsbStatusQuery.data);
+      setAdsbEnabled(adsbStatusQuery.data.enabled);
+      setAdsbFeedUrl(adsbStatusQuery.data.feedUrl);
+      setAdsbIntervalMs(adsbStatusQuery.data.intervalMs);
+    }
+  }, [adsbStatusQuery.data]);
+
   const faaStatusQuery = useQuery<FaaRegistryStatusResponse>({
     queryKey: ['faaStatus'],
     queryFn: () => apiClient.get<FaaRegistryStatusResponse>('/config/faa/status'),
@@ -373,6 +392,12 @@ export function ConfigPage() {
     type: 'success' | 'error' | 'info';
     text: string;
   } | null>(null);
+  const [adsbStatus, setAdsbStatus] = useState<AdsbStatus | null>(null);
+  const [adsbEnabled, setAdsbEnabled] = useState<boolean>(false);
+  const [adsbFeedUrl, setAdsbFeedUrl] = useState<string>(
+    'http://127.0.0.1:8080/data/aircraft.json',
+  );
+  const [adsbIntervalMs, setAdsbIntervalMs] = useState<number>(15000);
   const { getKey: getChatKey, setKey: setChatKey, clearKey: clearChatKey } = useChatKeyStore();
   const chatPopupEnabled = useChatStore((state) => state.popupEnabled);
   const setChatPopupEnabled = useChatStore((state) => state.setPopupEnabled);
@@ -384,6 +409,19 @@ export function ConfigPage() {
   const [firewallMessage, setFirewallMessage] = useState<string | null>(null);
   const [firewallError, setFirewallError] = useState<string | null>(null);
   const [firewallDirty, setFirewallDirty] = useState(false);
+  const adsbConfigMutation = useMutation({
+    mutationFn: (body: { enabled?: boolean; feedUrl?: string; intervalMs?: number }) =>
+      updateAdsbConfig(body),
+    onSuccess: (data) => {
+      setAdsbStatus(data);
+      setConfigNotice({ type: 'success', text: 'ADS-B settings updated.' });
+      void adsbStatusQuery.refetch();
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Unable to update ADS-B settings.';
+      setConfigNotice({ type: 'error', text: message });
+    },
+  });
   const volumeKeys: Array<keyof AlarmConfig> = [
     'volumeInfo',
     'volumeNotice',
@@ -4003,6 +4041,85 @@ export function ConfigPage() {
                   }}
                 />
               </div>
+            </div>
+          </section>
+
+          <section className={cardClass('adsb')}>
+            <header>
+              <h2>ADS-B Ingest</h2>
+              <p>Poll dump1090/readsb JSON to render ADS-B tracks (cross-platform, HTTP only).</p>
+            </header>
+            <div className="config-card__body">
+              <div className="config-row">
+                <span className="config-label">Enabled</span>
+                <label className="switch" aria-label="Toggle ADS-B ingest">
+                  <input
+                    type="checkbox"
+                    checked={adsbEnabled}
+                    onChange={(event) => setAdsbEnabled(event.target.checked)}
+                  />
+                  <span />
+                </label>
+              </div>
+              <div className="config-row">
+                <span className="config-label">Feed URL</span>
+                <input
+                  value={adsbFeedUrl}
+                  onChange={(event) => setAdsbFeedUrl(event.target.value)}
+                />
+              </div>
+              <div className="config-row">
+                <span className="config-label">Poll interval (ms)</span>
+                <input
+                  type="number"
+                  min={2000}
+                  value={adsbIntervalMs}
+                  onChange={(event) => setAdsbIntervalMs(Number(event.target.value))}
+                />
+              </div>
+              <div className="config-row">
+                <span className="config-label">Last poll</span>
+                <span>
+                  {adsbStatus?.lastPollAt
+                    ? new Date(adsbStatus.lastPollAt).toLocaleString()
+                    : 'N/A'}
+                </span>
+              </div>
+              <div className="config-row">
+                <span className="config-label">Tracks</span>
+                <span>{adsbStatus?.trackCount ?? 0}</span>
+              </div>
+              {adsbStatus?.lastError ? (
+                <div className="form-error">Last error: {adsbStatus.lastError}</div>
+              ) : null}
+              <div className="controls-row">
+                <button
+                  type="button"
+                  className="submit-button"
+                  onClick={() =>
+                    adsbConfigMutation.mutate({
+                      enabled: adsbEnabled,
+                      feedUrl: adsbFeedUrl,
+                      intervalMs: adsbIntervalMs,
+                    })
+                  }
+                  disabled={adsbConfigMutation.isPending}
+                >
+                  {adsbConfigMutation.isPending ? 'Saving...' : 'Save ADS-B settings'}
+                </button>
+                <button
+                  type="button"
+                  className="control-chip"
+                  onClick={() => adsbStatusQuery.refetch()}
+                  disabled={adsbStatusQuery.isFetching}
+                >
+                  Refresh status
+                </button>
+              </div>
+              <p className="config-hint">
+                Ensure your dump1090/readsb feed is reachable via HTTP (e.g., aircraft.json). For
+                CORS-safe requests, proxy via the backend.
+              </p>
             </div>
           </section>
 

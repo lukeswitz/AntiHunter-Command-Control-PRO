@@ -13,6 +13,7 @@ import {
   MdCheckCircle,
   MdBookmarkAdd,
   MdClose,
+  MdRadar,
 } from 'react-icons/md';
 
 import { apiClient } from '../api/client';
@@ -28,6 +29,7 @@ import type {
   SavedMapViewPreference,
   SiteSummary,
   Target,
+  AdsbTrack,
 } from '../api/types';
 import { DroneFloatingCard } from '../components/DroneFloatingCard';
 import { CommandCenterMap, type IndicatorSeverity } from '../components/map/CommandCenterMap';
@@ -199,20 +201,35 @@ export function MapPage() {
     followEnabled,
     targetsEnabled,
     coverageEnabled,
+    adsbEnabled,
     mapStyle,
     toggleTrails,
     toggleRadius,
     toggleFollow,
     toggleTargets,
+    toggleAdsb,
   } = useMapPreferences();
   const fitEnabled = useMapPreferences((state) => state.fitEnabled);
   const setMapStyle = useMapPreferences((state) => state.setMapStyle);
   const setFitEnabled = useMapPreferences((state) => state.setFitEnabled);
+  const adsbTracksQuery = useQuery({
+    queryKey: ['adsb', 'tracks'],
+    queryFn: async () => apiClient.get<AdsbTrack[]>('/adsb/tracks'),
+    enabled: isAuthenticated && adsbEnabled,
+    refetchInterval: 15_000,
+  });
 
   const nodeList = useMemo(() => order.map((id) => nodes[id]).filter(Boolean), [nodes, order]);
   const nodeListWithFix = useMemo(
     () => nodeList.filter((node) => hasValidPosition(node.lat, node.lon)),
     [nodeList],
+  );
+  const adsbTracks = useMemo(
+    () =>
+      adsbEnabled && adsbTracksQuery.data
+        ? adsbTracksQuery.data.filter((track) => hasValidPosition(track.lat, track.lon))
+        : [],
+    [adsbEnabled, adsbTracksQuery.data],
   );
 
   const onlineCount = useMemo(
@@ -698,6 +715,13 @@ export function MapPage() {
             >
               <MdVisibility /> Targets
             </button>
+            <button
+              type="button"
+              className={`control-chip ${adsbEnabled ? 'is-active' : ''}`}
+              onClick={toggleAdsb}
+            >
+              <MdRadar /> ADS-B
+            </button>
           </div>
         </header>
         <div className="map-canvas">
@@ -713,6 +737,7 @@ export function MapPage() {
             showRadius={radiusEnabled}
             showTrails={trailsEnabled}
             showTargets={targetsEnabled}
+            adsbTracks={adsbEnabled ? adsbTracks : []}
             followEnabled={followEnabled}
             showCoverage={coverageEnabled}
             mapStyle={mapStyle}

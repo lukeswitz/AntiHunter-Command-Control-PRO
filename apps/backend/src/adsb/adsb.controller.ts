@@ -27,4 +27,14 @@ export class AdsbController {
   ) {
     return this.adsbService.updateConfig(body);
   }
+
+  @Get('proxy')
+  async proxy() {
+    // simple passthrough of current feed for CORS-safe access
+    const response = await fetch(this.adsbService.getFeedUrl());
+    if (!response.ok) {
+      throw new Error(`Proxy fetch failed: ${response.status} ${response.statusText}`);
+    }
+    return response.json();
+  }
 }
