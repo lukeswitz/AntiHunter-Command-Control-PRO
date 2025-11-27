@@ -26,6 +26,13 @@ type InventorySortKey =
 const SITE_COLORS = ['#3b82f6', '#f87171', '#34d399', '#fbbf24', '#a78bfa'];
 const RSSI_COLORS = ['#22c55e', '#f97316', '#ef4444'];
 
+function getChannelColor(percent: number): string {
+  if (percent >= 60) return '#ef4444'; // red
+  if (percent >= 40) return '#f59e0b'; // amber
+  if (percent >= 20) return '#84cc16'; // lime
+  return '#22c55e'; // green
+}
+
 export function InventoryPage() {
   const [search, setSearch] = useState('');
   const [autoRefreshMs, setAutoRefreshMs] = useState(2000);
@@ -123,9 +130,17 @@ export function InventoryPage() {
   const deleteDeviceMutation = useMutation({
     mutationFn: async (device: InventoryDevice) =>
       apiClient.delete(`/inventory/${encodeURIComponent(device.mac)}`),
-    onSuccess: async () => {
+    onSuccess: async (_result, device) => {
+      const macKey = device.mac.trim().toUpperCase();
+      const drones = useDroneStore.getState().list;
+      drones
+        .filter((drone) => (drone.mac ?? '').toUpperCase() === macKey)
+        .forEach((drone) => {
+          useDroneStore.getState().remove(drone.id);
+        });
       await queryClient.invalidateQueries({ queryKey: ['inventory'] });
       await queryClient.invalidateQueries({ queryKey: ['targets'] });
+      await queryClient.invalidateQueries({ queryKey: ['drones'] });
     },
     onError: (error: unknown) => {
       const message =
@@ -634,7 +649,12 @@ function InventoryAnalyticsDialog({ devices, sites, onClose }: InventoryAnalytic
                     </span>
                   </div>
                   <div className="inventory-analytics__progress" aria-hidden="true">
-                    <span style={{ width: `${stat.percent}%` }} />
+                    <span
+                      style={{
+                        width: `${Math.min(stat.percent * 1.5, 100)}%`,
+                        background: getChannelColor(stat.percent),
+                      }}
+                    />
                   </div>
                 </li>
               ))}
@@ -749,16 +769,19 @@ function InventoryAnalyticsDialog({ devices, sites, onClose }: InventoryAnalytic
 
         <section>
           <header className="inventory-analytics__section-header">
-            <h3>Hourly activity (last 12h)</h3>
+            <h3>Hourly activity (last 24h)</h3>
           </header>
           {analytics.hourlyTrend.length === 0 ? (
             <p className="empty-state">No recent activity.</p>
           ) : (
             <div className="inventory-analytics__sparkline">
               <SparklineChart data={analytics.hourlyTrend} />
-              <div className="inventory-analytics__sparkline-legend">
-                <span>Now</span>
-                <span>−12h</span>
+              <div className="inventory-analytics__sparkline-hours" aria-hidden="true">
+                <span className="inventory-analytics__sparkline-anchor">Now</span>
+                {analytics.hourlyTrend.map((bucket) => (
+                  <span key={bucket.label}>{bucket.label}</span>
+                ))}
+                <span className="inventory-analytics__sparkline-anchor">-24h</span>
               </div>
             </div>
           )}
@@ -832,8 +855,8 @@ function computeInventoryAnalytics(devices: InventoryDevice[]) {
   let latestSeen: number | null = null;
   const hourMs = 60 * 60 * 1000;
   const now = Date.now();
-  const hourlyBuckets = Array.from({ length: 12 }).map((_, idx) => {
-    const start = now - (12 - idx) * hourMs;
+  const hourlyBuckets = Array.from({ length: 24 }).map((_, idx) => {
+    const start = now - (24 - idx) * hourMs;
     const end = start + hourMs;
     return {
       start,

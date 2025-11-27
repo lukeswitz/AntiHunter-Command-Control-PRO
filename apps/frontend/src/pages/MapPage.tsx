@@ -55,6 +55,7 @@ const DRONE_STATUS_OPTIONS: { value: DroneStatus; label: string }[] = [
   { value: 'NEUTRAL', label: 'Neutral' },
   { value: 'HOSTILE', label: 'Hostile' },
 ];
+const FRESH_DRONE_MAX_AGE_MS = 15 * 60 * 1000;
 
 export function MapPage() {
   const queryClient = useQueryClient();
@@ -452,20 +453,30 @@ export function MapPage() {
     [geofenceHighlights],
   );
 
+  const freshDrones = useMemo(
+    () =>
+      drones.filter((drone) => {
+        const ts = new Date(drone.lastSeen).getTime();
+        if (Number.isNaN(ts)) return false;
+        return Date.now() - ts <= FRESH_DRONE_MAX_AGE_MS;
+      }),
+    [drones],
+  );
+
   const [activeDroneId, setActiveDroneId] = useState<string | null>(null);
   const [droneCardVisible, setDroneCardVisible] = useState(false);
 
   useEffect(() => {
-    if (drones.length === 0) {
+    if (freshDrones.length === 0) {
       setActiveDroneId(null);
       setDroneCardVisible(false);
       return;
     }
-    if (!activeDroneId || !drones.some((drone) => drone.id === activeDroneId)) {
-      setActiveDroneId(drones[0].id);
+    if (!activeDroneId || !freshDrones.some((drone) => drone.id === activeDroneId)) {
+      setActiveDroneId(freshDrones[0].id);
       setDroneCardVisible(true);
     }
-  }, [drones, activeDroneId]);
+  }, [freshDrones, activeDroneId]);
 
   const droneStatusMutation = useMutation<
     Drone,
@@ -826,9 +837,9 @@ export function MapPage() {
         </footer>
       </section>
       <DroneFloatingCard
-        drones={drones}
+        drones={freshDrones}
         activeDroneId={activeDroneId}
-        visible={droneCardVisible && drones.length > 0}
+        visible={droneCardVisible && freshDrones.length > 0}
         onClose={handleDroneCardClose}
         onSelect={handleDroneSelect}
         onStatusChange={canManageDrones ? handleDroneStatusChange : undefined}
