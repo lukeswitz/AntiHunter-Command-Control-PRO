@@ -464,44 +464,49 @@ export class FaaRegistryService {
 
     fileStream.pipe(parser);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.faaAircraft.deleteMany();
-      for await (const record of parser) {
-        const mapped = this.mapRecord(record);
-        if (!mapped) {
-          continue;
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.faaAircraft.deleteMany();
+        for await (const record of parser) {
+          const mapped = this.mapRecord(record);
+          if (!mapped) {
+            continue;
+          }
+          batch.push(mapped);
+          if (batch.length >= batchingSize) {
+            await tx.faaAircraft.createMany({ data: batch as Prisma.FaaAircraftCreateManyInput[] });
+            total += batch.length;
+            batch = [];
+            this.progress = this.progress ? { ...this.progress, processed: total } : null;
+          }
         }
-        batch.push(mapped);
-        if (batch.length >= batchingSize) {
+        if (batch.length > 0) {
           await tx.faaAircraft.createMany({ data: batch as Prisma.FaaAircraftCreateManyInput[] });
           total += batch.length;
-          batch = [];
           this.progress = this.progress ? { ...this.progress, processed: total } : null;
         }
-      }
-      if (batch.length > 0) {
-        await tx.faaAircraft.createMany({ data: batch as Prisma.FaaAircraftCreateManyInput[] });
-        total += batch.length;
-        this.progress = this.progress ? { ...this.progress, processed: total } : null;
-      }
 
-      await tx.faaRegistrySync.upsert({
-        where: { id: 1 },
-        create: {
-          id: 1,
-          datasetUrl,
-          datasetVersion,
-          lastSyncedAt: new Date(),
-          totalRecords: total,
-        },
-        update: {
-          datasetUrl,
-          datasetVersion,
-          lastSyncedAt: new Date(),
-          totalRecords: total,
-        },
-      });
-    });
+        await tx.faaRegistrySync.upsert({
+          where: { id: 1 },
+          create: {
+            id: 1,
+            datasetUrl,
+            datasetVersion,
+            lastSyncedAt: new Date(),
+            totalRecords: total,
+          },
+          update: {
+            datasetUrl,
+            datasetVersion,
+            lastSyncedAt: new Date(),
+            totalRecords: total,
+          },
+        });
+      },
+      {
+        timeout: 120_000, // FAA ingest can take time; allow longer interactive transaction
+      },
+    );
   }
 
   private mapRecord(record: Record<string, string>): Prisma.FaaAircraftCreateManyInput | null {
