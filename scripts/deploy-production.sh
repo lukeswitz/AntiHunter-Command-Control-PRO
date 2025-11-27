@@ -1183,6 +1183,9 @@ limit_req_zone \$binary_remote_addr zone=api_limit:10m rate=10r/s;
 limit_req_zone \$binary_remote_addr zone=general_limit:10m rate=30r/s;
 limit_conn_zone \$binary_remote_addr zone=conn_limit:10m;
 
+# Upload size limit
+client_max_body_size 50M;
+
 # HTTPS Server
 server {
     listen 443 ssl http2;
