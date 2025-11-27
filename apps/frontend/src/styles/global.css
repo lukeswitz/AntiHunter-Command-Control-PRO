@@ -1092,6 +1092,21 @@ body.theme-dark .control-chip[disabled] {
   }
 }
 
+.leaflet-tooltip {
+  background: rgba(5, 7, 8, 0.8);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  text-shadow: none;
+  border-radius: 0.75rem;
+}
+
+.leaflet-tooltip a {
+  color: #8df4ff;
+  text-decoration: underline;
+}
+
 .drone-tooltip,
 .drone-operator-tooltip {
   max-width: 280px;
@@ -4120,11 +4135,11 @@ body.theme-dark .alert-color-item {
   justify-content: flex-end;
 }
 .strategy-map .leaflet-tooltip {
-  background: var(--color-panel);
-  color: var(--color-text);
-  border-radius: 0.5rem;
-  border: 1px solid var(--color-panel-border);
-  box-shadow: 0 6px 20px var(--color-panel-shadow);
+  background: rgba(5, 7, 8, 0.8);
+  color: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
 }
 .strategy-warnings {
   margin-top: 1.5rem;
