@@ -4302,6 +4302,10 @@ body.theme-dark .strategy-table__row--selected {
   flex-direction: column;
   gap: 0.75rem;
 }
+.firewall-log-entry--blocked {
+  border-left: 3px solid #ef4444;
+  background: rgba(239, 68, 68, 0.04);
+}
 .firewall-log-entry__header {
   display: flex;
   align-items: center;

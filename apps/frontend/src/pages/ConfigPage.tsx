@@ -2412,7 +2412,7 @@ export function ConfigPage() {
                       <span className="firewall-log-viewer__summary-meta">
                         {firewallLogsQuery.isFetching
                           ? 'Refreshing...'
-                          : `${firewallLogs.length} entries`}
+                          : `${firewallStats?.totalLogs ?? 0} entries`}
                       </span>
                     </summary>
                     <div className="firewall-log-viewer__body">
@@ -2443,7 +2443,10 @@ export function ConfigPage() {
                       ) : (
                         <ul className="firewall-log-list">
                           {firewallLogs.map((log) => (
-                            <li key={log.id} className="firewall-log-entry">
+                            <li
+                              key={log.id}
+                              className={`firewall-log-entry${log.blocked ? ' firewall-log-entry--blocked' : ''}`}
+                            >
                               <div className="firewall-log-entry__header">
                                 <span className="firewall-log-entry__ip">{log.ip}</span>
                                 <span
