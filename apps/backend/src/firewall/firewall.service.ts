@@ -582,7 +582,7 @@ export class FirewallService {
   }
 
   private addressToString(addr: ipaddr.IPv4 | ipaddr.IPv6): string {
-    return addr.kind() === 'ipv6' ? addr.toNormalizedString() : addr.toString();
+    return addr.toString();
   }
 
   private normalizeParsedAddress(addr: ipaddr.IPv4 | ipaddr.IPv6): ipaddr.IPv4 | ipaddr.IPv6 {
