@@ -4027,7 +4027,11 @@ export function ConfigPage() {
                   disabled={faaInProgress || faaSyncMutation.isPending}
                   onClick={() => faaSyncMutation.mutate()}
                 >
+<<<<<<< HEAD
                   {faaInProgress ? 'Sync in progress' : 'Download & Parse'}
+=======
+                  {faaInProgress ? 'Sync in progress…' : 'Download & Parse'}
+>>>>>>> 9fa5850 (Fix FAA sync button label encoding)
                 </button>
                 <button
                   type="button"
