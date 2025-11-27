@@ -616,4 +616,3 @@ export class FaaRegistryService {
     return this.prisma.faaRegistrySync;
   }
 }
-
