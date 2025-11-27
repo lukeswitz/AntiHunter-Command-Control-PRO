@@ -1183,6 +1183,9 @@ limit_req_zone \$binary_remote_addr zone=api_limit:10m rate=10r/s;
 limit_req_zone \$binary_remote_addr zone=general_limit:10m rate=30r/s;
 limit_conn_zone \$binary_remote_addr zone=conn_limit:10m;
 
+# Upload size limit
+client_max_body_size 50M;
+
 # HTTPS Server
 server {
     listen 443 ssl http2;
@@ -1244,7 +1247,7 @@ server {
     # WebSocket proxy for Socket.IO
     location /socket.io/ {
         limit_req zone=general_limit burst=50 nodelay;
-        
+
         proxy_pass http://127.0.0.1:$BACKEND_PORT/socket.io/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade           \$http_upgrade;
@@ -1253,7 +1256,25 @@ server {
         proxy_set_header X-Real-IP         \$remote_addr;
         proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        
+
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+        proxy_buffering off;
+    }
+
+    # WebSocket proxy for /ws namespace
+    location /ws {
+        limit_req zone=general_limit burst=50 nodelay;
+
+        proxy_pass http://127.0.0.1:$BACKEND_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade           \$http_upgrade;
+        proxy_set_header Connection        "upgrade";
+        proxy_set_header Host              \$host;
+        proxy_set_header X-Real-IP         \$remote_addr;
+        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
         proxy_read_timeout 86400s;
         proxy_send_timeout 86400s;
         proxy_buffering off;
