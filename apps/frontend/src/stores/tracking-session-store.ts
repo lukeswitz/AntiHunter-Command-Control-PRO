@@ -139,8 +139,8 @@ export const useTrackingSessionStore = create<TrackingStoreState>((set, get) => 
       const samples = { ...session.samples };
       samples[canonicalId] = {
         nodeId: canonicalId,
-        lat: node.lat,
-        lon: node.lon,
+        lat: node.lat as number,
+        lon: node.lon as number,
         distance,
         weight,
         timestamp: now,

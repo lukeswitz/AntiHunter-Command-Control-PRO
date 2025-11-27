@@ -3,8 +3,8 @@ import { create } from 'zustand';
 export interface NodeSummary {
   id: string;
   name?: string | null;
-  lat: number;
-  lon: number;
+  lat: number | null;
+  lon: number | null;
   ts: string;
   lastMessage?: string | null;
   lastSeen?: string | null;
@@ -39,8 +39,8 @@ export interface PartialNode {
 export type IncomingNode = NodeSummary | PartialNode;
 
 export interface NodeHistoryPoint {
-  lat: number;
-  lon: number;
+  lat: number | null;
+  lon: number | null;
   ts: string;
 }
 
@@ -68,6 +68,12 @@ interface NodeStore {
 }
 
 const HISTORY_LIMIT = 50;
+const hasValidPosition = (lat: number | null, lon: number | null): boolean =>
+  lat !== null &&
+  lon !== null &&
+  Number.isFinite(lat) &&
+  Number.isFinite(lon) &&
+  !(lat === 0 && lon === 0);
 
 export function canonicalNodeId(value: string | null | undefined): string {
   if (!value) {
@@ -112,7 +118,9 @@ export const useNodeStore = create<NodeStore>((set) => ({
       nodes.forEach((node) => {
         const normalized = normalizeNode(node);
         map[normalized.id] = normalized;
-        histories[normalized.id] = [createHistoryPoint(normalized)];
+        histories[normalized.id] = hasValidPosition(normalized.lat, normalized.lon)
+          ? [createHistoryPoint(normalized)]
+          : [];
       });
 
       const order = Object.values(map)
@@ -138,12 +146,13 @@ export const useNodeStore = create<NodeStore>((set) => ({
         const normalized = normalizeNode(diff.node);
         next[normalized.id] = normalized;
         order.add(normalized.id);
-
         const history = histories[normalized.id] ? [...histories[normalized.id]] : [];
         const latest = createHistoryPoint(normalized);
-        const lastEntry = history.at(-1);
-        if (!lastEntry || lastEntry.lat !== latest.lat || lastEntry.lon !== latest.lon) {
-          history.push(latest);
+        if (hasValidPosition(latest.lat, latest.lon)) {
+          const lastEntry = history.at(-1);
+          if (!lastEntry || lastEntry.lat !== latest.lat || lastEntry.lon !== latest.lon) {
+            history.push(latest);
+          }
         }
         histories[normalized.id] = history.slice(-HISTORY_LIMIT);
       }
@@ -207,17 +216,6 @@ export const useNodeStore = create<NodeStore>((set) => ({
 }));
 
 function normalizeNode(node: IncomingNode): NodeSummary {
-  const ensureNumber = (value: number | string | null | undefined): number => {
-    if (typeof value === 'number') {
-      return value;
-    }
-    if (typeof value === 'string') {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-    return 0;
-  };
-
   const ensureOptionalNumber = (value: number | string | null | undefined): number | null => {
     if (typeof value === 'number') {
       return Number.isFinite(value) ? value : null;
@@ -269,8 +267,8 @@ function normalizeNode(node: IncomingNode): NodeSummary {
   return {
     id: canonicalId,
     name: displayName ?? null,
-    lat: ensureNumber(node.lat),
-    lon: ensureNumber(node.lon),
+    lat: ensureOptionalNumber(node.lat),
+    lon: ensureOptionalNumber(node.lon),
     ts: ensureIsoString(node.ts),
     lastMessage: node.lastMessage ?? null,
     lastSeen: node.lastSeen ? ensureIsoString(node.lastSeen) : null,

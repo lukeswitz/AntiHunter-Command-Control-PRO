@@ -275,8 +275,8 @@ export function NodesPage() {
 function buildRow(node: {
   id: string;
   name?: string | null;
-  lat: number;
-  lon: number;
+  lat?: number | null;
+  lon?: number | null;
   lastMessage?: string | null;
   lastSeen?: string | null;
   siteId?: string | null;
@@ -294,8 +294,8 @@ function buildRow(node: {
   const online = lastSeenDate ? Date.now() - lastSeenDate.getTime() <= ONLINE_THRESHOLD_MS : true;
   const lastSeenMs = lastSeenDate?.getTime() ?? null;
 
-  const latValue = Number(node.lat);
-  const lonValue = Number(node.lon);
+  const latValue = Number(node.lat ?? NaN);
+  const lonValue = Number(node.lon ?? NaN);
   const hasCoords =
     Number.isFinite(latValue) && Number.isFinite(lonValue) && !(latValue === 0 && lonValue === 0);
   const lat = hasCoords ? latValue : undefined;

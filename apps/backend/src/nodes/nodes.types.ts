@@ -1,8 +1,8 @@
 export interface NodeSnapshot {
   id: string;
   name?: string | null;
-  lat: number;
-  lon: number;
+  lat?: number | null;
+  lon?: number | null;
   ts: Date;
   lastMessage?: string | null;
   lastSeen?: Date | null;

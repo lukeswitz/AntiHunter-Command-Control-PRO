@@ -223,7 +223,12 @@ export const useGeofenceStore = create<GeofenceStoreState>()((set, get) => {
           return;
         }
 
-        const inside = pointInPolygon(node.lat, node.lon, geofence.polygon);
+        if (node.lat == null || node.lon == null) {
+          return;
+        }
+        const lat = node.lat as number;
+        const lon = node.lon as number;
+        const inside = pointInPolygon(lat, lon, geofence.polygon);
         const key = canonicalEntityKey(node.id, node.siteId ?? undefined);
 
         const currentStates = get().states;
@@ -242,8 +247,8 @@ export const useGeofenceStore = create<GeofenceStoreState>()((set, get) => {
             entityId: key,
             entityLabel: node.name ?? node.id,
             entityType: 'node',
-            lat: node.lat,
-            lon: node.lon,
+            lat,
+            lon,
             level: geofence.alarm.level,
             message: formatMessage(geofence.alarm.message, {
               geofence: geofence.name,
@@ -261,8 +266,8 @@ export const useGeofenceStore = create<GeofenceStoreState>()((set, get) => {
             entityId: key,
             entityLabel: node.name ?? node.id,
             entityType: 'node',
-            lat: node.lat,
-            lon: node.lon,
+            lat,
+            lon,
             level: geofence.alarm.level,
             message: formatMessage(geofence.alarm.message, {
               geofence: geofence.name,

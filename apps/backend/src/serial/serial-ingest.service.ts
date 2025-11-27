@@ -210,11 +210,13 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             ? this.nodesService.getSnapshotById(event.nodeId)
             : undefined;
           const detectionTime = new Date();
+          const nodeLat = nodeSnapshot?.lat ?? undefined;
+          const nodeLon = nodeSnapshot?.lon ?? undefined;
           const estimate = this.trackingService.ingestDetection({
             mac: event.mac,
             nodeId: event.nodeId,
-            nodeLat: nodeSnapshot?.lat,
-            nodeLon: nodeSnapshot?.lon,
+            nodeLat,
+            nodeLon,
             targetLat: event.lat,
             targetLon: event.lon,
             rssi: event.rssi,
@@ -222,8 +224,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             timestamp: detectionTime.getTime(),
           });
 
-          const latForRecord = estimate?.lat ?? event.lat ?? nodeSnapshot?.lat ?? undefined;
-          const lonForRecord = estimate?.lon ?? event.lon ?? nodeSnapshot?.lon ?? undefined;
+          const latForRecord = estimate?.lat ?? event.lat ?? nodeLat ?? undefined;
+          const lonForRecord = estimate?.lon ?? event.lon ?? nodeLon ?? undefined;
 
           const detectionForPersistence: SerialTargetDetected = {
             ...event,
@@ -235,8 +237,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           await this.inventoryService.recordDetection(
             detectionForPersistence,
             siteId,
-            nodeSnapshot?.lat,
-            nodeSnapshot?.lon,
+            nodeLat,
+            nodeLon,
           );
 
           if (estimate?.shouldPersist) {
@@ -257,8 +259,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             event,
             siteId,
             nodeName: nodeSnapshot?.name ?? event.nodeId ?? undefined,
-            nodeLat: nodeSnapshot?.lat,
-            nodeLon: nodeSnapshot?.lon,
+            nodeLat,
+            nodeLon,
             lat: latForRecord ?? undefined,
             lon: lonForRecord ?? undefined,
             timestamp: detectionTime,

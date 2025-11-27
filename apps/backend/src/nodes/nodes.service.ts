@@ -45,8 +45,16 @@ export class NodesService implements OnModuleInit {
 
   async upsert(snapshot: NodeSnapshot): Promise<void> {
     const now = snapshot.ts ?? new Date();
-    const lat = this.toNumber(snapshot.lat);
-    const lon = this.toNumber(snapshot.lon);
+    const latCandidate = this.toNumber(snapshot.lat);
+    const lonCandidate = this.toNumber(snapshot.lon);
+    const hasValidFix =
+      latCandidate !== null &&
+      lonCandidate !== null &&
+      Number.isFinite(latCandidate) &&
+      Number.isFinite(lonCandidate) &&
+      !(latCandidate === 0 && lonCandidate === 0);
+    const lat = hasValidFix ? latCandidate : undefined;
+    const lon = hasValidFix ? lonCandidate : undefined;
     const originSiteId = snapshot.originSiteId ?? this.localSiteId;
     const snapshotSiteId = snapshot.siteId ?? undefined;
 
@@ -99,7 +107,7 @@ export class NodesService implements OnModuleInit {
         update: updatePayload,
       });
 
-      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      if (hasValidFix && lat !== undefined && lon !== undefined) {
         await tx.nodePosition.create({
           data: {
             nodeId: snapshot.id,
@@ -131,8 +139,8 @@ export class NodesService implements OnModuleInit {
       ...existing,
       ...snapshot,
       originSiteId,
-      lat,
-      lon,
+      lat: lat ?? existing?.lat ?? null,
+      lon: lon ?? existing?.lon ?? null,
       ts: now,
       lastSeen: snapshot.lastSeen ?? now,
       siteId: snapshot.siteId ?? existing?.siteId,
@@ -327,11 +335,19 @@ export class NodesService implements OnModuleInit {
     } | null;
   }): NodeSnapshot {
     const lastPosition = node.positions.at(0);
+    const lat = this.toNumber(lastPosition?.lat);
+    const lon = this.toNumber(lastPosition?.lon);
+    const hasValidFix =
+      lat !== null &&
+      lon !== null &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      !(lat === 0 && lon === 0);
     return {
       id: node.id,
       name: node.name ?? undefined,
-      lat: this.toNumber(lastPosition?.lat),
-      lon: this.toNumber(lastPosition?.lon),
+      lat: hasValidFix ? lat : null,
+      lon: hasValidFix ? lon : null,
       ts: lastPosition?.ts ?? node.lastSeen ?? new Date(),
       lastMessage: node.lastMessage ?? undefined,
       lastSeen: node.lastSeen ?? undefined,
@@ -347,14 +363,14 @@ export class NodesService implements OnModuleInit {
     };
   }
 
-  private toNumber(value: number | string | null | undefined): number {
+  private toNumber(value: number | string | null | undefined): number | null {
     if (typeof value === 'number') {
-      return value;
+      return Number.isFinite(value) ? value : null;
     }
     if (typeof value === 'string') {
       const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : 0;
+      return Number.isFinite(parsed) ? parsed : null;
     }
-    return 0;
+    return null;
   }
 }

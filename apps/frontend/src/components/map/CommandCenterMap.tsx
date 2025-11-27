@@ -418,7 +418,10 @@ export function CommandCenterMap({
   );
 
   const nodesWithPosition = useMemo(
-    () => nodes.filter((node) => hasValidPosition(node.lat, node.lon)),
+    () =>
+      nodes.filter((node): node is NodeSummary & { lat: number; lon: number } =>
+        hasValidPosition(node.lat, node.lon),
+      ),
     [nodes],
   );
   const dronesWithPosition = useMemo(
@@ -581,7 +584,7 @@ export function CommandCenterMap({
           );
         })}
 
-      {nodes.map((node) => {
+      {nodesWithPosition.map((node) => {
         const siteScopedKey = nodeKey(node.id, node.siteId);
         const indicator =
           alertIndicators.get(siteScopedKey) ??

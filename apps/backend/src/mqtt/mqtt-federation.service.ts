@@ -13,8 +13,8 @@ type NodeUpsertMessage = {
   payload: {
     id: string;
     name?: string | null;
-    lat: number;
-    lon: number;
+    lat: number | null;
+    lon: number | null;
     ts: string;
     lastMessage?: string | null;
     lastSeen?: string | null;
@@ -89,14 +89,17 @@ export class MqttFederationService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    const latValue = Number.isFinite(node.lat ?? NaN) ? (node.lat as number) : null;
+    const lonValue = Number.isFinite(node.lon ?? NaN) ? (node.lon as number) : null;
+
     const message: NodeUpsertMessage = {
       type: 'node.upsert',
       originSiteId: this.localSiteId,
       payload: {
         id: node.id,
         name: node.name ?? null,
-        lat: Number.isFinite(node.lat) ? node.lat : 0,
-        lon: Number.isFinite(node.lon) ? node.lon : 0,
+        lat: latValue,
+        lon: lonValue,
         ts: (node.ts ?? new Date()).toISOString(),
         lastMessage: node.lastMessage ?? null,
         lastSeen: node.lastSeen ? node.lastSeen.toISOString() : null,
@@ -204,8 +207,8 @@ export class MqttFederationService implements OnModuleInit, OnModuleDestroy {
     await this.nodesService.upsert({
       id: nodePayload.id,
       name: nodePayload.name ?? undefined,
-      lat,
-      lon,
+      lat: lat ?? undefined,
+      lon: lon ?? undefined,
       ts: nodeTs,
       lastMessage: nodePayload.lastMessage ?? undefined,
       lastSeen: nodeLastSeen,
