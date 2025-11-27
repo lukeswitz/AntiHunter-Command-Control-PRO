@@ -274,7 +274,11 @@ export function SocketBridge() {
         return;
       }
 
-      const entry = parseEventPayload(payload);
+      const entry = parseEventPayload(payload, {
+        onTriangulationComplete: () => {
+          void queryClient.invalidateQueries({ queryKey: ['targets'] });
+        },
+      });
       addEntry(entry);
       const alarmLevel = extractAlarmLevel(payload);
       if (alarmLevel) {
@@ -610,7 +614,10 @@ function normalizeDroneStatus(value: unknown): DroneStatus {
   return isDroneStatus(value) ? value : 'UNKNOWN';
 }
 
-function parseEventPayload(payload: unknown): TerminalEntryInput {
+function parseEventPayload(
+  payload: unknown,
+  options?: { onTriangulationComplete?: () => void },
+): TerminalEntryInput {
   if (typeof payload === 'string') {
     return { message: payload, level: 'info', source: 'ws' };
   }
@@ -685,6 +692,8 @@ function parseEventPayload(payload: unknown): TerminalEntryInput {
         const lat = typeof dataRecord.lat === 'number' ? dataRecord.lat : undefined;
         const lon = typeof dataRecord.lon === 'number' ? dataRecord.lon : undefined;
         useTriangulationStore.getState().complete({ mac, lat, lon, link });
+        // Ensure map/targets refresh after a triangulation completes so the position and styling update.
+        options?.onTriangulationComplete?.();
       }
       return {
         message,

@@ -68,12 +68,17 @@ interface NodeStore {
 }
 
 const HISTORY_LIMIT = 50;
-const hasValidPosition = (lat: number | null, lon: number | null): boolean =>
-  lat !== null &&
-  lon !== null &&
-  Number.isFinite(lat) &&
-  Number.isFinite(lon) &&
-  !(lat === 0 && lon === 0);
+export const MIN_POSITION_EPSILON = 0.0001;
+export const hasValidPosition = (lat: number | null, lon: number | null): boolean => {
+  if (lat === null || lon === null) {
+    return false;
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return false;
+  }
+  const nearOrigin = Math.abs(lat) < MIN_POSITION_EPSILON && Math.abs(lon) < MIN_POSITION_EPSILON;
+  return !nearOrigin;
+};
 
 export function canonicalNodeId(value: string | null | undefined): string {
   if (!value) {

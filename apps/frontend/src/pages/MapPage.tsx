@@ -40,7 +40,7 @@ import { useGeofenceStore } from '../stores/geofence-store';
 import { useMapCommandStore } from '../stores/map-command-store';
 import { useMapPreferences } from '../stores/map-store';
 import { type SavedMapView, useMapViewsStore } from '../stores/map-views-store';
-import { canonicalNodeId, useNodeStore } from '../stores/node-store';
+import { canonicalNodeId, hasValidPosition, useNodeStore } from '../stores/node-store';
 import { useTargetStore } from '../stores/target-store';
 import type { TargetMarker } from '../stores/target-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
@@ -149,14 +149,18 @@ export function MapPage() {
     if (!targetsQuery.data) {
       return [];
     }
+    const withFix = targetsQuery.data.filter((target) =>
+      hasValidPosition(target.lat ?? null, target.lon ?? null),
+    );
     const triMac =
       triangulationState.status === 'success' &&
+      triangulationState.link &&
       triangulationState.targetMac &&
       triangulationState.lastUpdated &&
       Date.now() - triangulationState.lastUpdated < 10_000
         ? triangulationState.targetMac.toUpperCase()
         : null;
-    return targetsQuery.data.map<TargetMarker>((target) => {
+    return withFix.map<TargetMarker>((target) => {
       const trackingEntry = trackingMap[target.id];
       const comment = commentMap[target.id];
       const lastSeen = target.updatedAt ?? target.createdAt;
@@ -205,6 +209,10 @@ export function MapPage() {
   const setFitEnabled = useMapPreferences((state) => state.setFitEnabled);
 
   const nodeList = useMemo(() => order.map((id) => nodes[id]).filter(Boolean), [nodes, order]);
+  const nodeListWithFix = useMemo(
+    () => nodeList.filter((node) => hasValidPosition(node.lat, node.lon)),
+    [nodeList],
+  );
 
   const onlineCount = useMemo(
     () => nodeList.filter((node) => Boolean(node?.lastSeen)).length,
@@ -282,7 +290,7 @@ export function MapPage() {
     if (!mapReady || !mapRef.current) {
       return false;
     }
-    const positions = nodeList
+    const positions = nodeListWithFix
       .map((node) =>
         typeof node.lat === 'number' && typeof node.lon === 'number'
           ? ([node.lat, node.lon] as [number, number])
@@ -295,7 +303,7 @@ export function MapPage() {
     const bounds = latLngBounds(positions);
     mapRef.current.fitBounds(bounds.pad(0.25));
     return true;
-  }, [mapReady, nodeList]);
+  }, [mapReady, nodeListWithFix]);
 
   const handleFitClick = () => {
     if (fitEnabled) {
@@ -395,7 +403,7 @@ export function MapPage() {
       return;
     }
     performFit();
-  }, [fitEnabled, performFit, nodeList.length, mapReady]);
+  }, [fitEnabled, performFit, nodeListWithFix.length, mapReady]);
 
   useEffect(() => {
     if (!pendingTarget || !mapReady || !mapRef.current) {
@@ -683,7 +691,7 @@ export function MapPage() {
         </header>
         <div className="map-canvas">
           <CommandCenterMap
-            nodes={nodeList}
+            nodes={nodeListWithFix}
             trails={histories}
             targets={targetMarkers}
             drones={drones}

@@ -73,8 +73,9 @@ export class FaaRegistryService {
 
   async getStatus() {
     const registry = await this.ensureRegistryRecord();
+    const totalRecords = await this.faaModel().count();
     return {
-      registry,
+      registry: { ...registry, totalRecords },
       inProgress: this.currentSync !== null,
       progress: this.progress,
       lastError: this.lastError,
@@ -510,7 +511,16 @@ export class FaaRegistryService {
   }
 
   private mapRecord(record: Record<string, string>): Prisma.FaaAircraftCreateManyInput | null {
-    const nNumber = (record['N-NUMBER'] ?? '').trim().toUpperCase();
+    const normalizedRecord: Record<string, string> = {};
+    for (const [key, value] of Object.entries(record)) {
+      const safeValue = typeof value === 'string' ? value : '';
+      const normalizedKey = key.replace('\ufeff', '').trim();
+      normalizedRecord[normalizedKey] = safeValue;
+    }
+
+    const pickField = (key: string) => normalizedRecord[key] ?? '';
+
+    const nNumber = pickField('N-NUMBER').trim().toUpperCase();
     if (!nNumber) {
       return null;
     }
@@ -539,38 +549,38 @@ export class FaaRegistryService {
       return Number.isFinite(parsed) ? parsed : null;
     };
 
-    const fractionalOwner = (record['FRACT OWNER'] ?? '').trim().toUpperCase();
+    const fractionalOwner = pickField('FRACT OWNER').trim().toUpperCase();
 
     return {
       nNumber,
-      serialNumber: (record['SERIAL NUMBER'] ?? '').trim() || null,
-      manufacturerModel: (record['MFR MDL CODE'] ?? '').trim() || null,
-      engineModel: (record['ENG MFR MDL'] ?? '').trim() || null,
-      yearManufactured: parseIntField(record['YEAR MFR']),
-      registrantType: parseIntField(record['TYPE REGISTRANT']),
-      registrantName: (record['NAME'] ?? '').trim() || null,
-      street1: (record['STREET'] ?? '').trim() || null,
-      street2: (record['STREET2'] ?? '').trim() || null,
-      city: (record['CITY'] ?? '').trim() || null,
-      state: (record['STATE'] ?? '').trim() || null,
-      zip: (record['ZIP CODE'] ?? '').trim() || null,
-      region: (record['REGION'] ?? '').trim() || null,
-      county: (record['COUNTY'] ?? '').trim() || null,
-      country: (record['COUNTRY'] ?? '').trim() || null,
-      lastActionDate: mapDate(record['LAST ACTION DATE']),
-      certIssueDate: mapDate(record['CERT ISSUE DATE']),
-      certification: (record['CERTIFICATION'] ?? '').trim() || null,
-      aircraftType: (record['TYPE AIRCRAFT'] ?? '').trim() || null,
-      engineType: (record['TYPE ENGINE'] ?? '').trim() || null,
-      statusCode: (record['STATUS CODE'] ?? '').trim() || null,
-      modeSCode: (record['MODE S CODE'] ?? '').trim() || null,
-      modeSCodeHex: (record['MODE S CODE HEX'] ?? '').trim().toUpperCase() || null,
+      serialNumber: pickField('SERIAL NUMBER').trim() || null,
+      manufacturerModel: pickField('MFR MDL CODE').trim() || null,
+      engineModel: pickField('ENG MFR MDL').trim() || null,
+      yearManufactured: parseIntField(pickField('YEAR MFR')),
+      registrantType: parseIntField(pickField('TYPE REGISTRANT')),
+      registrantName: pickField('NAME').trim() || null,
+      street1: pickField('STREET').trim() || null,
+      street2: pickField('STREET2').trim() || null,
+      city: pickField('CITY').trim() || null,
+      state: pickField('STATE').trim() || null,
+      zip: pickField('ZIP CODE').trim() || null,
+      region: pickField('REGION').trim() || null,
+      county: pickField('COUNTY').trim() || null,
+      country: pickField('COUNTRY').trim() || null,
+      lastActionDate: mapDate(pickField('LAST ACTION DATE')),
+      certIssueDate: mapDate(pickField('CERT ISSUE DATE')),
+      certification: pickField('CERTIFICATION').trim() || null,
+      aircraftType: pickField('TYPE AIRCRAFT').trim() || null,
+      engineType: pickField('TYPE ENGINE').trim() || null,
+      statusCode: pickField('STATUS CODE').trim() || null,
+      modeSCode: pickField('MODE S CODE').trim() || null,
+      modeSCodeHex: pickField('MODE S CODE HEX').trim().toUpperCase() || null,
       fractionalOwner: fractionalOwner === 'Y',
-      airworthinessDate: mapDate(record['AIR WORTH DATE']),
-      expirationDate: mapDate(record['EXPIRATION DATE']),
-      uniqueId: (record['UNIQUE ID'] ?? '').trim() || null,
-      kitManufacturer: (record['KIT MFR'] ?? '').trim() || null,
-      kitModel: (record['KIT MODEL'] ?? '').trim() || null,
+      airworthinessDate: mapDate(pickField('AIR WORTH DATE')),
+      expirationDate: mapDate(pickField('EXPIRATION DATE')),
+      uniqueId: pickField('UNIQUE ID').trim() || null,
+      kitManufacturer: pickField('KIT MFR').trim() || null,
+      kitModel: pickField('KIT MODEL').trim() || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

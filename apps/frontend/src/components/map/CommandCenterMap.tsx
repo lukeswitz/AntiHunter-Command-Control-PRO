@@ -22,7 +22,12 @@ import controllerMarkerIcon from '../../assets/drone-controller.svg';
 import droneMarkerIcon from '../../assets/drone-marker.svg';
 import type { AlertColorConfig } from '../../constants/alert-colors';
 import type { DroneMarker, DroneTrailPoint } from '../../stores/drone-store';
-import { canonicalNodeId, type NodeHistoryPoint, type NodeSummary } from '../../stores/node-store';
+import {
+  canonicalNodeId,
+  hasValidPosition,
+  type NodeHistoryPoint,
+  type NodeSummary,
+} from '../../stores/node-store';
 import type { TargetMarker } from '../../stores/target-store';
 import type { TrackingEstimate } from '../../stores/tracking-session-store';
 
@@ -120,14 +125,6 @@ function hexToRgb(hex: string): string {
   const g = (value >> 8) & 255;
   const b = value & 255;
   return `${r}, ${g}, ${b}`;
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-function hasValidPosition(lat: unknown, lon: unknown): boolean {
-  return isFiniteNumber(lat) && isFiniteNumber(lon) && !(lat === 0 && lon === 0);
 }
 
 function createNodeIcon(
@@ -511,7 +508,11 @@ export function CommandCenterMap({
       </LayersControl>
       <BaseLayerChangeListener onChange={onMapStyleChange} />
 
-      <CoverageHeatLayer enabled={showCoverage} nodes={nodes} baseRadius={effectiveRadius} />
+      <CoverageHeatLayer
+        enabled={showCoverage}
+        nodes={nodesWithPosition}
+        baseRadius={effectiveRadius}
+      />
 
       {geofences.map((geofence) => {
         if (geofence.polygon.length < 3) {
@@ -1027,7 +1028,7 @@ function CoverageHeatLayer({
   baseRadius,
 }: {
   enabled: boolean;
-  nodes: NodeSummary[];
+  nodes: Array<NodeSummary & { lat: number; lon: number }>;
   baseRadius: number;
 }) {
   const map = useMap();
@@ -1109,12 +1110,12 @@ function estimateCoverageFactor(node: NodeSummary): number {
   return 0.8 + ((hash % 60) - 30) / 200;
 }
 
-function buildCoveragePoints(nodes: NodeSummary[], baseRadius: number): HeatPoint[] {
+function buildCoveragePoints(
+  nodes: Array<NodeSummary & { lat: number; lon: number }>,
+  baseRadius: number,
+): HeatPoint[] {
   const samples: HeatPoint[] = [];
   nodes.forEach((node) => {
-    if (typeof node.lat !== 'number' || typeof node.lon !== 'number') {
-      return;
-    }
     const factor = estimateCoverageFactor(node);
     const adjustedBase = Math.max(25, baseRadius);
     const coverageRadius = adjustedBase * COVERAGE_MULTIPLIER * factor;
