@@ -820,8 +820,8 @@ EOF
     info "Setting up minimal firewall rules..."
     PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" << 'EOF' || warn "Could not set up initial firewall rules"
 -- Only block clearly malicious IPs, keep everything else open for initial setup
-INSERT INTO "FirewallRule" (id, ip, type, reason, "createdBy") VALUES
-    (gen_random_uuid(), '0.0.0.0/0', 'ALLOW', 'Initial setup - allow all', 'system')
+INSERT INTO "FirewallRule" (id, ip, type, reason, "createdBy", "createdAt", "updatedAt") VALUES
+    (gen_random_uuid(), '0.0.0.0/0', 'ALLOW', 'Initial setup - allow all', 'system', NOW(), NOW())
 ON CONFLICT DO NOTHING;
 EOF
 }
