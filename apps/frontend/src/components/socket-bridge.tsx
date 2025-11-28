@@ -160,12 +160,15 @@ export function SocketBridge() {
         const filteredTracks = payload.tracks.filter((track) =>
           Boolean(track.callsign && track.callsign.trim()),
         );
-        addEntry({
-          message: `ADS-B tracks updated: ${filteredTracks.length} aircraft`,
-          level: 'info',
-          source: 'adsb',
-          timestamp: new Date().toISOString(),
-        });
+        const adsbMuted = useMapPreferences.getState().adsbMuted;
+        if (!adsbMuted) {
+          addEntry({
+            message: `ADS-B tracks updated: ${filteredTracks.length} aircraft`,
+            level: 'info',
+            source: 'adsb',
+            timestamp: new Date().toISOString(),
+          });
+        }
         queryClient.setQueryData(['adsb', 'tracks'], filteredTracks);
         return;
       }

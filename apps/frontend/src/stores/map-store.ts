@@ -10,6 +10,7 @@ interface MapPreferencesState {
   coverageEnabled: boolean;
   adsbEnabled: boolean;
   adsbGeofenceEnabled: boolean;
+  adsbMuted: boolean;
   mapStyle: string;
   setFitEnabled: (value: boolean) => void;
   toggleTrails: () => void;
@@ -19,6 +20,7 @@ interface MapPreferencesState {
   toggleCoverage: () => void;
   toggleAdsb: () => void;
   toggleAdsbGeofence: () => void;
+  toggleAdsbMuted: () => void;
   setMapStyle: (style: string) => void;
 }
 
@@ -31,6 +33,7 @@ const DEFAULT_STATE: Pick<
   | 'coverageEnabled'
   | 'adsbEnabled'
   | 'adsbGeofenceEnabled'
+  | 'adsbMuted'
   | 'mapStyle'
   | 'fitEnabled'
 > = {
@@ -42,6 +45,7 @@ const DEFAULT_STATE: Pick<
   coverageEnabled: false,
   adsbEnabled: false,
   adsbGeofenceEnabled: false,
+  adsbMuted: false,
   mapStyle: 'osm',
 };
 
@@ -58,6 +62,7 @@ export const useMapPreferences = create<MapPreferencesState>()(
       toggleAdsb: () => set((state) => ({ adsbEnabled: !state.adsbEnabled })),
       toggleAdsbGeofence: () =>
         set((state) => ({ adsbGeofenceEnabled: !state.adsbGeofenceEnabled })),
+      toggleAdsbMuted: () => set((state) => ({ adsbMuted: !state.adsbMuted })),
       setMapStyle: (style) => set({ mapStyle: style }),
     }),
     {
@@ -72,6 +77,7 @@ export const useMapPreferences = create<MapPreferencesState>()(
         coverageEnabled: state.coverageEnabled,
         adsbEnabled: state.adsbEnabled,
         adsbGeofenceEnabled: state.adsbGeofenceEnabled,
+        adsbMuted: state.adsbMuted,
         mapStyle: state.mapStyle,
       }),
     },

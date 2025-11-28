@@ -10,6 +10,7 @@ import {
 } from '../api/adsb';
 import type { AdsbStatus } from '../api/types';
 import { useAuthStore } from '../stores/auth-store';
+import { useMapPreferences } from '../stores/map-store';
 
 type LogEntry = {
   id: string;
@@ -43,6 +44,8 @@ export function AdsbPage() {
   const [uploading, setUploading] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string>('No file selected');
   const [log, setLog] = useState<Map<string, LogEntry>>(new Map());
+  const adsbMuted = useMapPreferences((state) => state.adsbMuted);
+  const toggleAdsbMuted = useMapPreferences((state) => state.toggleAdsbMuted);
 
   const adsbStatusQuery = useQuery({
     queryKey: ['adsb', 'status'],
@@ -283,6 +286,17 @@ export function AdsbPage() {
                         />
                         <span />
                       </label>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Mute ADS-B log updates</span>
+                      <label
+                        className="switch"
+                        aria-label="Mute ADS-B updates in Terminal & Events"
+                      >
+                        <input type="checkbox" checked={adsbMuted} onChange={toggleAdsbMuted} />
+                        <span />
+                      </label>
+                      <p className="form-hint">Suppress ADS-B info messages in the event feed.</p>
                     </div>
                     <div className="config-row">
                       <span className="config-label">Last poll</span>
