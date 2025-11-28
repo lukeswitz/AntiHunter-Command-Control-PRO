@@ -18,6 +18,8 @@ import {
 import 'leaflet.heat';
 
 import type { AdsbTrack, Geofence, GeofenceVertex, DroneStatus } from '../../api/types';
+import adsbHelicopterIcon from '../../assets/adsb-helicopter.svg';
+import adsbPlaneIcon from '../../assets/adsb-plane.svg';
 import controllerMarkerIcon from '../../assets/drone-controller.svg';
 import droneMarkerIcon from '../../assets/drone-marker.svg';
 import type { AlertColorConfig } from '../../constants/alert-colors';
@@ -175,13 +177,13 @@ function createAdsbIcon(track: AdsbTrack): DivIcon {
     track.categoryDescription,
   );
   const color = isHelicopter ? '#a855f7' : '#06b6d4';
-  const iconGlyph = isHelicopter ? '🚁' : '✈';
+  const iconSrc = isHelicopter ? adsbHelicopterIcon : adsbPlaneIcon;
   const markerClass = isHelicopter ? 'adsb-marker--heli' : 'adsb-marker--plane';
   const rotation = typeof track.heading === 'number' ? track.heading : null;
   return divIcon({
     html: `<div class="adsb-marker ${markerClass}" style="--adsb-color:${color};${
       rotation != null ? `--adsb-rotation:${rotation}deg;` : ''
-    }"><span class="adsb-marker__icon">${iconGlyph}</span><span class="adsb-marker__label">${label}</span></div>`,
+    }"><img src="${iconSrc}" alt="" class="adsb-marker__icon" /><span class="adsb-marker__label">${label}</span></div>`,
     className: 'adsb-marker-wrapper',
     iconSize: [28, 28],
     iconAnchor: [14, 14],

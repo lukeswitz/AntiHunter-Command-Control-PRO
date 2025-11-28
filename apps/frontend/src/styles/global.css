@@ -1496,11 +1496,13 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .adsb-marker__icon {
-  margin-right: 0.3rem;
-  font-size: 0.9rem;
+  margin-right: 0.35rem;
+  width: 16px;
+  height: 16px;
   line-height: 1;
   display: inline-block;
   transform: rotate(var(--adsb-rotation, 0deg));
+  vertical-align: middle;
 }
 
 .adsb-marker__label {
