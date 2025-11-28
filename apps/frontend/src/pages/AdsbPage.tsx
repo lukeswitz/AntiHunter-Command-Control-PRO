@@ -87,9 +87,12 @@ export function AdsbPage() {
 
   useEffect(() => {
     if (!tracksQuery.data) return;
+    const filtered = tracksQuery.data.filter((track) =>
+      Boolean(track.callsign && track.callsign.trim()),
+    );
     setLog((prev) => {
       const next = new Map(prev);
-      tracksQuery.data.forEach((track) => {
+      filtered.forEach((track) => {
         const existing = next.get(track.icao);
         const now = new Date().toISOString();
         if (existing) {

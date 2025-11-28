@@ -232,7 +232,11 @@ export function MapPage() {
   const adsbTracks = useMemo(
     () =>
       adsbAddonEnabled && adsbEnabled && adsbTracksQuery.data
-        ? adsbTracksQuery.data.filter((track) => hasValidPosition(track.lat, track.lon))
+        ? adsbTracksQuery.data.filter(
+            (track) =>
+              Boolean(track.callsign && track.callsign.trim()) &&
+              hasValidPosition(track.lat, track.lon),
+          )
         : [],
     [adsbAddonEnabled, adsbEnabled, adsbTracksQuery.data],
   );
