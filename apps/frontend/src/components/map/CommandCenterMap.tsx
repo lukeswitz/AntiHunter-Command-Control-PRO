@@ -764,6 +764,11 @@ export function CommandCenterMap({
                     ? 'Helicopter'
                     : 'Fixed wing'}
                 </div>
+                {track.dep || track.dest ? (
+                  <div>
+                    Route: {[track.dep, track.dest].filter(Boolean).join(' → ') || 'Unknown'}
+                  </div>
+                ) : null}
                 {track.alt != null ? <div>Altitude: {track.alt.toFixed(0)} ft</div> : null}
                 {track.speed != null ? <div>Speed: {track.speed.toFixed(0)} kt</div> : null}
                 {track.heading != null ? <div>Heading: {track.heading.toFixed(0)}&deg;</div> : null}

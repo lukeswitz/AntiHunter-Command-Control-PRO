@@ -11,6 +11,8 @@ export interface AdsbTrack {
   lastSeen: string;
   siteId?: string | null;
   category?: string | null;
+  dep?: string | null;
+  dest?: string | null;
   typeCode?: string | null;
   model?: string | null;
   manufacturer?: string | null;

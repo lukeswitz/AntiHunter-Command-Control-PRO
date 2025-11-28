@@ -17,6 +17,8 @@ type LogEntry = {
   icao: string;
   callsign?: string | null;
   category?: string | null;
+  dep?: string | null;
+  dest?: string | null;
   lat: number;
   lon: number;
   alt?: number | null;
@@ -103,6 +105,8 @@ export function AdsbPage() {
             ...existing,
             callsign: track.callsign ?? existing.callsign,
             category: track.category ?? existing.category,
+            dep: track.dep ?? existing.dep,
+            dest: track.dest ?? existing.dest,
             lat: track.lat,
             lon: track.lon,
             alt: track.alt ?? existing.alt,
@@ -117,6 +121,8 @@ export function AdsbPage() {
             icao: track.icao,
             callsign: track.callsign ?? null,
             category: track.category ?? null,
+            dep: track.dep ?? null,
+            dest: track.dest ?? null,
             lat: track.lat,
             lon: track.lon,
             alt: track.alt ?? null,
@@ -143,6 +149,8 @@ export function AdsbPage() {
       'ICAO',
       'Callsign',
       'Category',
+      'Departure',
+      'Destination',
       'Lat',
       'Lon',
       'Alt',
@@ -156,6 +164,8 @@ export function AdsbPage() {
       entry.icao,
       entry.callsign ?? '',
       entry.category ?? '',
+      entry.dep ?? '',
+      entry.dest ?? '',
       entry.lat,
       entry.lon,
       entry.alt ?? '',
@@ -534,6 +544,8 @@ export function AdsbPage() {
                         <th>ICAO</th>
                         <th>Callsign</th>
                         <th>Category</th>
+                        <th>Departure</th>
+                        <th>Destination</th>
                         <th>Lat</th>
                         <th>Lon</th>
                         <th>Alt</th>
@@ -550,6 +562,8 @@ export function AdsbPage() {
                           <td>{entry.icao}</td>
                           <td>{entry.callsign ?? '—'}</td>
                           <td>{entry.category ?? '—'}</td>
+                          <td>{entry.dep ?? '—'}</td>
+                          <td>{entry.dest ?? '—'}</td>
                           <td>{entry.lat.toFixed(5)}</td>
                           <td>{entry.lon.toFixed(5)}</td>
                           <td>{entry.alt != null ? entry.alt.toFixed(0) : '—'}</td>

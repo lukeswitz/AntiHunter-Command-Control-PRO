@@ -43,6 +43,8 @@ interface Dump1090Aircraft {
   category?: string;
   squawk?: string;
   nav_modes?: string;
+  dep?: string;
+  dest?: string;
 }
 
 @Injectable()
@@ -294,6 +296,8 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         lastSeen: new Date(Date.now() - (entry.seen ?? 0) * 1000).toISOString(),
         siteId: this.localSiteId,
         category: typeof entry.category === 'string' ? entry.category.trim() || null : null,
+        dep: typeof entry.dep === 'string' ? entry.dep.trim() || null : null,
+        dest: typeof entry.dest === 'string' ? entry.dest.trim() || null : null,
       };
       this.enrichTrack(track);
       nextTracks.set(id, track);

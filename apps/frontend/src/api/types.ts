@@ -286,6 +286,8 @@ export interface AdsbTrack {
   onGround?: boolean | null;
   lastSeen: string;
   category?: string | null;
+  dep?: string | null;
+  dest?: string | null;
   typeCode?: string | null;
   model?: string | null;
   manufacturer?: string | null;
