@@ -48,6 +48,7 @@ export function AdsbPage() {
     queryKey: ['adsb', 'status'],
     queryFn: () => getAdsbStatus(),
     staleTime: 15_000,
+    refetchInterval: () => Math.max(5_000, adsbIntervalMs),
   });
 
   useEffect(() => {
@@ -81,7 +82,7 @@ export function AdsbPage() {
   const tracksQuery = useQuery({
     queryKey: ['adsb', 'tracks', 'log'],
     queryFn: getAdsbTracksViaProxy,
-    refetchInterval: 15_000,
+    refetchInterval: () => Math.max(5_000, adsbIntervalMs),
   });
 
   useEffect(() => {

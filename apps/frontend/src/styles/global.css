@@ -1116,18 +1116,21 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .drone-tooltip,
-.drone-operator-tooltip {
-  max-width: 340px;
-  font-size: 0.8rem;
-  display: grid;
-  gap: 0.2rem;
-  word-break: normal;
-  overflow-wrap: break-word;
-}
+  .drone-operator-tooltip {
+    min-width: 200px;
+    max-width: 340px;
+    font-size: 0.8rem;
+    display: grid;
+    gap: 0.2rem;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
 
 .leaflet-tooltip.tooltip--drone {
   background: rgba(5, 7, 8, 0.8);
   color: #ffffff;
+  min-width: 220px;
+  max-width: 360px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(6px);
