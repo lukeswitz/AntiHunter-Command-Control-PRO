@@ -1485,32 +1485,34 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .adsb-marker {
-  background: color-mix(in srgb, var(--adsb-color, #06b6d4) 80%, #0b1321 20%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
   color: #ffffff;
-  padding: 0.1rem 0.35rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  box-shadow: 0 8px 18px rgba(6, 182, 212, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .adsb-marker__icon {
-  margin-right: 0.35rem;
-  width: 16px;
-  height: 16px;
+  width: 28px;
+  height: 28px;
   line-height: 1;
-  display: inline-block;
+  display: block;
   transform: rotate(var(--adsb-rotation, 0deg));
-  vertical-align: middle;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--adsb-color, #06b6d4) 65%, transparent));
 }
 
 .adsb-marker__label {
   line-height: 1.2;
+  background: color-mix(in srgb, var(--adsb-color, #06b6d4) 82%, #0b1321 18%);
+  padding: 0.18rem 0.55rem;
+  border-radius: 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  box-shadow: 0 6px 12px color-mix(in srgb, var(--adsb-color, #06b6d4) 35%, transparent);
 }
 
 .adsb-marker--heli {
-  box-shadow: 0 8px 18px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 8px 18px rgba(168, 85, 247, 0.35);
 }
 
 .legend-swatch--adsb-plane {

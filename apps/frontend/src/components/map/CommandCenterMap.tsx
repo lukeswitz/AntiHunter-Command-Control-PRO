@@ -185,8 +185,8 @@ function createAdsbIcon(track: AdsbTrack): DivIcon {
       rotation != null ? `--adsb-rotation:${rotation}deg;` : ''
     }"><img src="${iconSrc}" alt="" class="adsb-marker__icon" /><span class="adsb-marker__label">${label}</span></div>`,
     className: 'adsb-marker-wrapper',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [40, 48],
+    iconAnchor: [20, 24],
   });
 }
 
