@@ -559,19 +559,27 @@ export function AdsbPage() {
                     <tbody>
                       {logEntries.map((entry) => (
                         <tr key={entry.icao}>
-                          <td>{entry.icao}</td>
-                          <td>{entry.callsign ?? '—'}</td>
-                          <td>{entry.category ?? '—'}</td>
-                          <td>{entry.dep ?? '—'}</td>
-                          <td>{entry.dest ?? '—'}</td>
-                          <td>{entry.lat.toFixed(5)}</td>
-                          <td>{entry.lon.toFixed(5)}</td>
-                          <td>{entry.alt != null ? entry.alt.toFixed(0) : '—'}</td>
-                          <td>{entry.speed != null ? entry.speed.toFixed(0) : '—'}</td>
-                          <td>{entry.heading != null ? entry.heading.toFixed(0) : '—'}</td>
-                          <td>{new Date(entry.firstSeen).toLocaleString()}</td>
-                          <td>{new Date(entry.lastSeen).toLocaleString()}</td>
-                          <td>{entry.hits}</td>
+                          <td data-label="ICAO">{entry.icao}</td>
+                          <td data-label="Callsign">{entry.callsign ?? '—'}</td>
+                          <td data-label="Category">{entry.category ?? '—'}</td>
+                          <td data-label="Departure">{entry.dep ?? '—'}</td>
+                          <td data-label="Destination">{entry.dest ?? '—'}</td>
+                          <td data-label="Lat">{entry.lat.toFixed(5)}</td>
+                          <td data-label="Lon">{entry.lon.toFixed(5)}</td>
+                          <td data-label="Alt">{entry.alt != null ? entry.alt.toFixed(0) : '—'}</td>
+                          <td data-label="Speed">
+                            {entry.speed != null ? entry.speed.toFixed(0) : '—'}
+                          </td>
+                          <td data-label="Heading">
+                            {entry.heading != null ? entry.heading.toFixed(0) : '—'}
+                          </td>
+                          <td data-label="First Seen">
+                            {new Date(entry.firstSeen).toLocaleString()}
+                          </td>
+                          <td data-label="Last Seen">
+                            {new Date(entry.lastSeen).toLocaleString()}
+                          </td>
+                          <td data-label="Hits">{entry.hits}</td>
                         </tr>
                       ))}
                       {logEntries.length === 0 ? (

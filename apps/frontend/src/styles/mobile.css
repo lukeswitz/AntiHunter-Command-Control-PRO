@@ -576,6 +576,62 @@
     font-size: 0.88rem;
     padding-inline: 0.35rem;
   }
+
+  .adsb-log-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .adsb-log-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .adsb-log-table thead {
+    border: 0;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+  }
+
+  .adsb-log-table tbody,
+  .adsb-log-table tr,
+  .adsb-log-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .adsb-log-table tr {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 0.5rem 0;
+    margin-bottom: 0.35rem;
+  }
+
+  .adsb-log-table tr:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+
+  .adsb-log-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.25rem 0;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+  }
+
+  .adsb-log-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: none;
+    font-size: 0.82rem;
+  }
 }
 .terminal-drawer__list--page {
   max-height: none;
