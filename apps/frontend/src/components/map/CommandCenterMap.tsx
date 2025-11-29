@@ -221,6 +221,7 @@ function isHelicopterCategory(
 
   return tokens.some(
     (token) =>
+      token === 'A7' ||
       token.startsWith('H') ||
       token.includes('HELI') ||
       token.includes('ROTOR') ||
