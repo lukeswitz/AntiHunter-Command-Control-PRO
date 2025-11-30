@@ -15,6 +15,7 @@ import {
   MdExtension,
   MdNotificationsActive,
   MdRadar,
+  MdRadioButtonChecked,
 } from 'react-icons/md';
 import { NavLink } from 'react-router-dom';
 
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/inventory', label: 'Inventory', icon: MdWifiTethering },
   { to: '/alerts', label: 'Alerts', icon: MdNotificationsActive },
   { to: '/targets', label: 'Targets', icon: MdMyLocation },
+  { to: '/acars', label: 'ACARS', icon: MdRadioButtonChecked },
   { to: '/adsb', label: 'ADS-B', icon: MdRadar },
   { to: '/geofences', label: 'Geofences', icon: MdOutlineAreaChart },
   { to: '/nodes', label: 'Nodes', icon: MdSensors },

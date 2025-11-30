@@ -17,7 +17,7 @@ import {
 } from 'react-leaflet';
 import 'leaflet.heat';
 
-import type { AdsbTrack, Geofence, GeofenceVertex, DroneStatus } from '../../api/types';
+import type { AcarsMessage, AdsbTrack, Geofence, GeofenceVertex, DroneStatus } from '../../api/types';
 import controllerMarkerIcon from '../../assets/drone-controller.svg';
 import droneMarkerIcon from '../../assets/drone-marker.svg';
 import type { AlertColorConfig } from '../../constants/alert-colors';
@@ -108,6 +108,21 @@ const ADSB_HELI_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 2
     stroke-width="1.2"
     stroke-linecap="round"
     d="M12 4.5v15M4.5 12H19.5M6.5 6.5l11 11M17.5 6.5l-11 11"
+  />
+</svg>`;
+
+const ACARS_COMM_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <path
+    fill="#ffffff"
+    d="M12 2c-1.1 0-2 .9-2 2v3c-2.8.4-5 2.8-5 5.7v3.6c0 .4.3.7.7.7h.6c.4 0 .7-.3.7-.7v-3.6c0-2.2 1.8-4 4-4s4 1.8 4 4v3.6c0 .4.3.7.7.7h.6c.4 0 .7-.3.7-.7v-3.6c0-2.9-2.2-5.3-5-5.7V4c0-.6.4-1 1-1s1 .4 1 1h2c0-1.1-.9-2-2-2zm-1 17h2v3h-2v-3z"
+  />
+  <circle cx="7" cy="8" r="1.5" fill="#ffffff"/>
+  <circle cx="17" cy="8" r="1.5" fill="#ffffff"/>
+  <path
+    stroke="#ffffff"
+    stroke-width="1"
+    stroke-linecap="round"
+    d="M5 5.5c-1-1-2-1.5-3-1.5M19 5.5c1-1 2-1.5 3-1.5"
   />
 </svg>`;
 
@@ -202,6 +217,17 @@ function createAdsbIcon(track: AdsbTrack): DivIcon {
       rotation != null ? `--adsb-rotation:${rotation}deg;` : ''
     }"><span class="adsb-marker__icon" aria-hidden="true">${svg}</span><span class="adsb-marker__label">${label}</span></div>`,
     className: 'adsb-marker-wrapper',
+    iconSize: [40, 48],
+    iconAnchor: [20, 24],
+  });
+}
+
+function createAcarsIcon(message: AcarsMessage): DivIcon {
+  const label = escapeHtml(message.flight ?? message.tail);
+  const color = '#f59e0b';
+  return divIcon({
+    html: `<div class="acars-marker" style="--acars-color:${color};"><span class="acars-marker__icon" aria-hidden="true">${ACARS_COMM_SVG}</span><span class="acars-marker__label">${label}</span></div>`,
+    className: 'acars-marker-wrapper',
     iconSize: [40, 48],
     iconAnchor: [20, 24],
   });
@@ -407,6 +433,7 @@ interface CommandCenterMapProps {
   followEnabled: boolean;
   showCoverage: boolean;
   adsbTracks?: { lat: number; lon: number; icao: string; callsign?: string | null; id: string }[];
+  acarsMessages?: AcarsMessage[];
   geofences: Geofence[];
   geofenceHighlights: Record<string, number>;
   mapStyle: string;
@@ -448,6 +475,7 @@ export function CommandCenterMap({
   onNodeCommand,
   trackingOverlays = [],
   adsbTracks = [],
+  acarsMessages = [],
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const baseLayerKeys = useMemo(() => BASE_LAYERS.map((layer) => layer.key), []);
@@ -500,6 +528,10 @@ export function CommandCenterMap({
         (track): track is AdsbTrack => Number.isFinite(track.lat) && Number.isFinite(track.lon),
       ),
     [adsbTracks],
+  );
+  const acarsWithPosition = useMemo(
+    () => acarsMessages.filter((msg) => hasValidPosition(msg.lat, msg.lon)),
+    [acarsMessages],
   );
 
   const center = useMemo<LatLngExpression>(() => {
@@ -792,6 +824,29 @@ export function CommandCenterMap({
                 {track.speed != null ? <div>Speed: {track.speed.toFixed(0)} kt</div> : null}
                 {track.heading != null ? <div>Heading: {track.heading.toFixed(0)}&deg;</div> : null}
                 <div>Last seen: {new Date(track.lastSeen).toLocaleTimeString()}</div>
+              </div>
+            </Tooltip>
+          </Marker>
+        );
+      })}
+      {acarsWithPosition.map((message) => {
+        const position: LatLngExpression = [message.lat!, message.lon!];
+        return (
+          <Marker key={`acars-${message.id}`} position={position} icon={createAcarsIcon(message)}>
+            <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
+              <div className="drone-tooltip">
+                <div className="badge badge--inline">Source: ACARS</div>
+                <strong>{message.flight ?? message.tail}</strong>
+                <div className="muted">{message.tail}</div>
+                <div>
+                  Location: {message.lat!.toFixed(5)}, {message.lon!.toFixed(5)}
+                </div>
+                {message.label ? <div>Label: {message.label}</div> : null}
+                {message.text ? <div className="text-truncate">Message: {message.text}</div> : null}
+                {message.frequency ? <div>Frequency: {message.frequency.toFixed(3)} MHz</div> : null}
+                {message.signalLevel ? <div>Signal: {message.signalLevel.toFixed(1)} dB</div> : null}
+                {message.stationId ? <div>Station: {message.stationId}</div> : null}
+                <div>Last seen: {new Date(message.lastSeen).toLocaleTimeString()}</div>
               </div>
             </Tooltip>
           </Marker>

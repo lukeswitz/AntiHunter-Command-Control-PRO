@@ -16,6 +16,7 @@ import {
   MdRadar,
 } from 'react-icons/md';
 
+import { getAcarsMessages } from '../api/acars';
 import { getAdsbTracksViaProxy } from '../api/adsb';
 import { apiClient } from '../api/client';
 import type {
@@ -197,6 +198,8 @@ export function MapPage() {
 
   const adsbAddonEnabled =
     useAuthStore((state) => state.user?.preferences?.notifications?.addons?.adsb ?? true) ?? true;
+  const acarsAddonEnabled =
+    useAuthStore((state) => state.user?.preferences?.notifications?.addons?.acars ?? true) ?? true;
 
   const {
     trailsEnabled,
@@ -206,6 +209,7 @@ export function MapPage() {
     coverageEnabled,
     adsbEnabled,
     adsbGeofenceEnabled,
+    acarsEnabled,
     mapStyle,
     toggleTrails,
     toggleRadius,
@@ -213,6 +217,7 @@ export function MapPage() {
     toggleTargets,
     toggleAdsb,
     toggleAdsbGeofence,
+    toggleAcars,
   } = useMapPreferences();
   const fitEnabled = useMapPreferences((state) => state.fitEnabled);
   const setMapStyle = useMapPreferences((state) => state.setMapStyle);
@@ -239,6 +244,23 @@ export function MapPage() {
           })
         : [],
     [adsbAddonEnabled, adsbEnabled, adsbTracksQuery.data],
+  );
+
+  const acarsMessagesQuery = useQuery({
+    queryKey: ['acars', 'messages'],
+    queryFn: getAcarsMessages,
+    enabled: isAuthenticated && acarsAddonEnabled && acarsEnabled,
+    refetchInterval: 5_000,
+  });
+
+  const acarsMessages = useMemo(
+    () =>
+      acarsAddonEnabled && acarsEnabled && acarsMessagesQuery.data
+        ? acarsMessagesQuery.data.filter((message) => {
+            return message.tail && message.tail.trim() && hasValidPosition(message.lat, message.lon);
+          })
+        : [],
+    [acarsAddonEnabled, acarsEnabled, acarsMessagesQuery.data],
   );
 
   useEffect(() => {
@@ -763,6 +785,7 @@ export function MapPage() {
             showTrails={trailsEnabled}
             showTargets={targetsEnabled}
             adsbTracks={adsbAddonEnabled && adsbEnabled ? adsbTracks : []}
+            acarsMessages={acarsAddonEnabled && acarsEnabled ? acarsMessages : []}
             followEnabled={followEnabled}
             showCoverage={coverageEnabled}
             mapStyle={mapStyle}
