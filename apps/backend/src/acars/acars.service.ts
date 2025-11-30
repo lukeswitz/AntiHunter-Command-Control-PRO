@@ -211,7 +211,9 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
     const adsbTracks = this.adsbService.getTracks();
 
     if (adsbTracks.length > 0) {
-      this.logger.debug(`Processing ${messages.length} ACARS messages with ${adsbTracks.length} ADSB tracks available`);
+      this.logger.debug(
+        `Processing ${messages.length} ACARS messages with ${adsbTracks.length} ADSB tracks available`,
+      );
     }
 
     for (const msg of messages) {
