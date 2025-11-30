@@ -36,6 +36,7 @@ import { DroneFloatingCard } from '../components/DroneFloatingCard';
 import { CommandCenterMap, type IndicatorSeverity } from '../components/map/CommandCenterMap';
 import { extractAlertColors, applyAlertOverrides } from '../constants/alert-colors';
 import type { AlertColorConfig } from '../constants/alert-colors';
+import { useAdsbStore } from '../stores/adsb-store';
 import { useAlertStore } from '../stores/alert-store';
 import { useAuthStore } from '../stores/auth-store';
 import { useDroneStore } from '../stores/drone-store';
@@ -121,6 +122,7 @@ export function MapPage() {
   const setDroneStatusStore = useDroneStore((state) => state.setStatus);
   const setPendingDroneStatus = useDroneStore((state) => state.setPendingStatus);
   const clearPendingDroneStatus = useDroneStore((state) => state.clearPendingStatus);
+  const adsbTrails = useAdsbStore((state) => state.trails);
 
   const sitesQuery = useQuery({
     queryKey: ['sites'],
@@ -788,6 +790,7 @@ export function MapPage() {
             showTrails={trailsEnabled}
             showTargets={targetsEnabled}
             adsbTracks={adsbAddonEnabled && adsbEnabled ? adsbTracks : []}
+            adsbTrails={adsbTrails}
             acarsMessages={acarsAddonEnabled && acarsEnabled ? acarsMessages : []}
             followEnabled={followEnabled}
             showCoverage={coverageEnabled}

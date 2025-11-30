@@ -27,6 +27,7 @@ import type {
 import controllerMarkerIcon from '../../assets/drone-controller.svg';
 import droneMarkerIcon from '../../assets/drone-marker.svg';
 import type { AlertColorConfig } from '../../constants/alert-colors';
+import type { AdsbTrailPoint } from '../../stores/adsb-store';
 import type { DroneMarker, DroneTrailPoint } from '../../stores/drone-store';
 import {
   canonicalNodeId,
@@ -439,6 +440,7 @@ interface CommandCenterMapProps {
   followEnabled: boolean;
   showCoverage: boolean;
   adsbTracks?: { lat: number; lon: number; icao: string; callsign?: string | null; id: string }[];
+  adsbTrails?: Record<string, AdsbTrailPoint[]>;
   acarsMessages?: AcarsMessage[];
   geofences: Geofence[];
   geofenceHighlights: Record<string, number>;
@@ -481,6 +483,7 @@ export function CommandCenterMap({
   onNodeCommand,
   trackingOverlays = [],
   adsbTracks = [],
+  adsbTrails = {},
   acarsMessages = [],
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
@@ -798,41 +801,58 @@ export function CommandCenterMap({
         })}
       {adsbWithPosition.map((track) => {
         const position: LatLngExpression = [track.lat, track.lon];
+        const trailPoints = adsbTrails[track.id] ?? [];
+        const trailPositions =
+          trailPoints.length > 1
+            ? (trailPoints.map((point) => [point.lat, point.lon]) as LatLngTuple[])
+            : null;
+        const isHelicopter = isHelicopterCategory(
+          track.category,
+          track.aircraftType,
+          track.typeCode,
+          track.categoryDescription,
+        );
+        const trailColor = isHelicopter ? '#a855f7' : '#06b6d4';
+
         return (
-          <Marker key={`adsb-${track.id}`} position={position} icon={createAdsbIcon(track)}>
-            <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
-              <div className="drone-tooltip">
-                <div className="badge badge--inline">Source: ADS-B</div>
-                <strong>{track.callsign ?? track.icao}</strong>
-                <div className="muted">{track.icao}</div>
-                <div>
-                  Location: {track.lat.toFixed(5)}, {track.lon.toFixed(5)}
-                </div>
-                <div>
-                  Type:{' '}
-                  {isHelicopterCategory(
-                    track.category,
-                    track.aircraftType,
-                    track.typeCode,
-                    track.categoryDescription,
-                  )
-                    ? 'Helicopter'
-                    : 'Fixed wing'}
-                </div>
-                {track.dep || track.dest ? (
+          <Fragment key={`adsb-${track.id}`}>
+            {trailPositions && showTrails ? (
+              <Polyline
+                positions={trailPositions}
+                pathOptions={{
+                  color: trailColor,
+                  weight: 2,
+                  opacity: 0.6,
+                }}
+              />
+            ) : null}
+            <Marker position={position} icon={createAdsbIcon(track)}>
+              <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
+                <div className="drone-tooltip">
+                  <div className="badge badge--inline">Source: ADS-B</div>
+                  <strong>{track.callsign ?? track.icao}</strong>
+                  <div className="muted">{track.icao}</div>
                   <div>
-                    Route: {[track.dep, track.dest].filter(Boolean).join(' → ') || 'Unknown'}
+                    Location: {track.lat.toFixed(5)}, {track.lon.toFixed(5)}
                   </div>
-                ) : null}
-                {track.reg ? <div>Registration: {track.reg}</div> : null}
-                {track.country ? <div>Country: {track.country}</div> : null}
-                {track.alt != null ? <div>Altitude: {track.alt.toFixed(0)} ft</div> : null}
-                {track.speed != null ? <div>Speed: {track.speed.toFixed(0)} kt</div> : null}
-                {track.heading != null ? <div>Heading: {track.heading.toFixed(0)}&deg;</div> : null}
-                <div>Last seen: {new Date(track.lastSeen).toLocaleTimeString()}</div>
-              </div>
-            </Tooltip>
-          </Marker>
+                  <div>Type: {isHelicopter ? 'Helicopter' : 'Fixed wing'}</div>
+                  {track.dep || track.dest ? (
+                    <div>
+                      Route: {[track.dep, track.dest].filter(Boolean).join(' → ') || 'Unknown'}
+                    </div>
+                  ) : null}
+                  {track.reg ? <div>Registration: {track.reg}</div> : null}
+                  {track.country ? <div>Country: {track.country}</div> : null}
+                  {track.alt != null ? <div>Altitude: {track.alt.toFixed(0)} ft</div> : null}
+                  {track.speed != null ? <div>Speed: {track.speed.toFixed(0)} kt</div> : null}
+                  {track.heading != null ? (
+                    <div>Heading: {track.heading.toFixed(0)}&deg;</div>
+                  ) : null}
+                  <div>Last seen: {new Date(track.lastSeen).toLocaleTimeString()}</div>
+                </div>
+              </Tooltip>
+            </Marker>
+          </Fragment>
         );
       })}
       {acarsWithPosition.map((message) => {

@@ -13,6 +13,7 @@ import type {
   AcarsMessage,
   AcarsStatus,
 } from './acars.types';
+import type { AdsbService } from '../adsb/adsb.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
 @Injectable()
@@ -34,6 +35,7 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly configService: ConfigService,
     private readonly gateway: CommandCenterGateway,
+    private readonly adsbService: AdsbService,
   ) {
     this.enabled = this.configService.get<boolean>('acars.enabled', false) ?? false;
     this.udpHost = this.configService.get<string>('acars.udpHost', '127.0.0.1') ?? '127.0.0.1';
@@ -206,6 +208,8 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
 
   private processMessages(messages: AcarsdecMessage[]): void {
     const now = Date.now();
+    const adsbTracks = this.adsbService.getTracks();
+
     for (const msg of messages) {
       if (!msg.tail || !msg.timestamp) {
         continue;
@@ -213,6 +217,34 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
 
       const id = this.generateMessageId(msg);
       const timestamp = new Date(msg.timestamp * 1000).toISOString();
+
+      // Correlate with ADSB by matching tail number to registration
+      let lat: number | null = null;
+      let lon: number | null = null;
+
+      // Try to find matching ADSB track
+      const normalizedTail = this.normalizeTailNumber(msg.tail);
+      const normalizedFlight = msg.flight ? this.normalizeTailNumber(msg.flight) : null;
+
+      for (const track of adsbTracks) {
+        const normalizedReg = track.reg ? this.normalizeTailNumber(track.reg) : null;
+        const normalizedCallsign = track.callsign ? this.normalizeTailNumber(track.callsign) : null;
+
+        // Match by registration or callsign
+        if (
+          (normalizedReg && normalizedReg === normalizedTail) ||
+          (normalizedCallsign && normalizedCallsign === normalizedTail) ||
+          (normalizedFlight && normalizedReg && normalizedReg === normalizedFlight) ||
+          (normalizedFlight && normalizedCallsign && normalizedCallsign === normalizedFlight)
+        ) {
+          lat = track.lat;
+          lon = track.lon;
+          this.logger.debug(
+            `Correlated ACARS ${msg.tail} with ADSB ${track.reg ?? track.callsign} at ${lat},${lon}`,
+          );
+          break;
+        }
+      }
 
       const acarsMessage: AcarsMessage = {
         id,
@@ -230,10 +262,17 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
         channel: msg.channel || null,
         stationId: msg.station_id || null,
         lastSeen: new Date(now).toISOString(),
+        lat,
+        lon,
       };
 
       this.messages.set(id, acarsMessage);
     }
+  }
+
+  private normalizeTailNumber(tail: string): string {
+    // Remove spaces, hyphens, and convert to uppercase for comparison
+    return tail.replace(/[\s-]/g, '').toUpperCase().trim();
   }
 
   private generateMessageId(msg: AcarsdecMessage): string {

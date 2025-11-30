@@ -78,12 +78,28 @@ function randomOffset(base, radiusKm) {
   return { lat: base.lat + dLat, lon: base.lon + dLon };
 }
 
+// Sample aircraft registrations for ACARS correlation testing
+const sampleRegistrations = [
+  { reg: 'N12345', flight: 'UAL123' },
+  { reg: 'N789AB', flight: 'AAL456' },
+  { reg: 'N456XY', flight: 'DAL789' },
+  { reg: 'G-ABCD', flight: 'BAW101' },
+  { reg: 'N999ZZ', flight: 'SWA202' },
+];
+
 function createAircraft(index) {
   const { dep, dest } = randomDepDest();
   const baseTrack = Math.random() * 360;
+
+  // Use sample registration if available, otherwise generate random
+  const sample = sampleRegistrations[index] ?? null;
+  const reg = sample?.reg ?? null;
+  const flight = sample?.flight ?? randomCallsign();
+
   return {
     hex: randomHex(),
-    flight: randomCallsign(),
+    flight,
+    reg,
     lat: null,
     lon: null,
     alt_geom: Math.floor(2500 + Math.random() * 12000),
@@ -138,6 +154,7 @@ const server = http.createServer((req, res) => {
       aircraft: state.aircraft.map((a) => ({
         hex: a.hex,
         flight: a.flight,
+        reg: a.reg,
         lat: a.lat,
         lon: a.lon,
         alt_geom: a.alt_geom,
