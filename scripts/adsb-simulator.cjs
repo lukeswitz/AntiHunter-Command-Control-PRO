@@ -122,23 +122,51 @@ const sampleRegistrations = [
   { reg: 'N999ZZ', flight: 'SWA202' },
 ];
 
+function shuffleArray(arr) {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Get unique categories first, then fill randomly
+function getShuffledTypes(count) {
+  const byCategory = new Map();
+  AIRCRAFT_TYPES.forEach((t) => {
+    if (!byCategory.has(t.category)) byCategory.set(t.category, []);
+    byCategory.get(t.category).push(t);
+  });
+
+  const result = [];
+  // One from each category first
+  for (const types of byCategory.values()) {
+    result.push(types[Math.floor(Math.random() * types.length)]);
+  }
+  // Fill remaining slots randomly
+  while (result.length < count) {
+    result.push(AIRCRAFT_TYPES[Math.floor(Math.random() * AIRCRAFT_TYPES.length)]);
+  }
+  return shuffleArray(result).slice(0, count);
+}
+
+const shuffledTypes = getShuffledTypes(options.count);
+
 function createAircraft(index) {
   const { dep, dest } = randomDepDest();
   const baseTrack = Math.random() * 360;
 
-  // Use predefined aircraft types, cycling through them
-  const aircraftType = AIRCRAFT_TYPES[index % AIRCRAFT_TYPES.length];
+  const aircraftType = shuffledTypes[index] ?? AIRCRAFT_TYPES[Math.floor(Math.random() * AIRCRAFT_TYPES.length)];
 
-  // Generate altitude and speed within type's range
   const [minAlt, maxAlt] = aircraftType.altRange;
   const [minSpeed, maxSpeed] = aircraftType.speedRange;
   const alt = Math.floor(minAlt + Math.random() * (maxAlt - minAlt));
   const speed = Math.floor(minSpeed + Math.random() * (maxSpeed - minSpeed));
 
-  // Use sample registration if available for ACARS correlation testing
   const sample = sampleRegistrations[index] ?? null;
   const reg = sample?.reg ?? null;
-  const flight = sample?.flight ?? aircraftType.callsign;
+  const flight = sample?.flight ?? aircraftType.callsign + Math.floor(Math.random() * 100);
 
   return {
     hex: randomHex(),
