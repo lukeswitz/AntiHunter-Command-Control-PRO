@@ -2,18 +2,25 @@
 /**
  * Lightweight ADS-B feed simulator for local testing.
  *
- * Serves a dump1090/readsb-style aircraft.json at /data/aircraft.json.
+ * Serves a dump1090/readsb-style aircraft.json at /data/aircraft.json
+ * and sends ACARS messages via UDP for correlation testing.
  *
  * Options (env or CLI flags):
- *   --port / PORT           HTTP port (default 8090)
- *   --count / COUNT         Number of aircraft to simulate (default 8)
- *   --interval / INTERVAL   Update interval in ms (default 1500)
- *   --lat / LAT             Center latitude (default 63.43)
- *   --lon / LON             Center longitude (default 10.39)
- *   --radius / RADIUS       Max offset from center in km (default 30)
+ *   --port / PORT              HTTP port (default 8090)
+ *   --count / COUNT            Number of aircraft to simulate (default 8)
+ *   --interval / INTERVAL      Update interval in ms (default 1500)
+ *   --lat / LAT                Center latitude (default 63.43)
+ *   --lon / LON                Center longitude (default 10.39)
+ *   --radius / RADIUS          Max offset from center in km (default 30)
+ *   --acars-host / ACARS_HOST  ACARS UDP host (default 127.0.0.1)
+ *   --acars-port / ACARS_PORT  ACARS UDP port (default 15550)
+ *
+ * First 5 aircraft have registrations for ACARS correlation testing.
+ * ACARS messages are sent every 10 seconds matching aircraft tail numbers.
  */
 
 const http = require('http');
+const dgram = require('dgram');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -38,6 +45,8 @@ function parseArgs() {
     lat: get('lat', 'LAT', 63.43),
     lon: get('lon', 'LON', 10.39),
     radiusKm: get('radius', 'RADIUS', 30),
+    acarsPort: get('acars-port', 'ACARS_PORT', 15550),
+    acarsHost: get('acars-host', 'ACARS_HOST', '127.0.0.1'),
   };
 }
 
@@ -78,12 +87,28 @@ function randomOffset(base, radiusKm) {
   return { lat: base.lat + dLat, lon: base.lon + dLon };
 }
 
+// Sample aircraft registrations for ACARS correlation testing
+const sampleRegistrations = [
+  { reg: 'N12345', flight: 'UAL123' },
+  { reg: 'N789AB', flight: 'AAL456' },
+  { reg: 'N456XY', flight: 'DAL789' },
+  { reg: 'G-ABCD', flight: 'BAW101' },
+  { reg: 'N999ZZ', flight: 'SWA202' },
+];
+
 function createAircraft(index) {
   const { dep, dest } = randomDepDest();
   const baseTrack = Math.random() * 360;
+
+  // Use sample registration if available, otherwise generate random
+  const sample = sampleRegistrations[index] ?? null;
+  const reg = sample?.reg ?? null;
+  const flight = sample?.flight ?? randomCallsign();
+
   return {
     hex: randomHex(),
-    flight: randomCallsign(),
+    flight,
+    reg,
     lat: null,
     lon: null,
     alt_geom: Math.floor(2500 + Math.random() * 12000),
@@ -128,6 +153,72 @@ function step() {
 
 setInterval(step, options.interval);
 
+// ACARS message simulation
+const acarsLabels = ['H1', 'Q0', '_d', '5Z', '80', 'H2', '5U', '44'];
+const acarsMessages = [
+  'REQUESTING CLEARANCE FOR DESCENT',
+  'ENGINE PARAMETERS NORMAL',
+  'FUEL REMAINING 12000 LBS',
+  'ETA 1430Z',
+  'ALTITUDE 35000 FT',
+  'TURBULENCE LIGHT',
+];
+
+const udpClient = dgram.createSocket('udp4');
+
+function sendAcarsMessages() {
+  const numMessages = Math.floor(Math.random() * 2) + 1;
+  const messages = [];
+
+  for (let i = 0; i < numMessages; i++) {
+    const aircraft = state.aircraft.filter((a) => a.reg);
+    if (aircraft.length === 0) continue;
+
+    const ac = aircraft[Math.floor(Math.random() * aircraft.length)];
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    messages.push({
+      timestamp,
+      station_id: 'TEST-STN',
+      channel: 0,
+      freq: Number((131.45 + Math.random() * 0.5).toFixed(3)),
+      level: Number((-15 + Math.random() * 10).toFixed(1)),
+      noise: Number((-35 + Math.random() * 5).toFixed(1)),
+      error: 0,
+      mode: '2',
+      label: acarsLabels[Math.floor(Math.random() * acarsLabels.length)],
+      block_id: String.fromCharCode(65 + Math.floor(Math.random() * 26)),
+      ack: false,
+      tail: ac.reg,
+      flight: ac.flight,
+      msgno: String(Math.floor(Math.random() * 100)).padStart(3, '0'),
+      text: acarsMessages[Math.floor(Math.random() * acarsMessages.length)],
+      app: { name: 'adsb-simulator', ver: '1.0' },
+    });
+  }
+
+  if (messages.length > 0) {
+    const payload = JSON.stringify({ messages }, null, 2);
+    const buffer = Buffer.from(payload);
+
+    udpClient.send(buffer, 0, buffer.length, options.acarsPort, options.acarsHost, (err) => {
+      if (err) {
+        console.error(`[acars] Error: ${err.message}`);
+      } else {
+        console.log(
+          `[acars] Sent ${messages.length} message(s) to ${options.acarsHost}:${options.acarsPort}`,
+        );
+        messages.forEach((msg) => {
+          console.log(`  → ${msg.tail} [${msg.label}] ${msg.text.substring(0, 40)}...`);
+        });
+      }
+    });
+  }
+}
+
+setInterval(sendAcarsMessages, 10000);
+setTimeout(sendAcarsMessages, 2000);
+
 const server = http.createServer((req, res) => {
   if (req.url && req.url.includes('/data/aircraft.json')) {
     res.setHeader('Content-Type', 'application/json');
@@ -138,6 +229,7 @@ const server = http.createServer((req, res) => {
       aircraft: state.aircraft.map((a) => ({
         hex: a.hex,
         flight: a.flight,
+        reg: a.reg,
         lat: a.lat,
         lon: a.lon,
         alt_geom: a.alt_geom,
@@ -169,5 +261,11 @@ server.listen(options.port, () => {
   // eslint-disable-next-line no-console
   console.log(
     `[adsb-simulator] Listening on http://localhost:${options.port} (count=${state.aircraft.length}, interval=${options.interval}ms)`,
+  );
+  console.log(
+    `[acars] Will send messages to ${options.acarsHost}:${options.acarsPort} every 10s`,
+  );
+  console.log(
+    `[acars] Aircraft with registrations: ${state.aircraft.filter((a) => a.reg).map((a) => a.reg).join(', ')}`,
   );
 });
