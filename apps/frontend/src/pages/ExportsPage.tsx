@@ -351,13 +351,38 @@ function buildFilename(type: ExportType, format: ExportFormat): string {
   return `${type}-${timestamp}.${extension}`;
 }
 
+function sanitizeFilename(filename: string): string {
+  // Remove path separators and dangerous characters
+  let sanitized = filename
+    .replace(/[/\\]/g, '_') // Replace path separators
+    .replace(/\.\./g, '_') // Remove path traversal sequences
+    // eslint-disable-next-line no-control-regex
+    .replace(/[<>:"|?*\u0000-\u001f]/g, '_'); // Remove Windows-invalid and control characters
+
+  // Ensure filename is not empty
+  if (!sanitized || sanitized.trim().length === 0) {
+    sanitized = 'download';
+  }
+
+  // Limit filename length
+  if (sanitized.length > 255) {
+    const extension = sanitized.match(/\.[^.]+$/)?.[0] || '';
+    const nameWithoutExt = sanitized.slice(0, sanitized.length - extension.length);
+    sanitized = nameWithoutExt.slice(0, 255 - extension.length) + extension;
+  }
+
+  return sanitized;
+}
+
 function parseFilename(disposition: string | null, fallback: string): string {
   if (!disposition) {
     return fallback;
   }
   const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
   if (match && match[1]) {
-    return decodeURIComponent(match[1]);
+    const decoded = decodeURIComponent(match[1]);
+    // Sanitize filename to prevent path traversal and XSS
+    return sanitizeFilename(decoded);
   }
   return fallback;
 }
@@ -365,11 +390,21 @@ function parseFilename(disposition: string | null, fallback: string): string {
 function triggerBrowserDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
+
+  // Sanitize filename one more time before setting as download attribute
+  const safeFilename = sanitizeFilename(filename);
+
   anchor.href = url;
-  anchor.download = filename;
+  anchor.download = safeFilename;
   anchor.style.display = 'none';
+  anchor.rel = 'noopener noreferrer'; // Security best practice
+
   document.body.appendChild(anchor);
   anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+
+  // Clean up
+  setTimeout(() => {
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }, 100);
 }

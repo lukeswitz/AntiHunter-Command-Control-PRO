@@ -111,6 +111,11 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     const clientId = dto.clientId?.trim();
     const username = dto.username?.trim();
 
+    // Validate broker URL to prevent SSRF
+    if (brokerUrl && brokerUrl.length > 0) {
+      this.validateBrokerUrl(brokerUrl);
+    }
+
     const normalizedBrokerUrl = brokerUrl && brokerUrl.length > 0 ? brokerUrl : undefined;
     const normalizedClientId = clientId && clientId.length > 0 ? clientId : undefined;
     const normalizedUsername =
@@ -403,5 +408,75 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
   private normalizeQos(value?: number | null): 0 | 1 | 2 {
     return value === 0 || value === 1 || value === 2 ? value : 1;
+  }
+
+  private validateBrokerUrl(urlString: string): void {
+    try {
+      const url = new URL(urlString);
+
+      // Allow mqtt, mqtts, ws, wss protocols for MQTT
+      const allowedProtocols = ['mqtt:', 'mqtts:', 'ws:', 'wss:', 'tcp:', 'ssl:', 'tls:'];
+      if (!allowedProtocols.includes(url.protocol)) {
+        throw new Error(`Broker URL must use one of: ${allowedProtocols.join(', ')}`);
+      }
+
+      const hostname = url.hostname.toLowerCase();
+
+      // Block metadata endpoints
+      if (hostname.includes('metadata') || hostname === '169.254.169.254') {
+        throw new Error('Broker URL cannot point to metadata endpoints');
+      }
+
+      // For MQTT brokers, we allow localhost and private IPs since MQTT brokers
+      // are commonly hosted on internal networks or localhost for development
+      // If you want to restrict this, uncomment the checks below:
+
+      // // Block localhost in production (comment out for development)
+      // if (
+      //   hostname === 'localhost' ||
+      //   hostname === '127.0.0.1' ||
+      //   hostname === '::1' ||
+      //   hostname.startsWith('127.') ||
+      //   hostname.startsWith('0.')
+      // ) {
+      //   throw new Error('Broker URL cannot point to localhost');
+      // }
+
+      // // Block private IP ranges
+      // if (this.isPrivateIp(hostname)) {
+      //   throw new Error('Broker URL cannot point to private IP addresses');
+      // }
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error('Broker URL is not valid');
+      }
+      throw error;
+    }
+  }
+
+  private isPrivateIp(hostname: string): boolean {
+    // Check for private IPv4 ranges
+    const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipv4Match) {
+      const [, a, b] = ipv4Match.map(Number);
+      // 10.0.0.0/8
+      if (a === 10) return true;
+      // 172.16.0.0/12
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      // 192.168.0.0/16
+      if (a === 192 && b === 168) return true;
+      // Link-local 169.254.0.0/16
+      if (a === 169 && b === 254) return true;
+    }
+
+    // Check for private IPv6 ranges
+    if (hostname.includes(':')) {
+      // fc00::/7 (Unique Local Addresses)
+      if (hostname.startsWith('fc') || hostname.startsWith('fd')) return true;
+      // fe80::/10 (Link-Local)
+      if (hostname.startsWith('fe80:')) return true;
+    }
+
+    return false;
   }
 }
