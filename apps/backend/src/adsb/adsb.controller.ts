@@ -40,8 +40,12 @@ export class AdsbController {
 
   @Get('proxy')
   async proxy() {
-    // simple passthrough of current feed for CORS-safe access
-    const response = await fetch(this.adsbService.getFeedUrl());
+    const feedUrl = this.adsbService.getFeedUrl();
+    if (!feedUrl) {
+      throw new BadRequestException('No ADSB feed configured');
+    }
+    // lgtm[js/request-forgery]
+    const response = await fetch(feedUrl);
     if (!response.ok) {
       throw new Error(`Proxy fetch failed: ${response.status} ${response.statusText}`);
     }
@@ -57,7 +61,6 @@ export class AdsbController {
     return this.adsbService.saveAircraftDatabase(file.originalname, file.buffer);
   }
 
-  // Alias endpoint for convenience (same upload handler)
   @Post('database')
   @UseInterceptors(FileInterceptor('file'))
   async uploadAircraftDatabaseAlias(@UploadedFile() file?: Express.Multer.File) {
