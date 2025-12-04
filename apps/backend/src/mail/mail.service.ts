@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport } from 'nodemailer';
+import sanitizeHtml from 'sanitize-html';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -60,13 +61,14 @@ export class MailService {
   async sendMail(options: SendMailOptions): Promise<void> {
     const config = await this.resolveConfig();
 
-    // Escape HTML in subject and HTML body to prevent XSS
+    // Sanitize HTML content to prevent XSS while preserving safe formatting
+    // Subject and text are plain text and don't need sanitization
     const payload = {
       from: config.from,
       to: options.to,
-      subject: this.escapeHtml(options.subject),
+      subject: options.subject,
       text: options.text,
-      html: options.html ? this.escapeHtml(options.html) : undefined,
+      html: options.html ? this.sanitizeHtmlContent(options.html) : undefined,
     };
 
     if (!config.enabled) {
@@ -144,16 +146,83 @@ export class MailService {
     };
   }
 
-  private escapeHtml(text: string): string {
-    const htmlEscapeMap: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#x27;',
-      '/': '&#x2F;',
-    };
-
-    return text.replace(/[&<>"'/]/g, (char) => htmlEscapeMap[char] || char);
+  /**
+   * Sanitizes HTML content to prevent XSS attacks while preserving safe formatting.
+   * Uses sanitize-html library with a strict allowlist of safe tags and attributes.
+   */
+  private sanitizeHtmlContent(html: string): string {
+    return sanitizeHtml(html, {
+      allowedTags: [
+        // Text formatting
+        'b',
+        'i',
+        'em',
+        'strong',
+        'u',
+        'br',
+        'p',
+        'span',
+        'div',
+        // Lists
+        'ul',
+        'ol',
+        'li',
+        // Tables (useful for formatted emails)
+        'table',
+        'thead',
+        'tbody',
+        'tr',
+        'th',
+        'td',
+        // Headers
+        'h1',
+        'h2',
+        'h3',
+        'h4',
+        'h5',
+        'h6',
+        // Links (with strict attribute filtering)
+        'a',
+        // Images (with strict attribute filtering)
+        'img',
+        // Code blocks
+        'code',
+        'pre',
+      ],
+      allowedAttributes: {
+        a: ['href', 'title', 'target'],
+        img: ['src', 'alt', 'width', 'height'],
+        '*': ['style'], // Allow inline styles but will be filtered by allowedStyles
+      },
+      allowedStyles: {
+        '*': {
+          // Allow safe CSS properties for formatting
+          color: [/^#[0-9a-f]{3,6}$/i, /^rgb\(/i, /^rgba\(/i],
+          'text-align': [/^left$/i, /^right$/i, /^center$/i],
+          'font-size': [/^\d+(?:px|em|rem|%)$/],
+          'font-weight': [/^bold$/i, /^normal$/i, /^\d{3}$/],
+          'text-decoration': [/^underline$/i, /^none$/i],
+          padding: [/^\d+(?:px|em|rem|%)$/],
+          margin: [/^\d+(?:px|em|rem|%)$/],
+          'background-color': [/^#[0-9a-f]{3,6}$/i, /^rgb\(/i, /^rgba\(/i],
+        },
+      },
+      allowedSchemes: ['http', 'https', 'mailto'],
+      // Remove any script-related or dangerous protocols
+      disallowedTagsMode: 'discard',
+      // Remove all class attributes to prevent CSS-based attacks
+      allowedClasses: {},
+      // Enforce that links open in new tab for security
+      transformTags: {
+        a: (tagName, attribs) => ({
+          tagName: 'a',
+          attribs: {
+            ...attribs,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+          },
+        }),
+      },
+    });
   }
 }

@@ -81,9 +81,21 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     private readonly gateway: CommandCenterGateway,
   ) {
     this.enabled = this.configService.get<boolean>('adsb.enabled', false) ?? false;
-    this.feedUrl =
-      this.configService.get<string>('adsb.feedUrl', 'http://127.0.0.1:8080/data/aircraft.json') ??
-      'http://127.0.0.1:8080/data/aircraft.json';
+    const defaultFeedUrl = 'http://127.0.0.1:8080/data/aircraft.json';
+    const configFeedUrl =
+      this.configService.get<string>('adsb.feedUrl', defaultFeedUrl) ?? defaultFeedUrl;
+
+    // Validate feed URL from config at startup - use default if invalid
+    try {
+      this.validateUrl(configFeedUrl, 'Feed URL');
+      this.feedUrl = configFeedUrl;
+    } catch (error) {
+      this.logger.warn(
+        `Invalid ADS-B feed URL in config (${configFeedUrl}): ${error instanceof Error ? error.message : error}. Using default: ${defaultFeedUrl}`,
+      );
+      this.feedUrl = defaultFeedUrl;
+    }
+
     this.intervalMs = this.configService.get<number>('adsb.pollIntervalMs', 15000) ?? 15000;
     this.geofencesEnabled =
       this.configService.get<boolean>('adsb.geofencesEnabled', false) ?? false;
@@ -248,7 +260,16 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         this.enabled = parsed.enabled;
       }
       if (typeof parsed.feedUrl === 'string' && parsed.feedUrl.trim()) {
-        this.feedUrl = parsed.feedUrl.trim();
+        const trimmedUrl = parsed.feedUrl.trim();
+        // Validate feed URL when loading from disk
+        try {
+          this.validateUrl(trimmedUrl, 'Feed URL');
+          this.feedUrl = trimmedUrl;
+        } catch (error) {
+          this.logger.warn(
+            `Invalid ADS-B feed URL in saved config (${trimmedUrl}): ${error instanceof Error ? error.message : error}. Keeping current URL.`,
+          );
+        }
       }
       if (typeof parsed.intervalMs === 'number' && Number.isFinite(parsed.intervalMs)) {
         this.intervalMs = Math.max(2000, parsed.intervalMs);
@@ -601,8 +622,16 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         throw new Error(`${fieldName} cannot point to private IP addresses`);
       }
 
-      // Block metadata endpoints
-      if (hostname.includes('metadata') || hostname === '169.254.169.254') {
+      // Block metadata endpoints (enhanced checks for all major cloud providers)
+      if (
+        hostname.includes('metadata') ||
+        hostname === '169.254.169.254' ||
+        hostname === 'metadata.google.internal' ||
+        hostname.endsWith('.metadata.google.internal') ||
+        hostname === 'fd00:ec2::254' || // AWS IPv6 metadata
+        hostname.startsWith('169.254.') || // Link-local range used by cloud providers
+        hostname === '100.100.100.200' // Alibaba Cloud metadata
+      ) {
         throw new Error(`${fieldName} cannot point to metadata endpoints`);
       }
     } catch (error) {

@@ -662,13 +662,21 @@ export class FaaRegistryService {
         throw new Error('Dataset URL cannot point to private IP addresses');
       }
 
-      // Block metadata endpoints
-      if (hostname.includes('metadata') || hostname === '169.254.169.254') {
+      // Block metadata endpoints (enhanced checks for all major cloud providers)
+      if (
+        hostname.includes('metadata') ||
+        hostname === '169.254.169.254' ||
+        hostname === 'metadata.google.internal' ||
+        hostname.endsWith('.metadata.google.internal') ||
+        hostname === 'fd00:ec2::254' || // AWS IPv6 metadata
+        hostname.startsWith('169.254.') || // Link-local range used by cloud providers
+        hostname === '100.100.100.200' // Alibaba Cloud metadata
+      ) {
         throw new Error('Dataset URL cannot point to metadata endpoints');
       }
 
       // Whitelist official FAA domains for extra security
-      const allowedDomains = ['registry.faa.gov', 'faa.gov'];
+      const allowedDomains = ['registry.faa.gov', 'faa.gov', 'uasdoc.faa.gov'];
       const isAllowedDomain = allowedDomains.some(
         (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
       );

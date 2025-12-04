@@ -174,7 +174,33 @@ export async function bootstrap(): Promise<void> {
       // Validate and sanitize the Host header to prevent open redirect attacks
       const hostHeader = req.headers.host ?? '';
       const hostname = validateAndSanitizeHostname(hostHeader, logger);
-      const location = `https://${hostname}${httpsPortSuffix}${req.url ?? ''}`;
+
+      // Sanitize the URL path to prevent open redirects via path manipulation
+      // Only allow relative paths starting with / and block any attempts to redirect to external URLs
+      let path = req.url ?? '/';
+      try {
+        // Ensure the path doesn't contain protocol-like patterns that could bypass validation
+        if (
+          path.includes('://') ||
+          path.startsWith('//') ||
+          path.toLowerCase().startsWith('javascript:') ||
+          path.toLowerCase().startsWith('data:') ||
+          path.toLowerCase().startsWith('vbscript:')
+        ) {
+          logger.warn(`Suspicious redirect path detected: ${path}. Using / instead.`);
+          path = '/';
+        } else {
+          // Parse the URL to extract just the pathname and search params (no protocol/host)
+          // This also normalizes the path and handles edge cases
+          const urlObj = new URL(path, `https://${hostname}`);
+          path = urlObj.pathname + urlObj.search;
+        }
+      } catch (error) {
+        logger.warn(`Invalid URL in redirect: ${path}. Using / instead.`);
+        path = '/';
+      }
+
+      const location = `https://${hostname}${httpsPortSuffix}${path}`;
 
       res.writeHead(301, { Location: location });
       res.end();

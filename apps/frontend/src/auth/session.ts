@@ -1,3 +1,9 @@
+/**
+ * LocalStorage key name for storing the authentication token.
+ * NOTE: This is NOT a secret - it's simply the key name used to access localStorage.
+ * The actual authentication token (JWT) stored at this key is the secret value.
+ * This key name is intentionally descriptive and public.
+ */
 const TOKEN_KEY = 'command-center.auth.token';
 
 let cachedToken: string | null = null;

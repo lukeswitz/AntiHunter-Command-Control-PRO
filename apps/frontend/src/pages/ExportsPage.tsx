@@ -357,12 +357,22 @@ function sanitizeFilename(filename: string): string {
     .replace(/[/\\]/g, '_') // Replace path separators
     .replace(/\.\./g, '_') // Remove path traversal sequences
     // eslint-disable-next-line no-control-regex
-    .replace(/[<>:"|?*\u0000-\u001f]/g, '_'); // Remove Windows-invalid and control characters
+    .replace(/[<>:"|?*\u0000-\u001f]/g, '_') // Remove Windows-invalid and control characters
+    .replace(/[&'"]/g, '_') // Remove HTML special characters for additional safety
+    .replace(/\s+/g, '_') // Replace whitespace with underscores for cleaner filenames
+    .replace(/_+/g, '_'); // Collapse multiple underscores
+
+  // Remove leading/trailing dots and underscores
+  sanitized = sanitized.replace(/^[._]+|[._]+$/g, '');
 
   // Ensure filename is not empty
-  if (!sanitized || sanitized.trim().length === 0) {
+  if (!sanitized || sanitized.length === 0) {
     sanitized = 'download';
   }
+
+  // Ensure filename has valid characters (alphanumeric, dots, hyphens, underscores)
+  // This is a whitelist approach for maximum security
+  sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, '_');
 
   // Limit filename length
   if (sanitized.length > 255) {

@@ -339,6 +339,9 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     certPem: string | null;
     keyPem: string | null;
   }): Promise<MqttClient> {
+    // Validate broker URL as defense-in-depth measure
+    this.validateBrokerUrl(config.brokerUrl);
+
     const connectTimeoutMs = Number(process.env.MQTT_CONNECT_TIMEOUT_MS ?? 10_000);
 
     const options: IClientOptions = {
@@ -422,30 +425,62 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
       const hostname = url.hostname.toLowerCase();
 
-      // Block metadata endpoints
-      if (hostname.includes('metadata') || hostname === '169.254.169.254') {
+      // Always block metadata endpoints (critical security risk)
+      if (
+        hostname.includes('metadata') ||
+        hostname === '169.254.169.254' ||
+        hostname === 'metadata.google.internal' ||
+        hostname.endsWith('.metadata.google.internal')
+      ) {
         throw new Error('Broker URL cannot point to metadata endpoints');
       }
 
-      // For MQTT brokers, we allow localhost and private IPs since MQTT brokers
-      // are commonly hosted on internal networks or localhost for development
-      // If you want to restrict this, uncomment the checks below:
+      // Block cloud metadata services
+      if (
+        hostname === 'fd00:ec2::254' || // AWS IPv6 metadata
+        hostname.startsWith('169.254.') || // Link-local range used by cloud providers
+        hostname === '100.100.100.200' // Alibaba Cloud metadata
+      ) {
+        throw new Error('Broker URL cannot point to cloud metadata services');
+      }
 
-      // // Block localhost in production (comment out for development)
-      // if (
-      //   hostname === 'localhost' ||
-      //   hostname === '127.0.0.1' ||
-      //   hostname === '::1' ||
-      //   hostname.startsWith('127.') ||
-      //   hostname.startsWith('0.')
-      // ) {
-      //   throw new Error('Broker URL cannot point to localhost');
-      // }
+      // Check if strict mode is enabled via environment variable
+      const strictMode = process.env.MQTT_STRICT_SSRF_PROTECTION === 'true';
 
-      // // Block private IP ranges
-      // if (this.isPrivateIp(hostname)) {
-      //   throw new Error('Broker URL cannot point to private IP addresses');
-      // }
+      if (strictMode) {
+        // In strict mode, block localhost
+        if (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname === '::1' ||
+          hostname.startsWith('127.') ||
+          hostname.startsWith('0.')
+        ) {
+          throw new Error('Broker URL cannot point to localhost (strict mode enabled)');
+        }
+
+        // In strict mode, block private IP ranges
+        if (this.isPrivateIp(hostname)) {
+          throw new Error('Broker URL cannot point to private IP addresses (strict mode enabled)');
+        }
+      } else {
+        // In permissive mode (default for MQTT use cases), log warnings for localhost/private IPs
+        if (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname === '::1' ||
+          hostname.startsWith('127.') ||
+          hostname.startsWith('0.')
+        ) {
+          this.logger.warn(
+            `MQTT broker URL points to localhost (${hostname}). This is allowed but may pose security risks. Set MQTT_STRICT_SSRF_PROTECTION=true to block this.`,
+          );
+        } else if (this.isPrivateIp(hostname)) {
+          this.logger.warn(
+            `MQTT broker URL points to private IP (${hostname}). This is allowed for IoT use cases but may pose security risks. Set MQTT_STRICT_SSRF_PROTECTION=true to block this.`,
+          );
+        }
+      }
     } catch (error) {
       if (error instanceof TypeError) {
         throw new Error('Broker URL is not valid');
