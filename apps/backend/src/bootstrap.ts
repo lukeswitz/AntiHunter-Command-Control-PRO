@@ -12,7 +12,6 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { SanitizeInputPipe } from './utils/sanitize-input.pipe';
 
-
 function validateAndSanitizeHostname(hostHeader: string, logger: Logger): string {
   // Extract hostname without port
   const hostname = hostHeader.split(':')[0] || 'localhost';
