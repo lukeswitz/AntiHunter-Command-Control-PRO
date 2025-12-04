@@ -21,7 +21,7 @@ COPY . .
 # Generate Prisma client and build the NestJS backend
 RUN pnpm --filter @command-center/backend prisma:generate  && pnpm --filter @command-center/backend build
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:20.19.6-trixie-slim AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
