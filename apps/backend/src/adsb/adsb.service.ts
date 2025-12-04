@@ -170,7 +170,14 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   async saveAircraftDatabase(fileName: string, content: Buffer): Promise<{ saved: boolean }> {
     try {
       await mkdir(this.dataDir, { recursive: true });
-      const targetPath = join(this.dataDir, fileName || 'aircraft-database.csv');
+      const basename = (fileName || 'aircraft-database.csv').replace(/^.*[/\\]/, '').replace(/\.\./g, '');
+      if (!basename || basename.length === 0) {
+        throw new Error('Invalid filename');
+      }
+      const targetPath = join(this.dataDir, basename);
+      if (!targetPath.startsWith(this.dataDir)) {
+        throw new Error('Invalid file path');
+      }
       await writeFile(targetPath, content);
       this.logger.log(`Saved aircraft database to ${targetPath}`);
       await this.loadAircraftDatabaseFromDisk(targetPath);
@@ -184,6 +191,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async loadAircraftDatabaseFromDisk(path = this.aircraftDbPath): Promise<void> {
+    if (!path.startsWith(this.dataDir)) {
+      throw new Error('Invalid database path');
+    }
     if (!existsSync(path)) {
       return;
     }
@@ -325,7 +335,22 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async poll(): Promise<void> {
-    const response = await fetch(this.feedUrl);
+    try {
+      const url = new URL(this.feedUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw new Error('Feed URL must use http or https protocol');
+      }
+      const hostname = url.hostname.toLowerCase();
+      if (hostname.includes('metadata') || hostname === '169.254.169.254' || hostname === 'metadata.google.internal' || hostname.endsWith('.metadata.google.internal') || hostname === 'fd00:ec2::254' || hostname.startsWith('169.254.') || hostname === '100.100.100.200') {
+        throw new Error('Feed URL cannot point to cloud metadata endpoints');
+      }
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error('Invalid feed URL');
+      }
+      throw error;
+    }
+    const response = await fetch(this.feedUrl, { redirect: 'error' });
     if (!response.ok) {
       throw new Error(`ADSB feed error: ${response.status} ${response.statusText}`);
     }
