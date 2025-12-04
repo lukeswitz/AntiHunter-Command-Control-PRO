@@ -173,13 +173,16 @@ export async function bootstrap(): Promise<void> {
       // Sanitize the URL path to prevent open redirects via path manipulation
       let path = req.url ?? '/';
       try {
-        if (
-          path.includes('://') ||
-          path.startsWith('//') ||
-          path.toLowerCase().startsWith('javascript:') ||
-          path.toLowerCase().startsWith('data:') ||
-          path.toLowerCase().startsWith('vbscript:')
-        ) {
+        const normalizedPath = path
+          .trim()
+          .replace(/[\s\t\n\r]/g, '')
+          .toLowerCase();
+        const dangerousSchemes = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:', 'blob:'];
+        const hasDangerousScheme = dangerousSchemes.some((scheme) =>
+          normalizedPath.startsWith(scheme),
+        );
+
+        if (path.includes('://') || path.startsWith('//') || hasDangerousScheme) {
           logger.warn(`Suspicious redirect path detected: ${path}. Using / instead.`);
           path = '/';
         } else {

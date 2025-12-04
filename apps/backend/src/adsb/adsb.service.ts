@@ -336,9 +336,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async poll(): Promise<void> {
+  private validateFeedUrl(urlString: string): string {
     try {
-      const url = new URL(this.feedUrl);
+      const url = new URL(urlString);
       if (!['http:', 'https:'].includes(url.protocol)) {
         throw new Error('Feed URL must use http or https protocol');
       }
@@ -354,13 +354,18 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       ) {
         throw new Error('Feed URL cannot point to cloud metadata endpoints');
       }
+      return urlString;
     } catch (error) {
       if (error instanceof TypeError) {
         throw new Error('Invalid feed URL');
       }
       throw error;
     }
-    const response = await fetch(this.feedUrl, { redirect: 'error' });
+  }
+
+  private async poll(): Promise<void> {
+    const validatedUrl = this.validateFeedUrl(this.feedUrl);
+    const response = await fetch(validatedUrl, { redirect: 'error' });
     if (!response.ok) {
       throw new Error(`ADSB feed error: ${response.status} ${response.statusText}`);
     }

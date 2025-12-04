@@ -441,6 +441,7 @@ export class FaaRegistryService {
   }
 
   private async downloadFile(url: string, destination: string): Promise<void> {
+    this.validateDatasetUrl(url);
     const response = await fetch(url, {
       redirect: 'error',
     });
