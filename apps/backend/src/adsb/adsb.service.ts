@@ -170,7 +170,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   async saveAircraftDatabase(fileName: string, content: Buffer): Promise<{ saved: boolean }> {
     try {
       await mkdir(this.dataDir, { recursive: true });
-      const basename = (fileName || 'aircraft-database.csv').replace(/^.*[/\\]/, '').replace(/\.\./g, '');
+      const basename = (fileName || 'aircraft-database.csv')
+        .replace(/^.*[/\\]/, '')
+        .replace(/\.\./g, '');
       if (!basename || basename.length === 0) {
         throw new Error('Invalid filename');
       }
@@ -341,7 +343,15 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         throw new Error('Feed URL must use http or https protocol');
       }
       const hostname = url.hostname.toLowerCase();
-      if (hostname.includes('metadata') || hostname === '169.254.169.254' || hostname === 'metadata.google.internal' || hostname.endsWith('.metadata.google.internal') || hostname === 'fd00:ec2::254' || hostname.startsWith('169.254.') || hostname === '100.100.100.200') {
+      if (
+        hostname.includes('metadata') ||
+        hostname === '169.254.169.254' ||
+        hostname === 'metadata.google.internal' ||
+        hostname.endsWith('.metadata.google.internal') ||
+        hostname === 'fd00:ec2::254' ||
+        hostname.startsWith('169.254.') ||
+        hostname === '100.100.100.200'
+      ) {
         throw new Error('Feed URL cannot point to cloud metadata endpoints');
       }
     } catch (error) {

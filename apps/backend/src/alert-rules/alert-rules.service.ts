@@ -580,7 +580,12 @@ export class AlertRulesService {
       if (!trimmed) continue;
       const atIndex = trimmed.indexOf('@');
       const lastDotIndex = trimmed.lastIndexOf('.');
-      if (atIndex <= 0 || lastDotIndex <= atIndex + 1 || lastDotIndex >= trimmed.length - 1 || trimmed.includes(' ')) {
+      if (
+        atIndex <= 0 ||
+        lastDotIndex <= atIndex + 1 ||
+        lastDotIndex >= trimmed.length - 1 ||
+        trimmed.includes(' ')
+      ) {
         throw new BadRequestException(`Invalid email recipient: ${trimmed}`);
       }
       normalized.add(trimmed.toLowerCase());
