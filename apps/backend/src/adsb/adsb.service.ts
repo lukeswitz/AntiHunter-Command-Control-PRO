@@ -145,7 +145,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       this.enabled = Boolean(config.enabled);
     }
     if (config.feedUrl) {
-      this.feedUrl = config.feedUrl.trim();
+      const trimmed = config.feedUrl.trim();
+      this.validateUrl(trimmed, 'Feed URL');
+      this.feedUrl = trimmed;
     }
     if (config.intervalMs && Number.isFinite(config.intervalMs)) {
       this.intervalMs = Math.max(2000, Number(config.intervalMs));
@@ -170,7 +172,16 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   async saveAircraftDatabase(fileName: string, content: Buffer): Promise<{ saved: boolean }> {
     try {
       await mkdir(this.dataDir, { recursive: true });
-      const targetPath = join(this.dataDir, fileName || 'aircraft-database.csv');
+
+      // Sanitize filename to prevent path traversal
+      const sanitizedFileName = this.sanitizeFileName(fileName || 'aircraft-database.csv');
+      const targetPath = join(this.dataDir, sanitizedFileName);
+
+      // Verify the resolved path is still within dataDir
+      if (!targetPath.startsWith(this.dataDir)) {
+        throw new Error('Invalid file path: path traversal detected');
+      }
+
       await writeFile(targetPath, content);
       this.logger.log(`Saved aircraft database to ${targetPath}`);
       await this.loadAircraftDatabaseFromDisk(targetPath);
@@ -560,5 +571,87 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       .replace(/\{node\}/gi, context.entity)
       .replace(/\{type\}/gi, context.type)
       .replace(/\{event\}/gi, context.event);
+  }
+
+  private validateUrl(urlString: string, fieldName: string): void {
+    try {
+      const url = new URL(urlString);
+
+      // Only allow http and https protocols
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw new Error(`${fieldName} must use http or https protocol`);
+      }
+
+      // Prevent access to private/internal IP ranges
+      const hostname = url.hostname.toLowerCase();
+
+      // Block localhost and loopback addresses
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname.startsWith('127.') ||
+        hostname.startsWith('0.')
+      ) {
+        throw new Error(`${fieldName} cannot point to localhost or loopback addresses`);
+      }
+
+      // Block private IP ranges
+      if (this.isPrivateIp(hostname)) {
+        throw new Error(`${fieldName} cannot point to private IP addresses`);
+      }
+
+      // Block metadata endpoints
+      if (hostname.includes('metadata') || hostname === '169.254.169.254') {
+        throw new Error(`${fieldName} cannot point to metadata endpoints`);
+      }
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error(`${fieldName} is not a valid URL`);
+      }
+      throw error;
+    }
+  }
+
+  private isPrivateIp(hostname: string): boolean {
+    // Check for private IPv4 ranges
+    const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipv4Match) {
+      const [, a, b] = ipv4Match.map(Number);
+      // 10.0.0.0/8
+      if (a === 10) return true;
+      // 172.16.0.0/12
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      // 192.168.0.0/16
+      if (a === 192 && b === 168) return true;
+      // Link-local 169.254.0.0/16
+      if (a === 169 && b === 254) return true;
+    }
+
+    // Check for private IPv6 ranges
+    if (hostname.includes(':')) {
+      // fc00::/7 (Unique Local Addresses)
+      if (hostname.startsWith('fc') || hostname.startsWith('fd')) return true;
+      // fe80::/10 (Link-Local)
+      if (hostname.startsWith('fe80:')) return true;
+    }
+
+    return false;
+  }
+
+  private sanitizeFileName(fileName: string): string {
+    // Remove any path separators and path traversal sequences
+    const basename = fileName.replace(/^.*[/\\]/, '');
+
+    // Remove any remaining dangerous characters
+    const sanitized = basename.replace(/\.\./g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    // Ensure the filename is not empty and has a reasonable length
+    if (!sanitized || sanitized.length === 0) {
+      return 'aircraft-database.csv';
+    }
+
+    // Limit filename length
+    return sanitized.slice(0, 255);
   }
 }

@@ -12,6 +12,33 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { SanitizeInputPipe } from './utils/sanitize-input.pipe';
 
+/**
+ * Validates and sanitizes the hostname from the Host header to prevent open redirect attacks.
+ * Only allows valid hostname characters and removes any suspicious content.
+ */
+function validateAndSanitizeHostname(hostHeader: string, logger: Logger): string {
+  // Extract hostname without port
+  const hostname = hostHeader.split(':')[0] || 'localhost';
+
+  // Validate hostname format - only allow alphanumeric, dots, and hyphens
+  // This prevents injection of special characters or malicious URLs
+  const hostnameRegex =
+    /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
+
+  if (!hostnameRegex.test(hostname)) {
+    logger.warn(`Invalid hostname in Host header: ${hostHeader}. Using localhost instead.`);
+    return 'localhost';
+  }
+
+  // Additional check: hostname should not be too long
+  if (hostname.length > 253) {
+    logger.warn(`Hostname too long in Host header: ${hostHeader}. Using localhost instead.`);
+    return 'localhost';
+  }
+
+  return hostname;
+}
+
 function resolveHttpsOptions(): HttpsOptions | undefined {
   const enabled =
     process.env.HTTPS_ENABLED === 'true' ||
@@ -144,8 +171,9 @@ export async function bootstrap(): Promise<void> {
   if (httpsOptions && redirectPort && redirectPort !== port) {
     const httpsPortSuffix = port === 443 ? '' : `:${port}`;
     const redirectServer = createServer((req, res) => {
+      // Validate and sanitize the Host header to prevent open redirect attacks
       const hostHeader = req.headers.host ?? '';
-      const hostname = hostHeader.split(':')[0] || 'localhost';
+      const hostname = validateAndSanitizeHostname(hostHeader, logger);
       const location = `https://${hostname}${httpsPortSuffix}${req.url ?? ''}`;
 
       res.writeHead(301, { Location: location });

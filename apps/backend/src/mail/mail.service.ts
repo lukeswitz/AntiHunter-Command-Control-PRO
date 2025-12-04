@@ -60,12 +60,13 @@ export class MailService {
   async sendMail(options: SendMailOptions): Promise<void> {
     const config = await this.resolveConfig();
 
+    // Escape HTML in subject and HTML body to prevent XSS
     const payload = {
       from: config.from,
       to: options.to,
-      subject: options.subject,
+      subject: this.escapeHtml(options.subject),
       text: options.text,
-      html: options.html,
+      html: options.html ? this.escapeHtml(options.html) : undefined,
     };
 
     if (!config.enabled) {
@@ -141,5 +142,18 @@ export class MailService {
       from: appConfig.mailFrom ?? this.envConfig.from,
       preview: appConfig.mailPreview ?? false,
     };
+  }
+
+  private escapeHtml(text: string): string {
+    const htmlEscapeMap: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;',
+    };
+
+    return text.replace(/[&<>"'/]/g, (char) => htmlEscapeMap[char] || char);
   }
 }

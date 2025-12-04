@@ -91,6 +91,10 @@ export class FaaRegistryService {
       throw new BadRequestException('FAA registry sync already running');
     }
     const targetUrl = (datasetUrl ?? FAA_DATASET_URL).trim() || FAA_DATASET_URL;
+
+    // Validate URL to prevent SSRF attacks
+    this.validateDatasetUrl(targetUrl);
+
     this.logger.log(`Starting FAA registry sync from ${targetUrl}`);
     this.progress = { processed: 0, startedAt: new Date() };
     this.lastError = null;
@@ -629,5 +633,85 @@ export class FaaRegistryService {
 
   private faaRegistryModel() {
     return this.prisma.faaRegistrySync;
+  }
+
+  private validateDatasetUrl(urlString: string): void {
+    try {
+      const url = new URL(urlString);
+
+      // Only allow https protocol for FAA dataset downloads
+      if (url.protocol !== 'https:') {
+        throw new Error('Dataset URL must use HTTPS protocol');
+      }
+
+      const hostname = url.hostname.toLowerCase();
+
+      // Block localhost and loopback addresses
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname.startsWith('127.') ||
+        hostname.startsWith('0.')
+      ) {
+        throw new Error('Dataset URL cannot point to localhost or loopback addresses');
+      }
+
+      // Block private IP ranges
+      if (this.isPrivateIp(hostname)) {
+        throw new Error('Dataset URL cannot point to private IP addresses');
+      }
+
+      // Block metadata endpoints
+      if (hostname.includes('metadata') || hostname === '169.254.169.254') {
+        throw new Error('Dataset URL cannot point to metadata endpoints');
+      }
+
+      // Whitelist official FAA domains for extra security
+      const allowedDomains = ['registry.faa.gov', 'faa.gov'];
+      const isAllowedDomain = allowedDomains.some(
+        (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+      );
+
+      if (!isAllowedDomain) {
+        this.logger.warn(
+          `Dataset URL ${urlString} is not from an official FAA domain. Proceeding with caution.`,
+        );
+        // Note: We log a warning but don't block non-FAA domains to allow flexibility
+        // If you want to enforce FAA-only URLs, uncomment the line below:
+        // throw new Error('Dataset URL must be from an official FAA domain (faa.gov)');
+      }
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error('Dataset URL is not valid');
+      }
+      throw error;
+    }
+  }
+
+  private isPrivateIp(hostname: string): boolean {
+    // Check for private IPv4 ranges
+    const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipv4Match) {
+      const [, a, b] = ipv4Match.map(Number);
+      // 10.0.0.0/8
+      if (a === 10) return true;
+      // 172.16.0.0/12
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      // 192.168.0.0/16
+      if (a === 192 && b === 168) return true;
+      // Link-local 169.254.0.0/16
+      if (a === 169 && b === 254) return true;
+    }
+
+    // Check for private IPv6 ranges
+    if (hostname.includes(':')) {
+      // fc00::/7 (Unique Local Addresses)
+      if (hostname.startsWith('fc') || hostname.startsWith('fd')) return true;
+      // fe80::/10 (Link-Local)
+      if (hostname.startsWith('fe80:')) return true;
+    }
+
+    return false;
   }
 }
