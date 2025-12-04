@@ -120,7 +120,7 @@ importers:
         specifier: ^5.14.1
         version: 5.14.1
       multer:
-        specifier: ^2.0.0
+        specifier: ^2.0.2
         version: 2.0.2
       nestjs-pino:
         specifier: ^4.0.0
