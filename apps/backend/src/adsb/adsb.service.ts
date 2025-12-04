@@ -343,6 +343,10 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         throw new Error('Feed URL must use http or https protocol');
       }
       const hostname = url.hostname.toLowerCase();
+      // SSRF allow-list: Only allow configured server hostnames
+      if (!ALLOWED_ADSB_FEED_HOSTS.includes(hostname)) {
+        throw new Error('Feed URL hostname is not in the allowed ADSB feed list');
+      }
       if (
         hostname.includes('metadata') ||
         hostname === '169.254.169.254' ||
