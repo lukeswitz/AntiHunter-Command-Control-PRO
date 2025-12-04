@@ -16,7 +16,7 @@ FROM deps AS builder
 COPY . .
 RUN pnpm --filter @command-center/frontend build
 
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.29.3-alpine AS runtime
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
 
