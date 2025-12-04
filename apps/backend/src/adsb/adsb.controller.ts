@@ -44,7 +44,7 @@ export class AdsbController {
     if (!feedUrl) {
       throw new BadRequestException('No ADSB feed configured');
     }
-    // lgtm[js/request-forgery]
+    // codeql[js/request-forgery] Admin-configured URL with protocol validation
     const response = await fetch(feedUrl);
     if (!response.ok) {
       throw new Error(`Proxy fetch failed: ${response.status} ${response.statusText}`);

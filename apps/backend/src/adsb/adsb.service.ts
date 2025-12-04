@@ -359,7 +359,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     throw new Error('No ADSB feed URL configured');
   }
   const feedUrl = validateFeedUrl(this.feedUrl);
-  // lgtm[js/request-forgery]
+  // codeql[js/request-forgery] Admin-configured URL with protocol validation
   const response = await fetch(feedUrl, { redirect: 'manual' });
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get('location');
