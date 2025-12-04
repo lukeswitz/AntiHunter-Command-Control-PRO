@@ -10,7 +10,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { setTimeout as delay } from 'node:timers/promises';
-
+import { URL } from 'node:url';
 import { FaaAircraftSummary } from './faa.types';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -410,6 +410,36 @@ export class FaaRegistryService {
 
   private normalizeOnlineKey(id: string): string {
     return id.trim().toUpperCase();
+  }
+
+  // Allow only the FAA's official dataset, explicit allowlist by host/path.
+  private validateDatasetUrl(url: string): void {
+    try {
+      const parsed = new URL(url);
+
+      // Check scheme is HTTPS
+      if (parsed.protocol !== 'https:') {
+        throw new BadRequestException('Only HTTPS URLs are allowed for FAA dataset');
+      }
+
+      // Check host is exactly registry.faa.gov (case-insensitive match)
+      if (!/^registry\.faa\.gov$/i.test(parsed.hostname)) {
+        throw new BadRequestException('Only registry.faa.gov is allowed for FAA dataset downloads');
+      }
+
+      // Allow only explicit path(s)
+      const allowedPaths = [
+        '/database/ReleasableAircraft.zip',
+      ];
+      if (!allowedPaths.includes(parsed.pathname)) {
+        throw new BadRequestException('URL path not allowed for FAA dataset download');
+      }
+    } catch (e) {
+      if (e instanceof BadRequestException) {
+        throw e;
+      }
+      throw new BadRequestException('Invalid FAA dataset URL');
+    }
   }
 
   private isOnlineLookupThrottled(key: string): boolean {
