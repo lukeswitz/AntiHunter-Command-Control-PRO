@@ -91,6 +91,10 @@ export class FaaRegistryService {
       throw new BadRequestException('FAA registry sync already running');
     }
     const targetUrl = (datasetUrl ?? FAA_DATASET_URL).trim() || FAA_DATASET_URL;
+
+    // Validate URL to prevent SSRF attacks
+    this.validateDatasetUrl(targetUrl);
+
     this.logger.log(`Starting FAA registry sync from ${targetUrl}`);
     this.progress = { processed: 0, startedAt: new Date() };
     this.lastError = null;
@@ -437,7 +441,9 @@ export class FaaRegistryService {
   }
 
   private async downloadFile(url: string, destination: string): Promise<void> {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      redirect: 'error',
+    });
     if (!response.ok || !response.body) {
       throw new Error(`Failed to download FAA registry: ${response.status} ${response.statusText}`);
     }
@@ -629,5 +635,55 @@ export class FaaRegistryService {
 
   private faaRegistryModel() {
     return this.prisma.faaRegistrySync;
+  }
+
+  private validateDatasetUrl(urlString: string): void {
+    try {
+      const url = new URL(urlString);
+
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw new Error('Dataset URL must use HTTP or HTTPS protocol');
+      }
+
+      const hostname = url.hostname.toLowerCase();
+
+      if (
+        hostname.includes('metadata') ||
+        hostname === '169.254.169.254' ||
+        hostname === 'metadata.google.internal' ||
+        hostname.endsWith('.metadata.google.internal') ||
+        hostname === 'fd00:ec2::254' ||
+        hostname.startsWith('169.254.') ||
+        hostname === '100.100.100.200'
+      ) {
+        throw new Error('Dataset URL cannot point to metadata endpoints');
+      }
+
+      const isLocalOrPrivate =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname.startsWith('127.') ||
+        hostname.startsWith('0.') ||
+        hostname.startsWith('10.') ||
+        (hostname.startsWith('172.') &&
+          parseInt(hostname.split('.')[1], 10) >= 16 &&
+          parseInt(hostname.split('.')[1], 10) <= 31) ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('fc') ||
+        hostname.startsWith('fd') ||
+        hostname.startsWith('fe80:');
+
+      if (isLocalOrPrivate) {
+        this.logger.warn(
+          `Dataset URL ${urlString} points to local/private address. Allowed for development/testing.`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error('Dataset URL is not valid');
+      }
+      throw error;
+    }
   }
 }

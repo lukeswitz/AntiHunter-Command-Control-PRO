@@ -55,9 +55,12 @@ export function buildCommandPayload(input: CommandBuildInput): CommandBuildOutpu
   if (SINGLE_NODE_COMMANDS.has(name) && target === '@ALL') {
     throw new BadRequestException(`${name} must target a single node, not @ALL.`);
   }
-  const handler = COMMAND_HANDLERS[name];
-  if (!handler) {
+  if (!Object.prototype.hasOwnProperty.call(COMMAND_HANDLERS, name)) {
     throw new BadRequestException(`Unsupported command ${name}`);
+  }
+  const handler = COMMAND_HANDLERS[name];
+  if (typeof handler !== 'function') {
+    throw new BadRequestException(`Invalid command handler for ${name}`);
   }
 
   const rawParams = (input.params ?? []).map((value) => value.trim()).filter(Boolean);
