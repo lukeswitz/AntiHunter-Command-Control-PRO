@@ -19,7 +19,7 @@ export class AcarsController {
 
   @Post('config')
   updateConfig(
-    @Body() body: { enabled?: boolean; udpHost?: string; udpPort?: number },
+    @Body() body: { enabled?: boolean; udpHost?: string; udpPort?: number; intervalMs?: number },
   ): AcarsStatus {
     return this.acarsService.updateConfig(body);
   }

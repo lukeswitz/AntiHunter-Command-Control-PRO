@@ -342,7 +342,7 @@ function createTargetIcon(target: TargetMarker): DivIcon {
 }
 
 function createAdsbIcon(track: AdsbTrack, hasAcarsMessages = false): DivIcon {
-  const label = escapeHtml(track.callsign ?? track.reg ?? track.icao);
+  const label = escapeHtml(track.callsign ?? track.icao ?? track.reg ?? 'Unknown');
   const typeInfo = detectAdsbAircraftType(
     track.category,
     track.aircraftType,
