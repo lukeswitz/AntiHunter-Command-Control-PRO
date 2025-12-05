@@ -31,6 +31,7 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
   private readonly dataDir: string;
   private readonly configPath: string;
   private messageExpiryMs: number;
+  private intervalMs: number;
 
   constructor(
     private readonly configService: ConfigService,
@@ -42,6 +43,7 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
     this.udpPort = this.configService.get<number>('acars.udpPort', 15550) ?? 15550;
     this.messageExpiryMs =
       this.configService.get<number>('acars.messageExpiryMs', 3600000) ?? 3600000;
+    this.intervalMs = this.configService.get<number>('acars.intervalMs', 5000) ?? 5000;
     this.localSiteId = this.configService.get<string>('site.id', 'default');
     const baseDir = join(__dirname, '..', '..');
     this.dataDir = join(baseDir, 'data', 'acars');
@@ -64,6 +66,7 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
       enabled: this.enabled,
       udpHost: this.udpHost,
       udpPort: this.udpPort,
+      intervalMs: this.intervalMs,
       lastMessageAt: this.lastMessageAt,
       lastError: this.lastError,
       messageCount: this.messages.size,
@@ -74,7 +77,12 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
     return Array.from(this.messages.values());
   }
 
-  updateConfig(config: { enabled?: boolean; udpHost?: string; udpPort?: number }): AcarsStatus {
+  updateConfig(config: {
+    enabled?: boolean;
+    udpHost?: string;
+    udpPort?: number;
+    intervalMs?: number;
+  }): AcarsStatus {
     if (config.enabled !== undefined) {
       this.enabled = Boolean(config.enabled);
     }
@@ -83,6 +91,9 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
     }
     if (config.udpPort && Number.isFinite(config.udpPort)) {
       this.udpPort = Math.max(1024, Number(config.udpPort));
+    }
+    if (config.intervalMs && Number.isFinite(config.intervalMs)) {
+      this.intervalMs = Math.max(1000, Number(config.intervalMs));
     }
 
     this.stopUdpListener();
@@ -109,6 +120,9 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
       if (saved.udpPort) {
         this.udpPort = saved.udpPort;
       }
+      if (saved.intervalMs && Number.isFinite(saved.intervalMs)) {
+        this.intervalMs = Math.max(1000, saved.intervalMs);
+      }
       this.logger.log('Loaded ACARS config from disk');
     } catch (error) {
       this.logger.warn(
@@ -124,6 +138,7 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
         enabled: this.enabled,
         udpHost: this.udpHost,
         udpPort: this.udpPort,
+        intervalMs: this.intervalMs,
       };
       await writeFile(this.configPath, JSON.stringify(payload, null, 2), 'utf-8');
       this.logger.log('Persisted ACARS config to disk');

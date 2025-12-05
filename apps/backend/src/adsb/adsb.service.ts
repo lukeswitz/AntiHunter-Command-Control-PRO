@@ -140,6 +140,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       lastPollAt: this.lastPollAt,
       lastError: this.lastError,
       trackCount: this.tracks.size,
+      aircraftDbCount: this.aircraftDbCount,
     };
   }
 

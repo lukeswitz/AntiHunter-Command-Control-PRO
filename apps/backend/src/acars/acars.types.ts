@@ -61,4 +61,5 @@ export interface AcarsConfig {
   enabled: boolean;
   udpHost: string;
   udpPort: number;
+  intervalMs?: number;
 }

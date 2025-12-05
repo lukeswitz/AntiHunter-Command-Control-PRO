@@ -31,4 +31,5 @@ export interface AdsbStatus {
   lastPollAt?: string | null;
   lastError?: string | null;
   trackCount: number;
+  aircraftDbCount?: number;
 }
