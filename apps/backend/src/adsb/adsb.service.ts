@@ -388,6 +388,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       const existing = this.tracks.get(id);
       const callsign = (entry.flight ?? '').trim() || null;
       const alt = entry.alt_geom ?? entry.alt_baro ?? null;
+      const now = new Date(Date.now() - (entry.seen ?? 0) * 1000).toISOString();
       const track: AdsbTrack = {
         id,
         icao: hex,
@@ -406,7 +407,8 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         speed: typeof entry.gs === 'number' ? entry.gs : (existing?.speed ?? null),
         heading: typeof entry.track === 'number' ? entry.track : (existing?.heading ?? null),
         onGround: null,
-        lastSeen: new Date(Date.now() - (entry.seen ?? 0) * 1000).toISOString(),
+        firstSeen: existing?.firstSeen ?? now,
+        lastSeen: now,
         siteId: this.localSiteId,
         category:
           typeof entry.category === 'string'
@@ -427,10 +429,13 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       nextTracks.set(id, track);
     });
 
-    this.tracks = nextTracks;
+    // Merge new tracks into existing tracks
+    nextTracks.forEach((track, id) => {
+      this.tracks.set(id, track);
+    });
     this.lastPollAt = new Date().toISOString();
     this.lastError = null;
-    this.evaluateGeofences(nextTracks);
+    this.evaluateGeofences(this.tracks);
     this.gateway.emitEvent(
       { type: 'adsb.tracks', tracks: Array.from(this.tracks.values()) },
       { skipBus: true },
