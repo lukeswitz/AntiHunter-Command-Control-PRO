@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   fetchAdsbProxy,
+  getAdsbLog,
   getAdsbStatus,
-  getAdsbTracks,
   updateAdsbConfig,
   uploadAircraftDatabase,
 } from '../api/adsb';
@@ -88,8 +88,8 @@ export function AdsbPage() {
   });
 
   const tracksQuery = useQuery({
-    queryKey: ['adsb', 'tracks', 'log'],
-    queryFn: getAdsbTracks,
+    queryKey: ['adsb', 'log'],
+    queryFn: getAdsbLog,
     refetchInterval: () => Math.max(5_000, adsbIntervalMs),
   });
 
@@ -141,7 +141,7 @@ export function AdsbPage() {
             speed: track.speed ?? null,
             heading: track.heading ?? null,
             messages: track.messages ?? null,
-            firstSeen: track.lastSeen ?? now,
+            firstSeen: track.firstSeen ?? track.lastSeen ?? now,
             lastSeen: track.lastSeen ?? now,
             hits: 1,
           });

@@ -35,6 +35,10 @@ export function getAdsbTracks() {
   return apiClient.get<AdsbTrack[]>('/adsb/tracks');
 }
 
+export function getAdsbLog() {
+  return apiClient.get<AdsbTrack[]>('/adsb/log');
+}
+
 export function updateAdsbConfig(body: {
   enabled?: boolean;
   feedUrl?: string;
@@ -66,6 +70,7 @@ export function normalizeDump1090Response(payload: Dump1090AircraftResponse): Ad
         return null;
       }
       const alt = entry.alt_geom ?? entry.alt_baro ?? null;
+      const timestamp = new Date(now - (entry.seen ?? 0) * 1000).toISOString();
       return {
         id: hex,
         icao: hex,
@@ -76,7 +81,8 @@ export function normalizeDump1090Response(payload: Dump1090AircraftResponse): Ad
         speed: typeof entry.gs === 'number' ? entry.gs : null,
         heading: typeof entry.track === 'number' ? entry.track : null,
         onGround: null,
-        lastSeen: new Date(now - (entry.seen ?? 0) * 1000).toISOString(),
+        firstSeen: timestamp,
+        lastSeen: timestamp,
         siteId: null,
         category: typeof entry.category === 'string' ? entry.category.trim() || null : null,
         reg:

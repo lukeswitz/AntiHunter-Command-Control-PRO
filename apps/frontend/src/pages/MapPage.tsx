@@ -18,7 +18,7 @@ import {
 } from 'react-icons/md';
 
 import { getAcarsMessages } from '../api/acars';
-import { getAdsbTracksViaProxy } from '../api/adsb';
+import { getAdsbTracks } from '../api/adsb';
 import { apiClient } from '../api/client';
 import type {
   AcarsMessage,
@@ -228,7 +228,7 @@ export function MapPage() {
   const setFitEnabled = useMapPreferences((state) => state.setFitEnabled);
   const adsbTracksQuery = useQuery({
     queryKey: ['adsb', 'tracks'],
-    queryFn: getAdsbTracksViaProxy,
+    queryFn: getAdsbTracks,
     enabled: isAuthenticated && adsbAddonEnabled && adsbEnabled,
     refetchInterval: 15_000,
   });

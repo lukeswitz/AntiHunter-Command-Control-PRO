@@ -25,6 +25,11 @@ export class AdsbController {
     return this.adsbService.getTracks();
   }
 
+  @Get('log')
+  getSessionLog() {
+    return this.adsbService.getSessionLog();
+  }
+
   @Post('config')
   updateConfig(
     @Body()
