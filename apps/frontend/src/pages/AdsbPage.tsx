@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   fetchAdsbProxy,
   getAdsbStatus,
-  getAdsbTracksViaProxy,
+  getAdsbTracks,
   updateAdsbConfig,
   uploadAircraftDatabase,
 } from '../api/adsb';
@@ -89,7 +89,7 @@ export function AdsbPage() {
 
   const tracksQuery = useQuery({
     queryKey: ['adsb', 'tracks', 'log'],
-    queryFn: getAdsbTracksViaProxy,
+    queryFn: getAdsbTracks,
     refetchInterval: () => Math.max(5_000, adsbIntervalMs),
   });
 
