@@ -1,3 +1,9 @@
+<div align="center">
+
+  [![CI](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/ci.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/ci.yml) [![CodeQL](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/github-code-scanning/codeql) [![Dependabot Updates](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/dependabot/dependabot-updates)
+
+</div>
+
 <p align="center">
   <img src="TopREADMElogo.png" alt="AntiHunter Command Center Logo" width="320" />
 </p>
