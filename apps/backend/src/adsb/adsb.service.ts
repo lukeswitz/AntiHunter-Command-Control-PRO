@@ -17,6 +17,22 @@ import {
 } from '../geofences/geofences.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
+function validateFeedUrl(urlString: string): string {
+  const parsed = new URL(urlString);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only HTTP and HTTPS protocols are allowed');
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (
+    host === '169.254.169.254' ||
+    host === 'metadata.google.internal' ||
+    host === 'metadata.aws.internal'
+  ) {
+    throw new Error('Access to cloud metadata endpoints is not allowed');
+  }
+  return urlString;
+}
+
 type AircraftDbEntry = {
   typeCode?: string | null;
   model?: string | null;
@@ -150,8 +166,10 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     if (config.enabled !== undefined) {
       this.enabled = Boolean(config.enabled);
     }
-    if (config.feedUrl) {
-      this.feedUrl = config.feedUrl.trim();
+    if (config.feedUrl !== undefined) {
+      const trimmed = String(config.feedUrl).trim();
+      validateFeedUrl(trimmed);
+      this.feedUrl = trimmed;
     }
     if (config.intervalMs && Number.isFinite(config.intervalMs)) {
       this.intervalMs = Math.max(2000, Number(config.intervalMs));
@@ -176,7 +194,16 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   async saveAircraftDatabase(fileName: string, content: Buffer): Promise<{ saved: boolean }> {
     try {
       await mkdir(this.dataDir, { recursive: true });
-      const targetPath = join(this.dataDir, fileName || 'aircraft-database.csv');
+      const basename = (fileName || 'aircraft-database.csv')
+        .replace(/^.*[/\\]/, '')
+        .replace(/\.\./g, '');
+      if (!basename || basename.length === 0) {
+        throw new Error('Invalid filename');
+      }
+      const targetPath = join(this.dataDir, basename);
+      if (!targetPath.startsWith(this.dataDir)) {
+        throw new Error('Invalid file path');
+      }
       await writeFile(targetPath, content);
       this.logger.log(`Saved aircraft database to ${targetPath}`);
       await this.loadAircraftDatabaseFromDisk(targetPath);
@@ -190,6 +217,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async loadAircraftDatabaseFromDisk(path = this.aircraftDbPath): Promise<void> {
+    if (!path.startsWith(this.dataDir)) {
+      throw new Error('Invalid database path');
+    }
     if (!existsSync(path)) {
       return;
     }
@@ -331,7 +361,19 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async poll(): Promise<void> {
-    const response = await fetch(this.feedUrl);
+    if (!this.feedUrl) {
+      throw new Error('No ADSB feed URL configured');
+    }
+    const feedUrl = validateFeedUrl(this.feedUrl);
+    // codeql[js/request-forgery] Admin-configured URL with protocol validation
+    const response = await fetch(feedUrl, { redirect: 'manual' });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (location) {
+        validateFeedUrl(new URL(location, feedUrl).toString());
+      }
+      throw new Error('Redirect not followed - update feed URL directly');
+    }
     if (!response.ok) {
       throw new Error(`ADSB feed error: ${response.status} ${response.statusText}`);
     }

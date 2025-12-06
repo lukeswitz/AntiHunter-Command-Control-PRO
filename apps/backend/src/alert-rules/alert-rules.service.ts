@@ -578,7 +578,14 @@ export class AlertRulesService {
     for (const value of values) {
       const trimmed = value?.trim();
       if (!trimmed) continue;
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      const atIndex = trimmed.indexOf('@');
+      const lastDotIndex = trimmed.lastIndexOf('.');
+      if (
+        atIndex <= 0 ||
+        lastDotIndex <= atIndex + 1 ||
+        lastDotIndex >= trimmed.length - 1 ||
+        trimmed.includes(' ')
+      ) {
         throw new BadRequestException(`Invalid email recipient: ${trimmed}`);
       }
       normalized.add(trimmed.toLowerCase());

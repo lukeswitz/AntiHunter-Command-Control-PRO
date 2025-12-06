@@ -10,6 +10,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { setTimeout as delay } from 'node:timers/promises';
+import { URL } from 'node:url';
 
 import { FaaAircraftSummary } from './faa.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -86,11 +87,12 @@ export class FaaRegistryService {
     };
   }
 
-  async triggerSync(datasetUrl?: string) {
+  async triggerSync() {
     if (this.currentSync) {
       throw new BadRequestException('FAA registry sync already running');
     }
-    const targetUrl = (datasetUrl ?? FAA_DATASET_URL).trim() || FAA_DATASET_URL;
+    const targetUrl = FAA_DATASET_URL;
+
     this.logger.log(`Starting FAA registry sync from ${targetUrl}`);
     this.progress = { processed: 0, startedAt: new Date() };
     this.lastError = null;
@@ -416,6 +418,7 @@ export class FaaRegistryService {
     return Date.now() - last < this.onlineLookupCooldownMs;
   }
 
+  // SSRF protection: Allow only the FAA's official dataset, explicit allowlist by host/path.
   private async performSync(datasetUrl: string): Promise<void> {
     const tempDir = await fs.mkdtemp(join(tmpdir(), 'faa-registry-'));
     const zipPath = join(tempDir, basename(datasetUrl) || 'faa.zip');
@@ -437,7 +440,10 @@ export class FaaRegistryService {
   }
 
   private async downloadFile(url: string, destination: string): Promise<void> {
-    const response = await fetch(url);
+    // No further validation needed; only hardcoded FAA_DATASET_URL is used
+    const response = await fetch(url, {
+      redirect: 'error',
+    });
     if (!response.ok || !response.body) {
       throw new Error(`Failed to download FAA registry: ${response.status} ${response.statusText}`);
     }

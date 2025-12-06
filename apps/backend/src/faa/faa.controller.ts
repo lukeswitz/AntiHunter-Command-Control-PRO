@@ -1,7 +1,6 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import { Role } from '@prisma/client';
 
-import { SyncFaaRegistryDto } from './dto/sync-faa.dto';
 import { FaaRegistryService } from './faa.service';
 import { Roles } from '../auth/auth.decorators';
 
@@ -17,7 +16,7 @@ export class FaaController {
 
   @Post('sync')
   @Roles(Role.ADMIN)
-  startSync(@Body() dto: SyncFaaRegistryDto) {
-    return this.faaRegistryService.triggerSync(dto.url);
+  startSync() {
+    return this.faaRegistryService.triggerSync();
   }
 }

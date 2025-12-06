@@ -942,7 +942,14 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
   private async simulateLinesInternal(lines: string[]): Promise<void> {
     for (const rawLine of lines) {
-      const line = rawLine.replace(/[\r\n]+$/g, '').trim();
+      let line = rawLine;
+      while (
+        line.length > 0 &&
+        (line[line.length - 1] === '\r' || line[line.length - 1] === '\n')
+      ) {
+        line = line.slice(0, -1);
+      }
+      line = line.trim();
       if (line) {
         this.processIncomingLine(line, 'simulation');
       }

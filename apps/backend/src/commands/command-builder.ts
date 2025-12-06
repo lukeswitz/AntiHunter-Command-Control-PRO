@@ -21,31 +21,31 @@ export type CommandBuildOutput = {
 
 type CommandHandler = (params: string[]) => string[];
 
-const COMMAND_HANDLERS: Record<string, CommandHandler> = {
-  STATUS: expectNoParams,
-  CONFIG_CHANNELS: handleConfigChannels,
-  CONFIG_TARGETS: handleConfigTargets,
-  CONFIG_RSSI: handleConfigRssi,
-  CONFIG_NODEID: handleConfigNodeId,
-  SCAN_START: handleScanStart,
-  DEVICE_SCAN_START: handleDeviceScanStart,
-  DRONE_START: handleTimedCommand,
-  DEAUTH_START: handleTimedCommand,
-  RANDOMIZATION_START: handleRandomizationStart,
-  BASELINE_START: handleBaselineStart,
-  BASELINE_STATUS: expectNoParams,
-  STOP: expectNoParams,
-  VIBRATION_STATUS: expectNoParams,
-  TRIANGULATE_START: handleTriangulateStart,
-  TRIANGULATE_STOP: expectNoParams,
-  TRIANGULATE_RESULTS: expectNoParams,
-  ERASE_REQUEST: expectNoParams,
-  ERASE_FORCE: handleEraseForce,
-  ERASE_CANCEL: expectNoParams,
-  AUTOERASE_ENABLE: handleAutoEraseEnable,
-  AUTOERASE_DISABLE: expectNoParams,
-  AUTOERASE_STATUS: expectNoParams,
-};
+const COMMAND_HANDLERS = new Map<string, CommandHandler>([
+  ['STATUS', expectNoParams],
+  ['CONFIG_CHANNELS', handleConfigChannels],
+  ['CONFIG_TARGETS', handleConfigTargets],
+  ['CONFIG_RSSI', handleConfigRssi],
+  ['CONFIG_NODEID', handleConfigNodeId],
+  ['SCAN_START', handleScanStart],
+  ['DEVICE_SCAN_START', handleDeviceScanStart],
+  ['DRONE_START', handleTimedCommand],
+  ['DEAUTH_START', handleTimedCommand],
+  ['RANDOMIZATION_START', handleRandomizationStart],
+  ['BASELINE_START', handleBaselineStart],
+  ['BASELINE_STATUS', expectNoParams],
+  ['STOP', expectNoParams],
+  ['VIBRATION_STATUS', expectNoParams],
+  ['TRIANGULATE_START', handleTriangulateStart],
+  ['TRIANGULATE_STOP', expectNoParams],
+  ['TRIANGULATE_RESULTS', expectNoParams],
+  ['ERASE_REQUEST', expectNoParams],
+  ['ERASE_FORCE', handleEraseForce],
+  ['ERASE_CANCEL', expectNoParams],
+  ['AUTOERASE_ENABLE', handleAutoEraseEnable],
+  ['AUTOERASE_DISABLE', expectNoParams],
+  ['AUTOERASE_STATUS', expectNoParams],
+]);
 
 const SINGLE_NODE_COMMANDS = new Set<string>(['CONFIG_NODEID']);
 
@@ -55,9 +55,12 @@ export function buildCommandPayload(input: CommandBuildInput): CommandBuildOutpu
   if (SINGLE_NODE_COMMANDS.has(name) && target === '@ALL') {
     throw new BadRequestException(`${name} must target a single node, not @ALL.`);
   }
-  const handler = COMMAND_HANDLERS[name];
-  if (!handler) {
+  if (!COMMAND_HANDLERS.has(name)) {
     throw new BadRequestException(`Unsupported command ${name}`);
+  }
+  const handler = COMMAND_HANDLERS.get(name);
+  if (!handler || typeof handler !== 'function') {
+    throw new BadRequestException(`Invalid command handler for ${name}`);
   }
 
   const rawParams = (input.params ?? []).map((value) => value.trim()).filter(Boolean);

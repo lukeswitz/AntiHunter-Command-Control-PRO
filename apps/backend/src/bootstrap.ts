@@ -12,6 +12,28 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { SanitizeInputPipe } from './utils/sanitize-input.pipe';
 
+function validateAndSanitizeHostname(hostHeader: string, logger: Logger): string {
+  // Extract hostname without port
+  const hostname = hostHeader.split(':')[0] || 'localhost';
+
+  // Validate hostname format - only allow alphanumeric, dots, and hyphens
+  const hostnameRegex =
+    /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
+
+  if (!hostnameRegex.test(hostname)) {
+    logger.warn(`Invalid hostname in Host header: ${hostHeader}. Using localhost instead.`);
+    return 'localhost';
+  }
+
+  // Check length
+  if (hostname.length > 253) {
+    logger.warn(`Hostname too long in Host header: ${hostHeader}. Using localhost instead.`);
+    return 'localhost';
+  }
+
+  return hostname;
+}
+
 function resolveHttpsOptions(): HttpsOptions | undefined {
   const enabled =
     process.env.HTTPS_ENABLED === 'true' ||
@@ -144,9 +166,35 @@ export async function bootstrap(): Promise<void> {
   if (httpsOptions && redirectPort && redirectPort !== port) {
     const httpsPortSuffix = port === 443 ? '' : `:${port}`;
     const redirectServer = createServer((req, res) => {
+      // Validate and sanitize the Host header to prevent open redirect attacks
       const hostHeader = req.headers.host ?? '';
-      const hostname = hostHeader.split(':')[0] || 'localhost';
-      const location = `https://${hostname}${httpsPortSuffix}${req.url ?? ''}`;
+      const hostname = validateAndSanitizeHostname(hostHeader, logger);
+
+      // Sanitize the URL path to prevent open redirects via path manipulation
+      let path = req.url ?? '/';
+      try {
+        const normalizedPath = path
+          .trim()
+          .replace(/[\s\t\n\r]/g, '')
+          .toLowerCase();
+        const dangerousSchemes = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:', 'blob:'];
+        const hasDangerousScheme = dangerousSchemes.some((scheme) =>
+          normalizedPath.startsWith(scheme),
+        );
+
+        if (path.includes('://') || path.startsWith('//') || hasDangerousScheme) {
+          logger.warn(`Suspicious redirect path detected: ${path}. Using / instead.`);
+          path = '/';
+        } else {
+          const urlObj = new URL(path, `https://${hostname}`);
+          path = urlObj.pathname + urlObj.search;
+        }
+      } catch (error) {
+        logger.warn(`Invalid URL in redirect: ${path}. Using / instead.`);
+        path = '/';
+      }
+
+      const location = `https://${hostname}${httpsPortSuffix}${path}`;
 
       res.writeHead(301, { Location: location });
       res.end();
