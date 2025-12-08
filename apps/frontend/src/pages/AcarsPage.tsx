@@ -1,7 +1,12 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 
-import { getAcarsMessages, getAcarsStatus, updateAcarsConfig } from '../api/acars';
+import {
+  clearAcarsMessages,
+  getAcarsMessages,
+  getAcarsStatus,
+  updateAcarsConfig,
+} from '../api/acars';
 import type { AcarsStatus } from '../api/types';
 import { useAuthStore } from '../stores/auth-store';
 import { useMapPreferences } from '../stores/map-store';
@@ -126,7 +131,14 @@ export function AcarsPage() {
     return Array.from(log.values()).sort((a, b) => (a.lastSeen > b.lastSeen ? -1 : 1));
   }, [log]);
 
-  const handleClearLog = () => setLog(new Map());
+  const handleClearLog = async () => {
+    try {
+      await clearAcarsMessages();
+      setLog(new Map());
+    } catch (error) {
+      console.error('Failed to clear ACARS messages:', error);
+    }
+  };
 
   const handleExportLog = () => {
     const header = [

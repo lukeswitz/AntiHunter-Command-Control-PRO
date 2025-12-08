@@ -9,6 +9,10 @@ export function getAcarsMessages() {
   return apiClient.get<AcarsMessage[]>('/acars/messages');
 }
 
+export function clearAcarsMessages() {
+  return apiClient.delete<{ cleared: boolean }>('/acars/messages');
+}
+
 export function updateAcarsConfig(body: {
   enabled?: boolean;
   udpHost?: string;

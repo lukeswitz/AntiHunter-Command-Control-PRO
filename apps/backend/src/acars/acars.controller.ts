@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post } from '@nestjs/common';
 
 import { AcarsService } from './acars.service';
 import type { AcarsMessage, AcarsStatus } from './acars.types';
@@ -15,6 +15,12 @@ export class AcarsController {
   @Get('messages')
   getMessages(): AcarsMessage[] {
     return this.acarsService.getMessages();
+  }
+
+  @Delete('messages')
+  clearMessages() {
+    this.acarsService.clearMessages();
+    return { cleared: true };
   }
 
   @Post('config')

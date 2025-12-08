@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Post,
   UploadedFile,
@@ -28,6 +29,12 @@ export class AdsbController {
   @Get('log')
   getSessionLog() {
     return this.adsbService.getSessionLog();
+  }
+
+  @Delete('log')
+  clearSessionLog() {
+    this.adsbService.clearSessionLog();
+    return { cleared: true };
   }
 
   @Post('config')
