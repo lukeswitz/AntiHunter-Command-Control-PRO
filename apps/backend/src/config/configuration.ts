@@ -176,6 +176,10 @@ export default () => ({
     openskyClientSecret:
       process.env.ADSB_OPENSKY_CLIENT_SECRET ?? process.env.ADSB_OPENSKY_PASSWORD,
     openskyCredentialsPath: process.env.ADSB_OPENSKY_CREDENTIALS_PATH,
+    openskyTokenUrl:
+      process.env.ADSB_OPENSKY_TOKEN_URL ??
+      'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token',
+    planespottersEnabled: process.env.ADSB_PLANESPOTTERS_ENABLED !== 'false',
   },
   acars: {
     enabled: process.env.ACARS_ENABLED === 'true',

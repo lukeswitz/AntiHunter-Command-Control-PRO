@@ -42,6 +42,14 @@ type AircraftDbEntry = {
   registration?: string | null;
 };
 
+type AirportInfo = {
+  icao?: string | null;
+  iata?: string | null;
+  name?: string | null;
+  city?: string | null;
+  country?: string | null;
+};
+
 interface Dump1090Aircraft {
   hex?: string;
   flight?: string;
@@ -89,18 +97,36 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   private readonly localSiteId: string;
   private readonly dataDir: string;
   private readonly aircraftDbPath: string;
+  private readonly airportsPath: string;
   private readonly configPath: string;
   private openskyEnabled: boolean;
   private openskyClientId?: string;
   private openskyClientSecret?: string;
+  private openskyTokenUrl: string;
+  private planespottersEnabled: boolean;
+  private openskyAccessToken?: string;
+  private openskyTokenExpiryMs = 0;
   private readonly routeCache: Map<
     string,
     { dep: string | null; dest: string | null; ts: number }
   > = new Map();
   private static readonly ROUTE_CACHE_TTL_MS = 10 * 60 * 1000;
+  private readonly photoCache: Map<
+    string,
+    {
+      url: string | null;
+      thumb: string | null;
+      author: string | null;
+      sourceUrl: string | null;
+      ts: number;
+    }
+  > = new Map();
+  private static readonly PHOTO_CACHE_TTL_MS = 60 * 60 * 1000;
   private readonly openskyCredentialsFile: string;
   private aircraftDb: Map<string, AircraftDbEntry> = new Map();
   private aircraftDbCount = 0;
+  private airportsByIcao: Map<string, AirportInfo> = new Map();
+  private airportsByIata: Map<string, AirportInfo> = new Map();
 
   constructor(
     private readonly configService: ConfigService,
@@ -121,10 +147,16 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     this.openskyEnabled = this.configService.get<boolean>('adsb.openskyEnabled', false) ?? false;
     this.openskyClientId = this.configService.get<string>('adsb.openskyClientId');
     this.openskyClientSecret = this.configService.get<string>('adsb.openskyClientSecret');
+    this.openskyTokenUrl =
+      this.configService.get<string>('adsb.openskyTokenUrl') ??
+      'https://opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+    this.planespottersEnabled =
+      this.configService.get<boolean>('adsb.planespottersEnabled', true) ?? true;
     this.localSiteId = this.configService.get<string>('site.id', 'default');
     const baseDir = join(__dirname, '..', '..');
     this.dataDir = join(baseDir, 'data', 'adsb');
     this.aircraftDbPath = join(this.dataDir, 'aircraft-database.csv');
+    this.airportsPath = join(this.dataDir, 'airports.dat');
     this.configPath = join(this.dataDir, 'config.json');
     this.openskyCredentialsFile =
       this.configService.get<string>('adsb.openskyCredentialsPath') ??
@@ -149,6 +181,11 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         `ADS-B aircraft database not loaded: ${error instanceof Error ? error.message : error}`,
       );
     });
+    void this.loadAirportsDatabaseFromDisk().catch((error) => {
+      this.logger.warn(
+        `ADS-B airports database not loaded: ${error instanceof Error ? error.message : error}`,
+      );
+    });
     if (this.enabled) {
       this.startPolling();
     }
@@ -171,6 +208,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       aircraftDbCount: this.aircraftDbCount,
       openskyEnabled: this.openskyEnabled,
       openskyClientId: this.openskyClientId ?? null,
+      // Note: planespottersEnabled is intentionally not exposed to clients to avoid toggling in UI yet
     };
   }
 
@@ -199,6 +237,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     openskyEnabled?: boolean;
     openskyClientId?: string | null;
     openskyClientSecret?: string | null;
+    planespottersEnabled?: boolean;
   }): AdsbStatus {
     if (this.hardDisabled) {
       this.enabled = false;
@@ -223,6 +262,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     }
     if (config.openskyEnabled !== undefined) {
       this.openskyEnabled = Boolean(config.openskyEnabled);
+    }
+    if (config.planespottersEnabled !== undefined) {
+      this.planespottersEnabled = Boolean(config.planespottersEnabled);
     }
     if (config.openskyClientId !== undefined) {
       const trimmed = config.openskyClientId?.trim() || null;
@@ -272,6 +314,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     const parsed = JSON.parse(content.toString('utf8')) as {
       clientId?: string;
       clientSecret?: string;
+      tokenUrl?: string;
     };
     if (!parsed.clientId || !parsed.clientSecret) {
       throw new Error('Credentials JSON must include clientId and clientSecret');
@@ -279,6 +322,11 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     await writeFile(targetPath, JSON.stringify(parsed, null, 2), 'utf8');
     this.openskyClientId = parsed.clientId.trim();
     this.openskyClientSecret = parsed.clientSecret.trim();
+    if (parsed.tokenUrl && parsed.tokenUrl.trim()) {
+      this.openskyTokenUrl = parsed.tokenUrl.trim();
+    }
+    this.openskyAccessToken = undefined;
+    this.openskyTokenExpiryMs = 0;
     await this.persistConfig();
     this.logger.log(`Saved OpenSky credentials to ${targetPath}`);
     return { saved: true };
@@ -323,6 +371,38 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     this.aircraftDb = next;
     this.aircraftDbCount = next.size;
     this.logger.log(`Loaded ADS-B aircraft database (${this.aircraftDbCount} entries)`);
+  }
+
+  private async loadAirportsDatabaseFromDisk(path = this.airportsPath): Promise<void> {
+    if (!path.startsWith(this.dataDir)) {
+      throw new Error('Invalid airport database path');
+    }
+    if (!existsSync(path)) {
+      return;
+    }
+    const stream = createReadStream(path, { encoding: 'utf8' });
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+    const byIcao = new Map<string, AirportInfo>();
+    const byIata = new Map<string, AirportInfo>();
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      const cols = this.parseCsvLine(line);
+      if (cols.length < 7) continue;
+      const name = cols[1]?.replace(/^"+|"+$/g, '') ?? null;
+      const city = cols[2]?.replace(/^"+|"+$/g, '') ?? null;
+      const country = cols[3]?.replace(/^"+|"+$/g, '') ?? null;
+      const iata = cols[4]?.trim().toUpperCase() || null;
+      const icao = cols[5]?.trim().toUpperCase() || null;
+      if (!icao && !iata) {
+        continue;
+      }
+      const info: AirportInfo = { icao, iata, name, city, country };
+      if (icao) byIcao.set(icao, info);
+      if (iata) byIata.set(iata, info);
+    }
+    this.airportsByIcao = byIcao;
+    this.airportsByIata = byIata;
+    this.logger.log(`Loaded ADS-B airport database (${byIcao.size} ICAO entries)`);
   }
 
   private async loadConfigFromDisk(): Promise<void> {
@@ -509,6 +589,13 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
             : (existing?.category ?? null),
         dep,
         dest,
+        depTime: existing?.depTime ?? null,
+        destTime: existing?.destTime ?? null,
+        depDistanceM: existing?.depDistanceM ?? null,
+        destDistanceM: existing?.destDistanceM ?? null,
+        depCandidates: existing?.depCandidates ?? null,
+        destCandidates: existing?.destCandidates ?? null,
+        routeSource: dep || dest ? 'feed' : (existing?.routeSource ?? null),
         country:
           typeof entry.cntry === 'string' && entry.cntry.trim()
             ? entry.cntry.trim()
@@ -518,11 +605,15 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         messages:
           typeof entry.messages === 'number' ? entry.messages : (existing?.messages ?? null),
       };
+      this.enrichAirportMetadata(track);
       this.enrichTrack(track);
       nextTracks.set(id, track);
 
       if (this.openskyEnabled && (!track.dep || !track.dest)) {
         enrichTasks.push(this.enrichRoute(track));
+      }
+      if (this.planespottersEnabled) {
+        enrichTasks.push(this.enrichPhoto(track));
       }
     });
 
@@ -725,6 +816,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
 
   private async loadOpenskyCredentialsFromFile(): Promise<void> {
     if (this.openskyClientId && this.openskyClientSecret) {
+      this.logger.debug('OpenSky credentials already provided via config.');
       return;
     }
     const candidates = [this.openskyCredentialsFile, join(process.cwd(), 'credentials.json')];
@@ -737,6 +829,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         const parsed = JSON.parse(raw) as {
           clientId?: string;
           clientSecret?: string;
+          tokenUrl?: string;
         };
         if (!this.openskyClientId && parsed.clientId) {
           this.openskyClientId = parsed.clientId.trim();
@@ -744,10 +837,15 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         if (!this.openskyClientSecret && parsed.clientSecret) {
           this.openskyClientSecret = parsed.clientSecret.trim();
         }
+        if (parsed.tokenUrl && parsed.tokenUrl.trim()) {
+          this.openskyTokenUrl = parsed.tokenUrl.trim();
+        }
         if (this.openskyClientId || this.openskyClientSecret) {
+          this.logger.log(`Loaded OpenSky credentials from ${path}`);
           return;
         }
       }
+      this.logger.debug('No OpenSky credential file found among candidates.');
     } catch (error) {
       throw error instanceof Error ? error : new Error(String(error));
     }
@@ -774,16 +872,49 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       }
 
       this.routeCache.set(track.icao, { dep: route.dep, dest: route.dest, ts: now });
-      if (route.dep && !track.dep) {
-        track.dep = route.dep;
-      }
-      if (route.dest && !track.dest) {
-        track.dest = route.dest;
-      }
+      track.routeSource = 'opensky';
+      if (route.dep && !track.dep) track.dep = route.dep;
+      if (route.dest && !track.dest) track.dest = route.dest;
+      if (route.depTime) track.depTime = route.depTime;
+      if (route.destTime) track.destTime = route.destTime;
+      if (route.depDistanceM !== undefined) track.depDistanceM = route.depDistanceM;
+      if (route.destDistanceM !== undefined) track.destDistanceM = route.destDistanceM;
+      if (route.depCandidates !== undefined) track.depCandidates = route.depCandidates;
+      if (route.destCandidates !== undefined) track.destCandidates = route.destCandidates;
+      this.enrichAirportMetadata(track);
       this.syncTrackRoute(track);
     } catch (error) {
       this.logger.debug(
         `OpenSky enrichment failed for ${track.icao}: ${error instanceof Error ? error.message : error}`,
+      );
+    }
+  }
+
+  private async enrichPhoto(track: AdsbTrack): Promise<void> {
+    const hex = track.icao?.toLowerCase();
+    if (!hex) return;
+    const now = Date.now();
+    const cached = this.photoCache.get(hex);
+    if (cached && now - cached.ts < AdsbService.PHOTO_CACHE_TTL_MS) {
+      this.applyPhoto(track, cached);
+      return;
+    }
+
+    try {
+      const photo = await this.fetchPlanespottersPhoto(hex, track.reg ?? undefined);
+      const record = {
+        url: photo?.url ?? null,
+        thumb: photo?.thumb ?? null,
+        author: photo?.author ?? null,
+        sourceUrl: photo?.sourceUrl ?? null,
+        ts: now,
+      };
+      this.photoCache.set(hex, record);
+      this.applyPhoto(track, record);
+    } catch (error) {
+      this.photoCache.set(hex, { url: null, thumb: null, author: null, sourceUrl: null, ts: now });
+      this.logger.debug(
+        `Planespotters lookup failed for ${hex}: ${error instanceof Error ? error.message : error}`,
       );
     }
   }
@@ -793,30 +924,56 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     if (current) {
       current.dep = track.dep ?? current.dep ?? null;
       current.dest = track.dest ?? current.dest ?? null;
+      current.routeSource = track.routeSource ?? current.routeSource ?? null;
+      current.depTime = track.depTime ?? current.depTime ?? null;
+      current.destTime = track.destTime ?? current.destTime ?? null;
+      current.depDistanceM = track.depDistanceM ?? current.depDistanceM ?? null;
+      current.destDistanceM = track.destDistanceM ?? current.destDistanceM ?? null;
+      current.depCandidates = track.depCandidates ?? current.depCandidates ?? null;
+      current.destCandidates = track.destCandidates ?? current.destCandidates ?? null;
+      current.depIata = track.depIata ?? current.depIata ?? null;
+      current.destIata = track.destIata ?? current.destIata ?? null;
+      current.depIcao = track.depIcao ?? current.depIcao ?? null;
+      current.destIcao = track.destIcao ?? current.destIcao ?? null;
+      current.depAirport = track.depAirport ?? current.depAirport ?? null;
+      current.destAirport = track.destAirport ?? current.destAirport ?? null;
     }
     const log = this.sessionLog.get(track.id);
     if (log) {
       log.dep = track.dep ?? log.dep ?? null;
       log.dest = track.dest ?? log.dest ?? null;
+      log.routeSource = track.routeSource ?? log.routeSource ?? null;
+      log.depTime = track.depTime ?? log.depTime ?? null;
+      log.destTime = track.destTime ?? log.destTime ?? null;
+      log.depDistanceM = track.depDistanceM ?? log.depDistanceM ?? null;
+      log.destDistanceM = track.destDistanceM ?? log.destDistanceM ?? null;
+      log.depCandidates = track.depCandidates ?? log.depCandidates ?? null;
+      log.destCandidates = track.destCandidates ?? log.destCandidates ?? null;
+      log.depIata = track.depIata ?? log.depIata ?? null;
+      log.destIata = track.destIata ?? log.destIata ?? null;
+      log.depIcao = track.depIcao ?? log.depIcao ?? null;
+      log.destIcao = track.destIcao ?? log.destIcao ?? null;
+      log.depAirport = track.depAirport ?? log.depAirport ?? null;
+      log.destAirport = track.destAirport ?? log.destAirport ?? null;
       this.sessionLog.set(track.id, log);
     }
   }
 
-  private async fetchOpenSkyRoute(
-    icao: string,
-  ): Promise<{ dep: string | null; dest: string | null } | null> {
+  private async fetchOpenSkyRoute(icao: string): Promise<{
+    dep: string | null;
+    dest: string | null;
+    depTime?: string | null;
+    destTime?: string | null;
+    depDistanceM?: number | null;
+    destDistanceM?: number | null;
+    depCandidates?: number | null;
+    destCandidates?: number | null;
+  } | null> {
     const end = Math.floor(Date.now() / 1000);
-    const begin = end - 6 * 3600;
+    const begin = end - 12 * 3600;
     const url = `https://opensky-network.org/api/flights/aircraft?icao24=${icao.toLowerCase()}&begin=${begin}&end=${end}`;
 
-    const auth = Buffer.from(`${this.openskyClientId}:${this.openskyClientSecret}`).toString(
-      'base64',
-    );
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${auth}`,
-      },
-    });
+    const response = await this.fetchWithOpenskyAuth(url);
 
     if (!response.ok) {
       throw new Error(`OpenSky ${response.status} ${response.statusText}`);
@@ -825,6 +982,12 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     const flights = (await response.json()) as Array<{
       estDepartureAirport?: string | null;
       estArrivalAirport?: string | null;
+      firstSeen?: number;
+      lastSeen?: number;
+      estDepartureAirportHorizDistance?: number;
+      estArrivalAirportHorizDistance?: number;
+      estDepartureAirportCandidatesCount?: number;
+      estArrivalAirportCandidatesCount?: number;
     }>;
     if (!Array.isArray(flights) || flights.length === 0) {
       return null;
@@ -836,7 +999,86 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     if (!dep && !dest) {
       return null;
     }
-    return { dep: dep ?? null, dest: dest ?? null };
+    return {
+      dep: dep ?? null,
+      dest: dest ?? null,
+      depTime: latest.firstSeen ? new Date(latest.firstSeen * 1000).toISOString() : null,
+      destTime: latest.lastSeen ? new Date(latest.lastSeen * 1000).toISOString() : null,
+      depDistanceM:
+        typeof latest.estDepartureAirportHorizDistance === 'number'
+          ? latest.estDepartureAirportHorizDistance
+          : null,
+      destDistanceM:
+        typeof latest.estArrivalAirportHorizDistance === 'number'
+          ? latest.estArrivalAirportHorizDistance
+          : null,
+      depCandidates:
+        typeof latest.estDepartureAirportCandidatesCount === 'number'
+          ? latest.estDepartureAirportCandidatesCount
+          : null,
+      destCandidates:
+        typeof latest.estArrivalAirportCandidatesCount === 'number'
+          ? latest.estArrivalAirportCandidatesCount
+          : null,
+    };
+  }
+
+  private async fetchWithOpenskyAuth(url: string, attempt = 0): Promise<Response> {
+    const token = await this.getOpenskyAccessToken(attempt > 0);
+    if (!token) {
+      throw new Error('OpenSky credentials not configured');
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if ((response.status === 401 || response.status === 403) && attempt < 1) {
+      this.openskyAccessToken = undefined;
+      this.openskyTokenExpiryMs = 0;
+      return this.fetchWithOpenskyAuth(url, attempt + 1);
+    }
+
+    return response;
+  }
+
+  private async getOpenskyAccessToken(forceRefresh = false): Promise<string | null> {
+    if (!this.openskyClientId || !this.openskyClientSecret) {
+      return null;
+    }
+    const now = Date.now();
+    if (!forceRefresh && this.openskyAccessToken && now < this.openskyTokenExpiryMs) {
+      return this.openskyAccessToken;
+    }
+
+    const body = new URLSearchParams();
+    body.set('grant_type', 'client_credentials');
+    body.set('client_id', this.openskyClientId);
+    body.set('client_secret', this.openskyClientSecret);
+
+    const response = await fetch(this.openskyTokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenSky auth failed: ${response.status} ${response.statusText}`);
+    }
+
+    const payload = (await response.json()) as { access_token?: string; expires_in?: number };
+    if (!payload.access_token) {
+      throw new Error('OpenSky auth response missing access_token');
+    }
+
+    const ttlMs = typeof payload.expires_in === 'number' ? payload.expires_in * 1000 : 300_000;
+    this.openskyAccessToken = payload.access_token;
+    this.openskyTokenExpiryMs = Date.now() + Math.max(30_000, ttlMs - 30_000);
+    return this.openskyAccessToken;
   }
 
   private extractRoute(
@@ -894,6 +1136,102 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     return {
       dep: departure ?? fromField ?? estDep ?? routeDep ?? existing?.dep ?? null,
       dest: destination ?? toField ?? estArr ?? routeDest ?? existing?.dest ?? null,
+    };
+  }
+
+  private enrichAirportMetadata(track: AdsbTrack): void {
+    const depInfo = this.resolveAirport(track.dep);
+    const destInfo = this.resolveAirport(track.dest);
+
+    if (depInfo) {
+      track.depIcao =
+        depInfo.icao ?? track.depIcao ?? (track.dep && track.dep.length === 4 ? track.dep : null);
+      track.depIata =
+        depInfo.iata ?? track.depIata ?? (track.dep && track.dep.length === 3 ? track.dep : null);
+      track.depAirport = depInfo.name ?? track.depAirport ?? depInfo.city ?? null;
+      if (depInfo.icao && track.dep && track.dep.length === 3) {
+        track.dep = depInfo.icao;
+      }
+    }
+
+    if (destInfo) {
+      track.destIcao =
+        destInfo.icao ??
+        track.destIcao ??
+        (track.dest && track.dest.length === 4 ? track.dest : null);
+      track.destIata =
+        destInfo.iata ??
+        track.destIata ??
+        (track.dest && track.dest.length === 3 ? track.dest : null);
+      track.destAirport = destInfo.name ?? track.destAirport ?? destInfo.city ?? null;
+      if (destInfo.icao && track.dest && track.dest.length === 3) {
+        track.dest = destInfo.icao;
+      }
+    }
+  }
+
+  private resolveAirport(code?: string | null): AirportInfo | null {
+    if (!code) return null;
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) return null;
+    const fromIcao = this.airportsByIcao.get(trimmed);
+    if (fromIcao) return fromIcao;
+    const fromIata = this.airportsByIata.get(trimmed);
+    if (fromIata) return fromIata;
+    return null;
+  }
+
+  private applyPhoto(
+    track: AdsbTrack,
+    photo: {
+      url: string | null;
+      thumb: string | null;
+      author: string | null;
+      sourceUrl: string | null;
+    },
+  ): void {
+    track.photoUrl = photo.url ?? track.photoUrl ?? null;
+    track.photoThumbUrl = photo.thumb ?? track.photoThumbUrl ?? null;
+    track.photoAuthor = photo.author ?? track.photoAuthor ?? null;
+    track.photoSourceUrl = photo.sourceUrl ?? track.photoSourceUrl ?? null;
+    this.syncTrackRoute(track);
+  }
+
+  private async fetchPlanespottersPhoto(
+    hex: string,
+    _registration?: string | null,
+  ): Promise<{
+    url: string | null;
+    thumb: string | null;
+    author: string | null;
+    sourceUrl: string | null;
+  } | null> {
+    const targetHex = hex.toLowerCase();
+    const url = `https://api.planespotters.net/pub/photos/hex/${encodeURIComponent(targetHex)}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Planespotters ${response.status} ${response.statusText}`);
+    }
+    const payload = (await response.json()) as {
+      photos?: Array<{
+        thumbnail?: string;
+        thumbnail_large?: string;
+        large?: string;
+        link?: string;
+        photographer?: string;
+      }>;
+    };
+    const photo =
+      Array.isArray(payload.photos) && payload.photos.length > 0 ? payload.photos[0] : null;
+    if (!photo) {
+      return null;
+    }
+    return {
+      url: photo.large ?? photo.thumbnail_large ?? null,
+      thumb: photo.thumbnail ?? photo.thumbnail_large ?? photo.large ?? null,
+      author: photo.photographer ?? null,
+      sourceUrl: photo.link ?? null,
     };
   }
 }
