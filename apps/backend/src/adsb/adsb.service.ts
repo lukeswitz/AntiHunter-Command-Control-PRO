@@ -157,6 +157,11 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     return Array.from(this.sessionLog.values());
   }
 
+  clearSessionLog(): void {
+    this.sessionLog.clear();
+    this.logger.log('Cleared ADS-B session log');
+  }
+
   updateConfig(config: {
     enabled?: boolean;
     feedUrl?: string;
@@ -501,7 +506,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       const entityKey = this.buildEntityKey(track);
       activeEntities.add(entityKey);
       this.geofences.forEach((geofence) => {
-        if (!geofence.alarm.enabled || geofence.polygon.length < 3) {
+        if (!geofence.alarm.enabled || geofence.polygon.length < 3 || !geofence.appliesToAdsb) {
           return;
         }
         const inside = this.pointInPolygon(track.lat, track.lon, geofence.polygon);

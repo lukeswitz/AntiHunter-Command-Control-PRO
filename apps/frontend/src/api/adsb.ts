@@ -39,6 +39,10 @@ export function getAdsbLog() {
   return apiClient.get<AdsbTrack[]>('/adsb/log');
 }
 
+export function clearAdsbLog() {
+  return apiClient.delete<{ cleared: boolean }>('/adsb/log');
+}
+
 export function updateAdsbConfig(body: {
   enabled?: boolean;
   feedUrl?: string;

@@ -476,6 +476,9 @@ model Geofence {
   alarmLevel         AlarmLevel @default(ALERT)
   alarmMessage       String     @default("{entity} entered geofence {geofence}")
   alarmTriggerOnExit Boolean    @default(false)
+  appliesToAdsb      Boolean    @default(true)
+  appliesToDrones    Boolean    @default(true)
+  appliesToTargets   Boolean    @default(true)
   createdBy          String?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt

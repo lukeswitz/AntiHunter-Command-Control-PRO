@@ -9,7 +9,6 @@ interface MapPreferencesState {
   targetsEnabled: boolean;
   coverageEnabled: boolean;
   adsbEnabled: boolean;
-  adsbGeofenceEnabled: boolean;
   adsbMuted: boolean;
   acarsEnabled: boolean;
   acarsMuted: boolean;
@@ -21,7 +20,6 @@ interface MapPreferencesState {
   toggleTargets: () => void;
   toggleCoverage: () => void;
   toggleAdsb: () => void;
-  toggleAdsbGeofence: () => void;
   toggleAdsbMuted: () => void;
   toggleAcars: () => void;
   toggleAcarsMuted: () => void;
@@ -36,7 +34,6 @@ const DEFAULT_STATE: Pick<
   | 'targetsEnabled'
   | 'coverageEnabled'
   | 'adsbEnabled'
-  | 'adsbGeofenceEnabled'
   | 'adsbMuted'
   | 'acarsEnabled'
   | 'acarsMuted'
@@ -50,7 +47,6 @@ const DEFAULT_STATE: Pick<
   targetsEnabled: true,
   coverageEnabled: false,
   adsbEnabled: false,
-  adsbGeofenceEnabled: false,
   adsbMuted: false,
   acarsEnabled: false,
   acarsMuted: false,
@@ -68,8 +64,6 @@ export const useMapPreferences = create<MapPreferencesState>()(
       toggleTargets: () => set((state) => ({ targetsEnabled: !state.targetsEnabled })),
       toggleCoverage: () => set((state) => ({ coverageEnabled: !state.coverageEnabled })),
       toggleAdsb: () => set((state) => ({ adsbEnabled: !state.adsbEnabled })),
-      toggleAdsbGeofence: () =>
-        set((state) => ({ adsbGeofenceEnabled: !state.adsbGeofenceEnabled })),
       toggleAdsbMuted: () => set((state) => ({ adsbMuted: !state.adsbMuted })),
       toggleAcars: () => set((state) => ({ acarsEnabled: !state.acarsEnabled })),
       toggleAcarsMuted: () => set((state) => ({ acarsMuted: !state.acarsMuted })),
@@ -86,7 +80,6 @@ export const useMapPreferences = create<MapPreferencesState>()(
         targetsEnabled: state.targetsEnabled,
         coverageEnabled: state.coverageEnabled,
         adsbEnabled: state.adsbEnabled,
-        adsbGeofenceEnabled: state.adsbGeofenceEnabled,
         adsbMuted: state.adsbMuted,
         acarsEnabled: state.acarsEnabled,
         acarsMuted: state.acarsMuted,

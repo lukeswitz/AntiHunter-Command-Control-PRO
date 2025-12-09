@@ -166,6 +166,9 @@ export const useGeofenceStore = create<GeofenceStoreState>()((set, get) => {
           message: input.alarm.message,
           triggerOnExit: input.alarm.triggerOnExit ?? false,
         },
+        appliesToAdsb: input.appliesToAdsb ?? true,
+        appliesToDrones: input.appliesToDrones ?? true,
+        appliesToTargets: input.appliesToTargets ?? true,
       };
 
       const geofence = await apiClient.post<Geofence>('/geofences', payload);
@@ -188,6 +191,15 @@ export const useGeofenceStore = create<GeofenceStoreState>()((set, get) => {
             ...('color' in update ? { color: update.color ?? geofence.color } : null),
             ...('originSiteId' in update
               ? { originSiteId: update.originSiteId ?? geofence.originSiteId ?? null }
+              : null),
+            ...('appliesToAdsb' in update
+              ? { appliesToAdsb: update.appliesToAdsb ?? geofence.appliesToAdsb }
+              : null),
+            ...('appliesToDrones' in update
+              ? { appliesToDrones: update.appliesToDrones ?? geofence.appliesToDrones }
+              : null),
+            ...('appliesToTargets' in update
+              ? { appliesToTargets: update.appliesToTargets ?? geofence.appliesToTargets }
               : null),
             polygon: update.polygon ? update.polygon.map(normalizeVertex) : geofence.polygon,
             alarm: update.alarm ? { ...geofence.alarm, ...update.alarm } : geofence.alarm,
@@ -412,6 +424,15 @@ function mergePatch(
   }
   if (update.alarm) {
     patch.alarm = { ...(patch.alarm ?? {}), ...update.alarm };
+  }
+  if (update.appliesToAdsb !== undefined) {
+    patch.appliesToAdsb = update.appliesToAdsb;
+  }
+  if (update.appliesToDrones !== undefined) {
+    patch.appliesToDrones = update.appliesToDrones;
+  }
+  if (update.appliesToTargets !== undefined) {
+    patch.appliesToTargets = update.appliesToTargets;
   }
 
   return patch;

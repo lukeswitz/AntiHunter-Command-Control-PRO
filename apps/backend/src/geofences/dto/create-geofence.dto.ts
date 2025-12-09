@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsHexColor,
   IsOptional,
   IsString,
@@ -43,4 +44,16 @@ export class CreateGeofenceDto {
   @ValidateNested()
   @Type(() => GeofenceAlarmConfigDto)
   alarm!: GeofenceAlarmConfigDto;
+
+  @IsOptional()
+  @IsBoolean()
+  appliesToAdsb?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  appliesToDrones?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  appliesToTargets?: boolean;
 }

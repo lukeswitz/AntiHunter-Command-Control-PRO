@@ -77,6 +77,11 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
     return Array.from(this.messages.values());
   }
 
+  clearMessages(): void {
+    this.messages.clear();
+    this.logger.log('Cleared ACARS messages');
+  }
+
   updateConfig(config: {
     enabled?: boolean;
     udpHost?: string;

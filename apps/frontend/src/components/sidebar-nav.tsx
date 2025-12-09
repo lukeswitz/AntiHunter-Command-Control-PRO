@@ -55,16 +55,16 @@ export function SidebarNav() {
   const [alertsEnabled, setAlertsEnabled] = useState<boolean>(addons.alerts ?? false);
   const [schedulerEnabled, setSchedulerEnabled] = useState<boolean>(addons.scheduler ?? false);
   const [chatEnabled, setChatEnabled] = useState<boolean>(addons.chat ?? false);
-  const [adsbEnabled, setAdsbEnabled] = useState<boolean>(addons.adsb ?? true);
-  const [acarsEnabled, setAcarsEnabled] = useState<boolean>(addons.acars ?? true);
+  const [adsbEnabled, setAdsbEnabled] = useState<boolean>(addons.adsb ?? false);
+  const [acarsEnabled, setAcarsEnabled] = useState<boolean>(addons.acars ?? false);
 
   useEffect(() => {
     setStrategyEnabled(addons.strategy ?? false);
     setAlertsEnabled(addons.alerts ?? false);
     setSchedulerEnabled(addons.scheduler ?? false);
     setChatEnabled(addons.chat ?? false);
-    setAdsbEnabled(addons.adsb ?? true);
-    setAcarsEnabled(addons.acars ?? true);
+    setAdsbEnabled(addons.adsb ?? false);
+    setAcarsEnabled(addons.acars ?? false);
   }, [addons.alerts, addons.chat, addons.scheduler, addons.strategy, addons.adsb, addons.acars]);
 
   const navItems = useMemo(() => {

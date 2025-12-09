@@ -76,8 +76,8 @@ export function GeofencePage() {
 
   const totalArea = useMemo(() => sortedGeofences.length, [sortedGeofences]);
 
-  const handleFocus = (geofenceIndex: number) => {
-    const geofence = geofences[geofenceIndex];
+  const handleFocus = (geofenceId: string) => {
+    const geofence = geofences.find((g) => g.id === geofenceId);
     if (!geofence || geofence.polygon.length === 0) {
       return;
     }
@@ -238,11 +238,14 @@ export function GeofencePage() {
                 </th>
                 <th>Trigger Exit</th>
                 <th>Alarm Message</th>
+                <th>ADS-B</th>
+                <th>Drones</th>
+                <th>Targets</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedGeofences.map((geofence, index) => (
+              {sortedGeofences.map((geofence) => (
                 <tr key={geofence.id}>
                   <td className="geofence-table__name">
                     <input
@@ -270,7 +273,7 @@ export function GeofencePage() {
                   <td>
                     <input
                       type="color"
-                      value={geofence.color}
+                      value={geofence.color || '#1d4ed8'}
                       onChange={(event) => handleColorChange(geofence.id, event)}
                       aria-label={`Color for ${geofence.name}`}
                     />
@@ -321,8 +324,53 @@ export function GeofencePage() {
                       placeholder="Alert text, e.g. {entity} entered geofence {geofence}"
                     />
                   </td>
+                  <td>
+                    <label
+                      className="switch"
+                      aria-label={`Apply to ADS-B aircraft for ${geofence.name ?? 'this geofence'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(geofence.appliesToAdsb)}
+                        onChange={(event) =>
+                          updateGeofence(geofence.id, { appliesToAdsb: event.target.checked })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </td>
+                  <td>
+                    <label
+                      className="switch"
+                      aria-label={`Apply to drones for ${geofence.name ?? 'this geofence'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(geofence.appliesToDrones)}
+                        onChange={(event) =>
+                          updateGeofence(geofence.id, { appliesToDrones: event.target.checked })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </td>
+                  <td>
+                    <label
+                      className="switch"
+                      aria-label={`Apply to targets/devices for ${geofence.name ?? 'this geofence'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(geofence.appliesToTargets)}
+                        onChange={(event) =>
+                          updateGeofence(geofence.id, { appliesToTargets: event.target.checked })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </td>
                   <td className="geofence-table__actions">
-                    <button type="button" onClick={() => handleFocus(index)}>
+                    <button type="button" onClick={() => handleFocus(geofence.id)}>
                       <MdMyLocation /> Focus
                     </button>
                     <button

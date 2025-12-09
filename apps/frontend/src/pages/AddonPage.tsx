@@ -21,16 +21,16 @@ export function AddonPage() {
   const [alertsEnabled, setAlertsEnabled] = useState<boolean>(addonPrefs.alerts ?? false);
   const [schedulerEnabled, setSchedulerEnabled] = useState<boolean>(addonPrefs.scheduler ?? false);
   const [chatEnabled, setChatEnabled] = useState<boolean>(addonPrefs.chat ?? false);
-  const [adsbEnabled, setAdsbEnabled] = useState<boolean>(addonPrefs.adsb ?? true);
-  const [acarsEnabled, setAcarsEnabled] = useState<boolean>(addonPrefs.acars ?? true);
+  const [adsbEnabled, setAdsbEnabled] = useState<boolean>(addonPrefs.adsb ?? false);
+  const [acarsEnabled, setAcarsEnabled] = useState<boolean>(addonPrefs.acars ?? false);
 
   useEffect(() => {
     setStrategyEnabled(addonPrefs.strategy ?? false);
     setAlertsEnabled(addonPrefs.alerts ?? false);
     setSchedulerEnabled(addonPrefs.scheduler ?? false);
     setChatEnabled(addonPrefs.chat ?? false);
-    setAdsbEnabled(addonPrefs.adsb ?? true);
-    setAcarsEnabled(addonPrefs.acars ?? true);
+    setAdsbEnabled(addonPrefs.adsb ?? false);
+    setAcarsEnabled(addonPrefs.acars ?? false);
   }, [
     addonPrefs.alerts,
     addonPrefs.chat,
@@ -49,8 +49,8 @@ export function AddonPage() {
       setAlertsEnabled(updated.preferences?.notifications?.addons?.alerts ?? false);
       setSchedulerEnabled(updated.preferences?.notifications?.addons?.scheduler ?? false);
       setChatEnabled(updated.preferences?.notifications?.addons?.chat ?? false);
-      setAdsbEnabled(updated.preferences?.notifications?.addons?.adsb ?? true);
-      setAcarsEnabled(updated.preferences?.notifications?.addons?.acars ?? true);
+      setAdsbEnabled(updated.preferences?.notifications?.addons?.adsb ?? false);
+      setAcarsEnabled(updated.preferences?.notifications?.addons?.acars ?? false);
     } catch (error) {
       console.error('Failed to update add-ons', error);
     }

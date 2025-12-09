@@ -29,6 +29,9 @@ export interface GeofenceResponse {
   color: string;
   polygon: GeofenceVertex[];
   alarm: GeofenceAlarmConfig;
+  appliesToAdsb: boolean;
+  appliesToDrones: boolean;
+  appliesToTargets: boolean;
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -58,6 +61,9 @@ export interface GeofenceUpsertPayload {
   alarmLevel: AlarmLevel;
   alarmMessage: string;
   alarmTriggerOnExit?: boolean;
+  appliesToAdsb?: boolean;
+  appliesToDrones?: boolean;
+  appliesToTargets?: boolean;
   createdBy?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -141,6 +147,9 @@ export class GeofencesService {
       alarmLevel: alarmConfig.level as AlarmLevel,
       alarmMessage: alarmConfig.message,
       alarmTriggerOnExit: alarmConfig.triggerOnExit ?? false,
+      appliesToAdsb: dto.appliesToAdsb ?? true,
+      appliesToDrones: dto.appliesToDrones ?? true,
+      appliesToTargets: dto.appliesToTargets ?? true,
       createdBy: createdBy ?? null,
     };
 
@@ -202,6 +211,15 @@ export class GeofencesService {
         data.alarmTriggerOnExit = alarm.triggerOnExit;
       }
     }
+    if (dto.appliesToAdsb !== undefined) {
+      data.appliesToAdsb = dto.appliesToAdsb;
+    }
+    if (dto.appliesToDrones !== undefined) {
+      data.appliesToDrones = dto.appliesToDrones;
+    }
+    if (dto.appliesToTargets !== undefined) {
+      data.appliesToTargets = dto.appliesToTargets;
+    }
 
     const geofence = await this.prisma.geofence.update({
       where: { id },
@@ -262,6 +280,9 @@ export class GeofencesService {
       alarmLevel: payload.alarmLevel,
       alarmMessage: payload.alarmMessage,
       alarmTriggerOnExit: payload.alarmTriggerOnExit ?? false,
+      appliesToAdsb: payload.appliesToAdsb ?? true,
+      appliesToDrones: payload.appliesToDrones ?? true,
+      appliesToTargets: payload.appliesToTargets ?? true,
       createdBy: payload.createdBy ?? null,
       createdAt: payload.createdAt ? new Date(payload.createdAt) : undefined,
       updatedAt: payload.updatedAt ? new Date(payload.updatedAt) : undefined,
@@ -278,6 +299,9 @@ export class GeofencesService {
       alarmLevel: payload.alarmLevel,
       alarmMessage: payload.alarmMessage,
       alarmTriggerOnExit: payload.alarmTriggerOnExit ?? false,
+      appliesToAdsb: payload.appliesToAdsb ?? true,
+      appliesToDrones: payload.appliesToDrones ?? true,
+      appliesToTargets: payload.appliesToTargets ?? true,
       createdBy: payload.createdBy ?? null,
       updatedAt: payload.updatedAt ? new Date(payload.updatedAt) : new Date(),
     };
@@ -367,6 +391,9 @@ export class GeofencesService {
         message: geofence.alarmMessage,
         triggerOnExit: geofence.alarmTriggerOnExit ?? false,
       },
+      appliesToAdsb: geofence.appliesToAdsb,
+      appliesToDrones: geofence.appliesToDrones,
+      appliesToTargets: geofence.appliesToTargets,
       createdBy: geofence.createdBy ?? null,
       createdAt: geofence.createdAt.toISOString(),
       updatedAt: geofence.updatedAt.toISOString(),

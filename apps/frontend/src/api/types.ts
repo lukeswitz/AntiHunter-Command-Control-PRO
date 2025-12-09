@@ -370,6 +370,9 @@ export interface Geofence {
   color: string;
   polygon: GeofenceVertex[];
   alarm: GeofenceAlarmConfig;
+  appliesToAdsb: boolean;
+  appliesToDrones: boolean;
+  appliesToTargets: boolean;
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -383,6 +386,9 @@ export interface CreateGeofenceRequest {
   siteId?: string | null;
   polygon: GeofenceVertex[];
   alarm: GeofenceAlarmConfig;
+  appliesToAdsb?: boolean;
+  appliesToDrones?: boolean;
+  appliesToTargets?: boolean;
 }
 
 export interface UpdateGeofenceRequest {
@@ -392,6 +398,9 @@ export interface UpdateGeofenceRequest {
   siteId?: string | null;
   polygon?: GeofenceVertex[];
   alarm?: Partial<GeofenceAlarmConfig>;
+  appliesToAdsb?: boolean;
+  appliesToDrones?: boolean;
+  appliesToTargets?: boolean;
 }
 
 export interface FaaAircraftSummary {

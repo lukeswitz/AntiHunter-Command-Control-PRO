@@ -219,7 +219,7 @@ export function SocketBridge() {
       if (isGeofenceAlertEvent(payload)) {
         const data = (payload as { data?: { geofenceId?: string } }).data;
         const geofenceId = (payload as { geofenceId?: string }).geofenceId ?? data?.geofenceId;
-        if (geofenceId && useMapPreferences.getState().adsbGeofenceEnabled) {
+        if (geofenceId) {
           useGeofenceStore.getState().setHighlighted(geofenceId, 5000);
         }
       }

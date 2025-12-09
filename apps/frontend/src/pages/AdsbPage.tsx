@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  clearAdsbLog,
   fetchAdsbProxy,
   getAdsbLog,
   getAdsbStatus,
@@ -155,7 +156,14 @@ export function AdsbPage() {
     return Array.from(log.values()).sort((a, b) => (a.lastSeen > b.lastSeen ? -1 : 1));
   }, [log]);
 
-  const handleClearLog = () => setLog(new Map());
+  const handleClearLog = async () => {
+    try {
+      await clearAdsbLog();
+      setLog(new Map());
+    } catch (error) {
+      console.error('Failed to clear ADS-B log:', error);
+    }
+  };
 
   const handleExportLog = () => {
     const header = [
