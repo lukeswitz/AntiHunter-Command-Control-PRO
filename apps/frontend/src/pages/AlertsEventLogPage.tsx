@@ -62,6 +62,18 @@ export function AlertsEventLogPage() {
             </span>
           </NavLink>
           <NavLink
+            to="/alerts/adsb"
+            className={({ isActive }) =>
+              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
+            }
+            end
+          >
+            <span className="config-menu__label">ADS-B &amp; ACARS Alerts</span>
+            <span className="config-menu__description">
+              Rules for aviation tracks and ACARS message activity.
+            </span>
+          </NavLink>
+          <NavLink
             to="/alerts/events"
             className={({ isActive }) =>
               `config-menu__item${isActive ? ' config-menu__item--active' : ''}`

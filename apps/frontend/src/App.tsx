@@ -134,6 +134,7 @@ export default function App() {
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/alerts" element={<Navigate to="/alerts/custom" replace />} />
               <Route path="/alerts/custom" element={<AlertsPage />} />
+              <Route path="/alerts/adsb" element={<AlertsPage />} />
               <Route path="/alerts/events" element={<AlertsEventLogPage />} />
               <Route path="/console" element={<CommandConsolePage />} />
               {chatEnabled ? <Route path="/chat" element={<ChatPage />} /> : null}

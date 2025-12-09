@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { MdDelete, MdRefresh } from 'react-icons/md';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 import {
   createAlertRule,
@@ -94,7 +94,9 @@ const createDefaultFormState = (): AlertRuleFormState => ({
 
 export function AlertsPage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const userRole = useAuthStore((state) => state.user?.role ?? 'VIEWER');
+  const isAdsbAlerts = location.pathname.includes('/alerts/adsb');
 
   const [search, setSearch] = useState('');
   const [formMode, setFormMode] = useState<FormMode>('create');
@@ -283,7 +285,9 @@ export function AlertsPage() {
         <div className="config-rail__title">
           <h2 className="config-rail__heading">Alerts</h2>
           <p className="config-rail__copy">
-            Manage custom alert rules, notification routing, and alert event monitoring.
+            {isAdsbAlerts
+              ? 'Manage ADS-B and ACARS alert rules, notification routing, and monitoring.'
+              : 'Manage custom alert rules, notification routing, and alert event monitoring.'}
           </p>
         </div>
         <nav className="config-menu" aria-label="Alert pages">
@@ -297,6 +301,18 @@ export function AlertsPage() {
             <span className="config-menu__label">DIGI node Alerts</span>
             <span className="config-menu__description">
               Vendor, SSID, channel, and device-based rules.
+            </span>
+          </NavLink>
+          <NavLink
+            to="/alerts/adsb"
+            className={({ isActive }) =>
+              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
+            }
+            end
+          >
+            <span className="config-menu__label">ADS-B &amp; ACARS Alerts</span>
+            <span className="config-menu__description">
+              Rules for aviation tracks and ACARS message activity.
             </span>
           </NavLink>
           <NavLink
@@ -316,8 +332,12 @@ export function AlertsPage() {
       <section className="panel alerts-panel">
         <header className="panel-header alerts-header">
           <div className="alerts-header__intro">
-            <h1>Alert automation</h1>
-            <p>Automatically highlight devices, vendors, SSIDs, and channels that matter.</p>
+            <h1>{isAdsbAlerts ? 'ADS-B & ACARS Alerts' : 'Alert automation'}</h1>
+            <p>
+              {isAdsbAlerts
+                ? 'Create alerts for aviation tracks and ACARS messages that matter to you.'
+                : 'Automatically highlight devices, vendors, SSIDs, and channels that matter.'}
+            </p>
           </div>
           <div className="controls-row alerts-header__controls">
             <label className="alerts-header__search">
