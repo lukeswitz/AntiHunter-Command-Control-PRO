@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AlarmLevel } from '@prisma/client';
+import { AlarmLevel, Prisma, WebhookEventType } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -8,13 +9,17 @@ import readline from 'node:readline';
 import { clearInterval as clearIntervalSafe, setInterval as setIntervalSafe } from 'node:timers';
 import { Subscription } from 'rxjs';
 
-import type { AdsbStatus, AdsbTrack } from './adsb.types';
+import type { AdsbAlertRule, AdsbStatus, AdsbTrack } from './adsb.types';
+import type { AcarsMessage } from '../acars/acars.types';
 import {
   GeofenceEvent,
   GeofenceResponse,
   GeofencesService,
   GeofenceVertex,
 } from '../geofences/geofences.service';
+import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
 function validateFeedUrl(urlString: string): string {
@@ -99,6 +104,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   private readonly aircraftDbPath: string;
   private readonly airportsPath: string;
   private readonly configPath: string;
+  private readonly alertRulesPath: string;
   private openskyEnabled: boolean;
   private openskyClientId?: string;
   private openskyClientSecret?: string;
@@ -142,10 +148,14 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   private aircraftDbCount = 0;
   private airportsByIcao: Map<string, AirportInfo> = new Map();
   private airportsByIata: Map<string, AirportInfo> = new Map();
+  private alertRules: AdsbAlertRule[] = [];
 
   constructor(
     private readonly configService: ConfigService,
     private readonly geofencesService: GeofencesService,
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+    private readonly webhookDispatcher: WebhookDispatcherService,
     private readonly gateway: CommandCenterGateway,
   ) {
     const envEnabled = process.env.ADSB_ENABLED;
@@ -178,6 +188,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     this.aircraftDbPath = join(this.dataDir, 'aircraft-database.csv');
     this.airportsPath = join(this.dataDir, 'airports.dat');
     this.configPath = join(this.dataDir, 'config.json');
+    this.alertRulesPath = join(this.dataDir, 'adsb-alert-rules.json');
     this.openskyCredentialsFile =
       this.configService.get<string>('adsb.openskyCredentialsPath') ??
       join(this.dataDir, 'opensky-credentials.json');
@@ -204,6 +215,16 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     void this.loadAirportsDatabaseFromDisk().catch((error) => {
       this.logger.warn(
         `ADS-B airports database not loaded: ${error instanceof Error ? error.message : error}`,
+      );
+    });
+    void this.loadAlertRulesFromDisk().catch((error) => {
+      this.logger.warn(
+        `ADS-B alert rules not loaded: ${error instanceof Error ? error.message : error}`,
+      );
+    });
+    void this.syncAllAlertRulesToDb().catch((error) => {
+      this.logger.warn(
+        `ADS-B alert rule DB sync skipped: ${error instanceof Error ? error.message : error}`,
       );
     });
     if (this.enabled) {
@@ -269,6 +290,98 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   clearSessionLog(): void {
     this.sessionLog.clear();
     this.logger.log('Cleared ADS-B session log');
+  }
+
+  // Alert rules CRUD
+  async listAlertRules(): Promise<AdsbAlertRule[]> {
+    return this.alertRules;
+  }
+
+  async createAlertRule(
+    payload: Omit<AdsbAlertRule, 'id' | 'createdAt' | 'updatedAt'>,
+  ): Promise<AdsbAlertRule> {
+    const now = new Date().toISOString();
+    const rule: AdsbAlertRule = {
+      ...payload,
+      id: randomUUID(),
+      createdAt: now,
+      updatedAt: now,
+      notifyVisual: payload.notifyVisual ?? true,
+      notifyAudible: payload.notifyAudible ?? false,
+      notifyEmail: payload.notifyEmail ?? false,
+      emailRecipients: payload.emailRecipients ?? [],
+      showOnMap: payload.showOnMap ?? true,
+      mapColor: payload.mapColor ?? null,
+      mapLabel: payload.mapLabel ?? null,
+      blink: payload.blink ?? false,
+      webhookIds: payload.webhookIds ?? [],
+      messageTemplate: payload.messageTemplate ?? null,
+    };
+    rule.alertRuleId = await this.syncAlertRuleToDb(rule).catch((error) => {
+      this.logger.warn(
+        `Failed to sync ADS-B alert rule to DB: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    });
+    this.alertRules.push(rule);
+    await this.saveAlertRulesToDisk();
+    return rule;
+  }
+
+  async updateAlertRule(id: string, patch: Partial<AdsbAlertRule>): Promise<AdsbAlertRule> {
+    const idx = this.alertRules.findIndex((rule) => rule.id === id);
+    if (idx === -1) {
+      throw new Error('Alert rule not found');
+    }
+    const updated: AdsbAlertRule = {
+      ...this.alertRules[idx],
+      ...patch,
+      notifyVisual: patch.notifyVisual ?? this.alertRules[idx].notifyVisual ?? true,
+      notifyAudible: patch.notifyAudible ?? this.alertRules[idx].notifyAudible ?? false,
+      notifyEmail: patch.notifyEmail ?? this.alertRules[idx].notifyEmail ?? false,
+      emailRecipients: patch.emailRecipients ?? this.alertRules[idx].emailRecipients ?? [],
+      showOnMap: patch.showOnMap ?? this.alertRules[idx].showOnMap ?? true,
+      mapColor: patch.mapColor ?? this.alertRules[idx].mapColor ?? null,
+      mapLabel: patch.mapLabel ?? this.alertRules[idx].mapLabel ?? null,
+      blink: patch.blink ?? this.alertRules[idx].blink ?? false,
+      webhookIds: patch.webhookIds ?? this.alertRules[idx].webhookIds ?? [],
+      messageTemplate: patch.messageTemplate ?? this.alertRules[idx].messageTemplate ?? null,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    updated.alertRuleId = await this.syncAlertRuleToDb(updated).catch((error) => {
+      this.logger.warn(
+        `Failed to sync ADS-B alert rule to DB: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return this.alertRules[idx].alertRuleId ?? null;
+    });
+    this.alertRules[idx] = updated;
+    await this.saveAlertRulesToDisk();
+    return updated;
+  }
+
+  async deleteAlertRule(id: string): Promise<{ deleted: boolean }> {
+    const target = this.alertRules.find((rule) => rule.id === id);
+    const before = this.alertRules.length;
+    this.alertRules = this.alertRules.filter((rule) => rule.id !== id);
+    const deleted = this.alertRules.length !== before;
+    if (deleted) {
+      if (target?.alertRuleId) {
+        await this.prisma.alertRule
+          .delete({
+            where: { id: target.alertRuleId },
+          })
+          .catch((error) => {
+            this.logger.warn(
+              `Failed to delete DB alert rule ${target.alertRuleId}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          });
+      }
+      await this.saveAlertRulesToDisk();
+    }
+    return { deleted };
   }
 
   updateConfig(config: {
@@ -657,6 +770,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       this.enrichAirportMetadata(track);
       this.enrichTrack(track);
       nextTracks.set(id, track);
+      this.evaluateAlertRules(track);
 
       if (this.openskyEnabled && (!track.dep || !track.dest)) {
         enrichTasks.push(this.enrichRoute(track));
@@ -1403,5 +1517,432 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       author: photo.photographer ?? null,
       sourceUrl: photo.link ?? null,
     };
+  }
+
+  // ----- Alert rules helpers -----
+  private evaluateAlertRules(track: AdsbTrack): void {
+    const activeRules = this.alertRules.filter((rule) => rule.enabled && rule.target === 'adsb');
+    if (activeRules.length === 0) return;
+    for (const rule of activeRules) {
+      if (this.ruleMatchesTrack(rule, track)) {
+        void this.dispatchAlert(rule, track, 'adsb').catch((error) => {
+          this.logger.warn(
+            `Failed to dispatch ADS-B alert: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+      }
+    }
+  }
+
+  evaluateAlertRulesForAcars(message: AcarsMessage): void {
+    const activeRules = this.alertRules.filter((rule) => rule.enabled && rule.target === 'acars');
+    if (activeRules.length === 0) return;
+    for (const rule of activeRules) {
+      if (this.ruleMatchesAcars(rule, message)) {
+        void this.dispatchAlert(rule, message, 'acars').catch((error) => {
+          this.logger.warn(
+            `Failed to dispatch ACARS alert: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+      }
+    }
+  }
+
+  private ruleMatchesTrack(rule: AdsbAlertRule, track: AdsbTrack): boolean {
+    if (rule.target !== 'adsb') return false;
+    const c = rule.conditions;
+    if (c.callsignContains) {
+      const val = track.callsign?.toLowerCase() ?? '';
+      if (!val.includes(c.callsignContains.toLowerCase())) return false;
+    }
+    if (c.icaoEquals) {
+      if (track.icao.toLowerCase() !== c.icaoEquals.toLowerCase()) return false;
+    }
+    if (c.registrationContains) {
+      const val = track.reg?.toLowerCase() ?? '';
+      if (!val.includes(c.registrationContains.toLowerCase())) return false;
+    }
+    if (c.countryEquals) {
+      if ((track.country ?? '').toLowerCase() !== c.countryEquals.toLowerCase()) return false;
+    }
+    if (c.categoryEquals) {
+      if ((track.category ?? '').toLowerCase() !== c.categoryEquals.toLowerCase()) return false;
+    }
+    if (c.depEquals) {
+      const dep = (track.depIcao ?? track.dep ?? '').toLowerCase();
+      if (dep !== c.depEquals.toLowerCase()) return false;
+    }
+    if (c.destEquals) {
+      const dest = (track.destIcao ?? track.dest ?? '').toLowerCase();
+      if (dest !== c.destEquals.toLowerCase()) return false;
+    }
+    if (typeof c.minAlt === 'number' && track.alt != null && track.alt < c.minAlt) return false;
+    if (typeof c.maxAlt === 'number' && track.alt != null && track.alt > c.maxAlt) return false;
+    if (typeof c.minSpeed === 'number' && track.speed != null && track.speed < c.minSpeed)
+      return false;
+    if (typeof c.maxSpeed === 'number' && track.speed != null && track.speed > c.maxSpeed)
+      return false;
+    return true;
+  }
+
+  private ruleMatchesAcars(rule: AdsbAlertRule, message: AcarsMessage): boolean {
+    if (rule.target !== 'acars') return false;
+    const c = rule.conditions;
+    if (c.tailContains) {
+      const tail = message.tail?.toLowerCase() ?? '';
+      if (!tail.includes(c.tailContains.toLowerCase())) return false;
+    }
+    if (c.flightContains) {
+      const flight = message.flight?.toLowerCase() ?? '';
+      if (!flight.includes(c.flightContains.toLowerCase())) return false;
+    }
+    if (c.labelEquals) {
+      if ((message.label ?? '').toLowerCase() !== c.labelEquals.toLowerCase()) return false;
+    }
+    if (c.textContains) {
+      const text = message.text?.toLowerCase() ?? '';
+      if (!text.includes(c.textContains.toLowerCase())) return false;
+    }
+    if (typeof c.minSignal === 'number' && message.signalLevel != null) {
+      if (message.signalLevel < c.minSignal) return false;
+    }
+    if (typeof c.maxNoise === 'number' && message.noiseLevel != null) {
+      if (message.noiseLevel > c.maxNoise) return false;
+    }
+    if (typeof c.freqEquals === 'number' && message.frequency != null) {
+      if (Math.abs(message.frequency - c.freqEquals) > 0.5) return false;
+    }
+    return true;
+  }
+
+  private async dispatchAlert(
+    rule: AdsbAlertRule,
+    source: AdsbTrack | AcarsMessage,
+    kind: 'adsb' | 'acars',
+  ): Promise<void> {
+    const isTrack = kind === 'adsb';
+    const track = isTrack ? (source as AdsbTrack) : null;
+    const acars = !isTrack ? (source as AcarsMessage) : null;
+    const lat = track?.lat ?? acars?.lat ?? undefined;
+    const lon = track?.lon ?? acars?.lon ?? undefined;
+    const callsign = track?.callsign ?? acars?.flight ?? null;
+    const icao = track?.icao ?? acars?.correlatedIcao ?? null;
+    const reg = track?.reg ?? acars?.tail ?? null;
+    const dep = track?.dep ?? null;
+    const dest = track?.dest ?? null;
+    const speed = track?.speed ?? null;
+    const alt = track?.alt ?? null;
+    const label = acars?.label ?? null;
+    const freq = acars?.frequency ?? null;
+    const signal = acars?.signalLevel ?? null;
+    const noise = acars?.noiseLevel ?? null;
+
+    const message = this.renderAlertMessage(rule, {
+      callsign,
+      icao,
+      reg,
+      dep,
+      dest,
+      speed,
+      alt,
+      label,
+    });
+
+    const mapStyle = {
+      showOnMap: rule.showOnMap ?? true,
+      color: rule.mapColor ?? null,
+      label: rule.mapLabel ?? null,
+      blink: rule.blink ?? false,
+    };
+
+    const alertId = randomUUID();
+    this.gateway.emitEvent(
+      {
+        type: 'event.alert',
+        category: `${kind}-alert`,
+        level: rule.severity,
+        id: alertId,
+        message,
+        siteId: this.localSiteId,
+        lat,
+        lon,
+        data: {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          siteId: this.localSiteId,
+          icao,
+          callsign,
+          reg,
+          dep,
+          dest,
+          speed,
+          alt,
+          label,
+          freq,
+          signal,
+          noise,
+          mapStyle,
+        },
+        mapStyle,
+      },
+      { skipBus: false },
+    );
+
+    if (rule.webhookIds && rule.webhookIds.length > 0) {
+      await this.webhookDispatcher.dispatchAlert(
+        rule.webhookIds.map((webhookId) => ({ webhookId }) as never),
+        {
+          eventType: WebhookEventType.ALERT_TRIGGERED,
+          event: 'alert.triggered',
+          ruleId: rule.id,
+          ruleName: rule.name,
+          severity: rule.severity,
+          message,
+          lat: lat ?? null,
+          lon: lon ?? null,
+          payload: {
+            callsign,
+            icao,
+            reg,
+            dep,
+            dest,
+            speed,
+            alt,
+            label,
+            freq,
+            signal,
+            noise,
+            kind,
+          },
+          timestamp: new Date(),
+        },
+      );
+    }
+
+    if (rule.notifyEmail && rule.emailRecipients && rule.emailRecipients.length > 0) {
+      const bodyLines = [
+        message,
+        `ICAO: ${icao ?? 'N/A'}`,
+        `Callsign: ${callsign ?? 'N/A'}`,
+        `Reg/Tail: ${reg ?? 'N/A'}`,
+        dep ? `Departure: ${dep}` : null,
+        dest ? `Destination: ${dest}` : null,
+        speed != null ? `Speed: ${speed} kt` : null,
+        alt != null ? `Altitude: ${alt} ft` : null,
+        label ? `Label: ${label}` : null,
+        freq != null ? `Freq: ${freq}` : null,
+        signal != null ? `Signal: ${signal}` : null,
+        noise != null ? `Noise: ${noise}` : null,
+      ].filter(Boolean);
+      const body = bodyLines.join('\n');
+      await Promise.all(
+        rule.emailRecipients.map((recipient) =>
+          this.mailService
+            .sendMail({
+              to: recipient,
+              subject: `[AHCC] ${kind.toUpperCase()} alert: ${rule.name}`,
+              text: body,
+            })
+            .catch((error) => {
+              this.logger.warn(
+                `Failed sending alert email to ${recipient}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }),
+        ),
+      );
+    }
+
+    await this.logAlertEvent(rule, {
+      message,
+      lat,
+      lon,
+      payload: {
+        callsign,
+        icao,
+        reg,
+        dep,
+        dest,
+        speed,
+        alt,
+        label,
+        freq,
+        signal,
+        noise,
+        kind,
+        mapStyle,
+      },
+    });
+  }
+
+  private renderAlertMessage(
+    rule: AdsbAlertRule,
+    ctx: {
+      callsign?: string | null;
+      icao?: string | null;
+      reg?: string | null;
+      dep?: string | null;
+      dest?: string | null;
+      speed?: number | null;
+      alt?: number | null;
+      label?: string | null;
+    },
+  ): string {
+    const template =
+      rule.messageTemplate?.trim() ||
+      `Alert "${rule.name}" matched ${ctx.callsign ?? ctx.icao ?? ctx.reg ?? 'target'}`;
+    const replacements: Record<string, string> = {
+      callsign: ctx.callsign ?? '',
+      icao: ctx.icao ?? '',
+      reg: ctx.reg ?? '',
+      dep: ctx.dep ?? '',
+      dest: ctx.dest ?? '',
+      speed: ctx.speed != null ? ctx.speed.toString() : '',
+      alt: ctx.alt != null ? ctx.alt.toString() : '',
+      label: ctx.label ?? '',
+      rule: rule.name,
+    };
+    return template.replace(/\{(callsign|icao|reg|dep|dest|speed|alt|label|rule)\}/g, (_, key) => {
+      return replacements[key as keyof typeof replacements] ?? '';
+    });
+  }
+
+  private async logAlertEvent(
+    rule: AdsbAlertRule,
+    params: {
+      message: string;
+      lat?: number | null;
+      lon?: number | null;
+      payload: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    if (!rule.alertRuleId) return;
+    try {
+      await this.prisma.alertEvent.create({
+        data: {
+          ruleId: rule.alertRuleId,
+          message: params.message,
+          payload: params.payload as Prisma.InputJsonValue,
+          triggeredAt: new Date(),
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to log ADS-B/ACARS alert event: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async syncAlertRuleToDb(rule: AdsbAlertRule): Promise<string | null> {
+    try {
+      const mapStyle =
+        rule.showOnMap !== undefined || rule.mapColor || rule.mapLabel || rule.blink
+          ? {
+              showOnMap: rule.showOnMap ?? true,
+              color: rule.mapColor ?? null,
+              icon: null,
+              blink: rule.blink ?? false,
+              label: rule.mapLabel ?? null,
+            }
+          : null;
+
+      const result = await this.prisma.alertRule.upsert({
+        where: { id: rule.alertRuleId ?? rule.id },
+        create: {
+          id: rule.alertRuleId ?? rule.id,
+          name: rule.name,
+          description: rule.description ?? null,
+          scope: 'GLOBAL',
+          severity: rule.severity,
+          matchMode: 'ANY',
+          isActive: rule.enabled,
+          ouiPrefixes: [],
+          ssids: [],
+          channels: [],
+          macAddresses: [],
+          inventoryMacs: [],
+          minRssi: null,
+          maxRssi: null,
+          notifyAudible: rule.notifyAudible ?? false,
+          notifyVisual: rule.notifyVisual ?? true,
+          notifyEmail: rule.notifyEmail ?? false,
+          emailRecipients: rule.emailRecipients ?? [],
+          messageTemplate: rule.messageTemplate ?? null,
+          mapStyle: mapStyle ? (mapStyle as Prisma.InputJsonValue) : Prisma.JsonNull,
+          webhooks: rule.webhookIds?.length
+            ? {
+                create: rule.webhookIds.map((webhookId) => ({
+                  webhook: { connect: { id: webhookId } },
+                })),
+              }
+            : undefined,
+        },
+        update: {
+          name: rule.name,
+          description: rule.description ?? null,
+          severity: rule.severity,
+          isActive: rule.enabled,
+          notifyAudible: rule.notifyAudible ?? false,
+          notifyVisual: rule.notifyVisual ?? true,
+          notifyEmail: rule.notifyEmail ?? false,
+          emailRecipients: rule.emailRecipients ?? [],
+          messageTemplate: rule.messageTemplate ?? null,
+          mapStyle: mapStyle ? (mapStyle as Prisma.InputJsonValue) : Prisma.JsonNull,
+          webhooks: {
+            deleteMany: {},
+            ...(rule.webhookIds?.length
+              ? {
+                  create: rule.webhookIds.map((webhookId) => ({
+                    webhook: { connect: { id: webhookId } },
+                  })),
+                }
+              : {}),
+          },
+        },
+      });
+      return result.id;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to upsert ADS-B alert rule into DB: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  private async loadAlertRulesFromDisk(): Promise<void> {
+    try {
+      if (!existsSync(this.alertRulesPath)) {
+        this.alertRules = [];
+        return;
+      }
+      const raw = await readFile(this.alertRulesPath, 'utf8');
+      const parsed = JSON.parse(raw) as AdsbAlertRule[];
+      this.alertRules = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      this.alertRules = [];
+      this.logger.warn(
+        `Failed to load ADS-B alert rules: ${error instanceof Error ? error.message : error}`,
+      );
+    }
+  }
+
+  private async saveAlertRulesToDisk(): Promise<void> {
+    await mkdir(this.dataDir, { recursive: true });
+    await writeFile(this.alertRulesPath, JSON.stringify(this.alertRules, null, 2), 'utf8');
+  }
+
+  private async syncAllAlertRulesToDb(): Promise<void> {
+    const updatedRules: AdsbAlertRule[] = [];
+    for (const rule of this.alertRules) {
+      const alertRuleId = await this.syncAlertRuleToDb(rule);
+      updatedRules.push({ ...rule, alertRuleId });
+    }
+    this.alertRules = updatedRules;
+    await this.saveAlertRulesToDisk();
   }
 }

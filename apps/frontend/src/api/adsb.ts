@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { AdsbStatus, AdsbTrack } from './types';
+import type { AdsbAlertRule, AdsbStatus, AdsbTrack } from './types';
 
 export interface Dump1090Aircraft {
   hex?: string;
@@ -68,6 +68,23 @@ export function fetchAdsbProxy() {
 export async function getAdsbTracksViaProxy(): Promise<AdsbTrack[]> {
   const payload = await fetchAdsbProxy();
   return normalizeDump1090Response(payload);
+}
+
+// ADS-B alert rules (ADS-B & ACARS alerts)
+export function listAdsbAlertRules() {
+  return apiClient.get<AdsbAlertRule[]>('/adsb/alerts/rules');
+}
+
+export function createAdsbAlertRule(body: Omit<AdsbAlertRule, 'id' | 'createdAt' | 'updatedAt'>) {
+  return apiClient.post<AdsbAlertRule>('/adsb/alerts/rules', body);
+}
+
+export function updateAdsbAlertRule(id: string, body: Partial<AdsbAlertRule>) {
+  return apiClient.put<AdsbAlertRule>(`/adsb/alerts/rules/${id}`, body);
+}
+
+export function deleteAdsbAlertRule(id: string) {
+  return apiClient.delete<{ deleted: boolean }>(`/adsb/alerts/rules/${id}`);
 }
 
 export function normalizeDump1090Response(payload: Dump1090AircraftResponse): AdsbTrack[] {

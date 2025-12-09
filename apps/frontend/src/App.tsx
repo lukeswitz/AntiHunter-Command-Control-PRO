@@ -18,6 +18,7 @@ import {
 import { resolveThemePalette, type ThemePalette, type ThemePresetId } from './constants/theme';
 import { AcarsPage } from './pages/AcarsPage';
 import { AddonPage } from './pages/AddonPage';
+import { AdsbAlertsPage } from './pages/AdsbAlertsPage';
 import { AdsbPage } from './pages/AdsbPage';
 import { AlertsEventLogPage } from './pages/AlertsEventLogPage';
 import { AlertsPage } from './pages/AlertsPage';
@@ -134,7 +135,7 @@ export default function App() {
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/alerts" element={<Navigate to="/alerts/custom" replace />} />
               <Route path="/alerts/custom" element={<AlertsPage />} />
-              <Route path="/alerts/adsb" element={<AlertsPage />} />
+              <Route path="/alerts/adsb" element={<AdsbAlertsPage />} />
               <Route path="/alerts/events" element={<AlertsEventLogPage />} />
               <Route path="/console" element={<CommandConsolePage />} />
               {chatEnabled ? <Route path="/chat" element={<ChatPage />} /> : null}

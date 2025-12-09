@@ -302,6 +302,7 @@ export class AcarsService implements OnModuleInit, OnModuleDestroy {
       };
 
       this.messages.set(id, acarsMessage);
+      this.adsbService.evaluateAlertRulesForAcars(acarsMessage);
     }
   }
 

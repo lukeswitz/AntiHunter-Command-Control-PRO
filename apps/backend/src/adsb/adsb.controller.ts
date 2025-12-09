@@ -7,10 +7,13 @@ import {
   Post,
   UploadedFile,
   UseInterceptors,
+  Param,
+  Put,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { AdsbService } from './adsb.service';
+import type { AdsbAlertRule } from './adsb.types';
 
 @Controller('adsb')
 export class AdsbController {
@@ -95,5 +98,28 @@ export class AdsbController {
         error instanceof Error ? error.message : 'Invalid credentials file',
       );
     }
+  }
+
+  @Get('alerts/rules')
+  async listAlertRules(): Promise<AdsbAlertRule[]> {
+    return this.adsbService.listAlertRules();
+  }
+
+  @Post('alerts/rules')
+  async createAlertRule(@Body() body: Omit<AdsbAlertRule, 'id' | 'createdAt' | 'updatedAt'>) {
+    return this.adsbService.createAlertRule(body);
+  }
+
+  @Put('alerts/rules/:id')
+  async updateAlertRule(
+    @Body() body: Partial<AdsbAlertRule>,
+    @Param('id') id: string,
+  ): Promise<AdsbAlertRule> {
+    return this.adsbService.updateAlertRule(id, body);
+  }
+
+  @Delete('alerts/rules/:id')
+  async deleteAlertRule(@Param('id') id: string) {
+    return this.adsbService.deleteAlertRule(id);
   }
 }

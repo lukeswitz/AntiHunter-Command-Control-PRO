@@ -1,3 +1,5 @@
+import type { AlarmLevel } from '@prisma/client';
+
 export interface AdsbTrack {
   id: string;
   icao: string;
@@ -39,6 +41,53 @@ export interface AdsbTrack {
   photoThumbUrl?: string | null;
   photoAuthor?: string | null;
   photoSourceUrl?: string | null;
+}
+
+export type AdsbAlertTarget = 'adsb' | 'acars';
+
+export interface AdsbAlertConditions {
+  callsignContains?: string | null;
+  icaoEquals?: string | null;
+  registrationContains?: string | null;
+  countryEquals?: string | null;
+  categoryEquals?: string | null;
+  depEquals?: string | null;
+  destEquals?: string | null;
+  minAlt?: number | null;
+  maxAlt?: number | null;
+  minSpeed?: number | null;
+  maxSpeed?: number | null;
+  // ACARS
+  tailContains?: string | null;
+  flightContains?: string | null;
+  labelEquals?: string | null;
+  textContains?: string | null;
+  minSignal?: number | null;
+  maxNoise?: number | null;
+  freqEquals?: number | null;
+}
+
+export interface AdsbAlertRule {
+  id: string;
+  name: string;
+  description?: string | null;
+  enabled: boolean;
+  severity: AlarmLevel;
+  target: AdsbAlertTarget;
+  conditions: AdsbAlertConditions;
+  alertRuleId?: string | null;
+  notifyVisual?: boolean;
+  notifyAudible?: boolean;
+  notifyEmail?: boolean;
+  emailRecipients?: string[] | null;
+  showOnMap?: boolean;
+  mapColor?: string | null;
+  mapLabel?: string | null;
+  blink?: boolean;
+  webhookIds?: string[] | null;
+  messageTemplate?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AdsbStatus {

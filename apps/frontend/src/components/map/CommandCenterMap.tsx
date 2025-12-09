@@ -1,4 +1,4 @@
-﻿import classNames from 'clsx';
+import classNames from 'clsx';
 import type { LatLngExpression, LatLngTuple, Map as LeafletMap, TileLayerOptions } from 'leaflet';
 import { DivIcon, divIcon } from 'leaflet';
 import * as L from 'leaflet';
@@ -1152,8 +1152,14 @@ export function CommandCenterMap({
                         <img
                           src={displaySrc}
                           alt="Aircraft"
-                          width={140}
-                          style={{ borderRadius: 4, objectFit: 'cover' }}
+                          style={{
+                            borderRadius: 4,
+                            objectFit: 'cover',
+                            maxWidth: 'min(220px, 45vw)',
+                            maxHeight: '140px',
+                            width: '100%',
+                            height: 'auto',
+                          }}
                           loading="lazy"
                           referrerPolicy="no-referrer"
                           onError={(event) => {
@@ -1167,7 +1173,7 @@ export function CommandCenterMap({
                           }}
                         />
                         {track.photoAuthor ? (
-                          <div className="muted">© {track.photoAuthor}</div>
+                          <div className="muted">(c) {track.photoAuthor}</div>
                         ) : null}
                       </div>
                     );
