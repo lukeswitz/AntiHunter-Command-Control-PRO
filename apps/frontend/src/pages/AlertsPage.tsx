@@ -294,7 +294,7 @@ export function AlertsPage() {
             }
             end
           >
-            <span className="config-menu__label">Custom alerts</span>
+            <span className="config-menu__label">DIGI node Alerts</span>
             <span className="config-menu__description">
               Vendor, SSID, channel, and device-based rules.
             </span>
