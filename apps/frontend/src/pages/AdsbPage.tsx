@@ -64,6 +64,18 @@ export function AdsbPage() {
   const [log, setLog] = useState<Map<string, LogEntry>>(new Map());
   const adsbMuted = useMapPreferences((state) => state.adsbMuted);
   const toggleAdsbMuted = useMapPreferences((state) => state.toggleAdsbMuted);
+  const openskyLastError = adsbStatus?.openskyStatus?.lastError ?? null;
+  const openskyCooldownUntil = adsbStatus?.openskyStatus?.cooldownUntil ?? null;
+  const openskyErrorMessage = useMemo(() => {
+    if (!openskyLastError) return null;
+    const cooldownText = openskyCooldownUntil
+      ? ` Automatic backoff until ${new Date(openskyCooldownUntil).toLocaleString()}.`
+      : '';
+    if (openskyLastError.includes('429')) {
+      return `OpenSky rate limited (too many requests).${cooldownText || ' Cooling down; will retry soon.'}`;
+    }
+    return `OpenSky error: ${openskyLastError}`;
+  }, [openskyLastError, openskyCooldownUntil]);
 
   const adsbStatusQuery = useQuery({
     queryKey: ['adsb', 'status'],
@@ -398,10 +410,8 @@ export function AdsbPage() {
                           {new Date(adsbStatus.openskyStatus.lastSuccessAt).toLocaleString()}
                         </div>
                       ) : null}
-                      {adsbStatus?.openskyStatus?.lastError ? (
-                        <div className="form-error">
-                          OpenSky error: {adsbStatus.openskyStatus.lastError}
-                        </div>
+                      {openskyErrorMessage ? (
+                        <div className="form-error">{openskyErrorMessage}</div>
                       ) : null}
                       {adsbStatus?.openskyStatus?.cooldownUntil ? (
                         <div className="form-hint">
