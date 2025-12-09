@@ -33,4 +33,6 @@ export interface AdsbStatus {
   lastError?: string | null;
   trackCount: number;
   aircraftDbCount?: number;
+  openskyEnabled?: boolean;
+  openskyClientId?: string | null;
 }

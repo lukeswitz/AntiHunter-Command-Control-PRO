@@ -73,6 +73,7 @@ interface Dump1090Aircraft {
 @Injectable()
 export class AdsbService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AdsbService.name);
+  private readonly hardDisabled: boolean;
   private enabled: boolean;
   private feedUrl: string;
   private intervalMs: number;
@@ -89,6 +90,15 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   private readonly dataDir: string;
   private readonly aircraftDbPath: string;
   private readonly configPath: string;
+  private openskyEnabled: boolean;
+  private openskyClientId?: string;
+  private openskyClientSecret?: string;
+  private readonly routeCache: Map<
+    string,
+    { dep: string | null; dest: string | null; ts: number }
+  > = new Map();
+  private static readonly ROUTE_CACHE_TTL_MS = 10 * 60 * 1000;
+  private readonly openskyCredentialsFile: string;
   private aircraftDb: Map<string, AircraftDbEntry> = new Map();
   private aircraftDbCount = 0;
 
@@ -97,18 +107,35 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     private readonly geofencesService: GeofencesService,
     private readonly gateway: CommandCenterGateway,
   ) {
-    this.enabled = this.configService.get<boolean>('adsb.enabled', false) ?? false;
+    const envEnabled = process.env.ADSB_ENABLED;
+    this.hardDisabled = envEnabled === 'false';
+    const cfgToggle = this.configService.get<boolean>('adsb.enabled');
+    const resolved = envEnabled !== undefined ? envEnabled === 'true' : cfgToggle;
+    this.enabled = this.hardDisabled ? false : (resolved ?? true);
     this.feedUrl =
       this.configService.get<string>('adsb.feedUrl', 'http://127.0.0.1:8080/data/aircraft.json') ??
       'http://127.0.0.1:8080/data/aircraft.json';
     this.intervalMs = this.configService.get<number>('adsb.pollIntervalMs', 15000) ?? 15000;
     this.geofencesEnabled =
       this.configService.get<boolean>('adsb.geofencesEnabled', false) ?? false;
+    this.openskyEnabled = this.configService.get<boolean>('adsb.openskyEnabled', false) ?? false;
+    this.openskyClientId = this.configService.get<string>('adsb.openskyClientId');
+    this.openskyClientSecret = this.configService.get<string>('adsb.openskyClientSecret');
     this.localSiteId = this.configService.get<string>('site.id', 'default');
     const baseDir = join(__dirname, '..', '..');
     this.dataDir = join(baseDir, 'data', 'adsb');
     this.aircraftDbPath = join(this.dataDir, 'aircraft-database.csv');
     this.configPath = join(this.dataDir, 'config.json');
+    this.openskyCredentialsFile =
+      this.configService.get<string>('adsb.openskyCredentialsPath') ??
+      join(this.dataDir, 'opensky-credentials.json');
+    this.loadOpenskyCredentialsFromFile().catch((error) => {
+      this.logger.debug(
+        `OpenSky credential file load skipped: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    });
   }
 
   async onModuleInit(): Promise<void> {
@@ -142,6 +169,8 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       lastError: this.lastError,
       trackCount: this.tracks.size,
       aircraftDbCount: this.aircraftDbCount,
+      openskyEnabled: this.openskyEnabled,
+      openskyClientId: this.openskyClientId ?? null,
     };
   }
 
@@ -167,8 +196,13 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     feedUrl?: string;
     intervalMs?: number;
     geofencesEnabled?: boolean;
+    openskyEnabled?: boolean;
+    openskyClientId?: string | null;
+    openskyClientSecret?: string | null;
   }): AdsbStatus {
-    if (config.enabled !== undefined) {
+    if (this.hardDisabled) {
+      this.enabled = false;
+    } else if (config.enabled !== undefined) {
       this.enabled = Boolean(config.enabled);
     }
     if (config.feedUrl !== undefined) {
@@ -186,6 +220,17 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       } else {
         void this.refreshGeofences();
       }
+    }
+    if (config.openskyEnabled !== undefined) {
+      this.openskyEnabled = Boolean(config.openskyEnabled);
+    }
+    if (config.openskyClientId !== undefined) {
+      const trimmed = config.openskyClientId?.trim() || null;
+      this.openskyClientId = trimmed || undefined;
+    }
+    if (config.openskyClientSecret !== undefined) {
+      const trimmed = config.openskyClientSecret?.trim() || null;
+      this.openskyClientSecret = trimmed || undefined;
     }
 
     this.stopPolling();
@@ -219,6 +264,24 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       );
       throw error;
     }
+  }
+
+  async saveOpenskyCredentials(fileName: string, content: Buffer): Promise<{ saved: boolean }> {
+    await mkdir(this.dataDir, { recursive: true });
+    const targetPath = this.openskyCredentialsFile;
+    const parsed = JSON.parse(content.toString('utf8')) as {
+      clientId?: string;
+      clientSecret?: string;
+    };
+    if (!parsed.clientId || !parsed.clientSecret) {
+      throw new Error('Credentials JSON must include clientId and clientSecret');
+    }
+    await writeFile(targetPath, JSON.stringify(parsed, null, 2), 'utf8');
+    this.openskyClientId = parsed.clientId.trim();
+    this.openskyClientSecret = parsed.clientSecret.trim();
+    await this.persistConfig();
+    this.logger.log(`Saved OpenSky credentials to ${targetPath}`);
+    return { saved: true };
   }
 
   private async loadAircraftDatabaseFromDisk(path = this.aircraftDbPath): Promise<void> {
@@ -273,9 +336,12 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         feedUrl: string;
         intervalMs: number;
         geofencesEnabled: boolean;
+        openskyEnabled: boolean;
+        openskyClientId?: string | null;
+        openskyClientSecret?: string | null;
       }>;
       if (typeof parsed.enabled === 'boolean') {
-        this.enabled = parsed.enabled;
+        this.enabled = this.hardDisabled ? false : parsed.enabled;
       }
       if (typeof parsed.feedUrl === 'string' && parsed.feedUrl.trim()) {
         this.feedUrl = parsed.feedUrl.trim();
@@ -285,6 +351,15 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       }
       if (typeof parsed.geofencesEnabled === 'boolean') {
         this.geofencesEnabled = parsed.geofencesEnabled;
+      }
+      if (typeof parsed.openskyEnabled === 'boolean') {
+        this.openskyEnabled = this.hardDisabled ? false : parsed.openskyEnabled;
+      }
+      if (typeof parsed.openskyClientId === 'string') {
+        this.openskyClientId = parsed.openskyClientId.trim() || undefined;
+      }
+      if (typeof parsed.openskyClientSecret === 'string') {
+        this.openskyClientSecret = parsed.openskyClientSecret.trim() || undefined;
       }
     } catch (error) {
       this.logger.warn(
@@ -301,6 +376,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         feedUrl: this.feedUrl,
         intervalMs: this.intervalMs,
         geofencesEnabled: this.geofencesEnabled,
+        openskyEnabled: this.openskyEnabled,
+        openskyClientId: this.openskyClientId ?? null,
+        openskyClientSecret: this.openskyClientSecret ?? null,
       };
       await writeFile(this.configPath, JSON.stringify(payload, null, 2), 'utf8');
     } catch (error) {
@@ -348,12 +426,12 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   private startPolling(): void {
     this.timer = setIntervalSafe(() => {
       void this.poll().catch((error) => {
-        this.lastError = error instanceof Error ? error.message : String(error);
+        this.lastError = this.normalizeError(error);
         this.logger.warn(`ADSB poll failed: ${this.lastError}`);
       });
     }, this.intervalMs);
     void this.poll().catch((error) => {
-      this.lastError = error instanceof Error ? error.message : String(error);
+      this.lastError = this.normalizeError(error);
       this.logger.warn(`ADSB initial poll failed: ${this.lastError}`);
     });
   }
@@ -366,6 +444,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async poll(): Promise<void> {
+    if (!this.enabled) {
+      return; // ignore scheduled polls when ADS-B is disabled
+    }
     if (!this.feedUrl) {
       throw new Error('No ADSB feed URL configured');
     }
@@ -385,6 +466,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     const payload = (await response.json()) as { aircraft?: Dump1090Aircraft[] };
     const aircraft = Array.isArray(payload.aircraft) ? payload.aircraft : [];
     const nextTracks: Map<string, AdsbTrack> = new Map();
+    const enrichTasks: Promise<void>[] = [];
 
     aircraft.forEach((entry) => {
       if (typeof entry.lat !== 'number' || typeof entry.lon !== 'number') {
@@ -399,6 +481,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       const callsign = (entry.flight ?? '').trim() || null;
       const alt = entry.alt_geom ?? entry.alt_baro ?? null;
       const now = new Date(Date.now() - (entry.seen ?? 0) * 1000).toISOString();
+      const { dep, dest } = this.extractRoute(entry, existing);
       const track: AdsbTrack = {
         id,
         icao: hex,
@@ -424,8 +507,8 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
           typeof entry.category === 'string'
             ? entry.category.trim() || null
             : (existing?.category ?? null),
-        dep: typeof entry.dep === 'string' ? entry.dep.trim() || null : (existing?.dep ?? null),
-        dest: typeof entry.dest === 'string' ? entry.dest.trim() || null : (existing?.dest ?? null),
+        dep,
+        dest,
         country:
           typeof entry.cntry === 'string' && entry.cntry.trim()
             ? entry.cntry.trim()
@@ -437,6 +520,10 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       };
       this.enrichTrack(track);
       nextTracks.set(id, track);
+
+      if (this.openskyEnabled && (!track.dep || !track.dest)) {
+        enrichTasks.push(this.enrichRoute(track));
+      }
     });
 
     // Update current active tracks (for map)
@@ -454,6 +541,10 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       { type: 'adsb.tracks', tracks: Array.from(nextTracks.values()) },
       { skipBus: true },
     );
+
+    if (enrichTasks.length > 0) {
+      await Promise.allSettled(enrichTasks);
+    }
   }
 
   private async refreshGeofences(): Promise<void> {
@@ -622,5 +713,187 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       .replace(/\{node\}/gi, context.entity)
       .replace(/\{type\}/gi, context.type)
       .replace(/\{event\}/gi, context.event);
+  }
+
+  private normalizeError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/fetch failed/i.test(message)) {
+      return 'Failed to fetch feed';
+    }
+    return message;
+  }
+
+  private async loadOpenskyCredentialsFromFile(): Promise<void> {
+    if (this.openskyClientId && this.openskyClientSecret) {
+      return;
+    }
+    const candidates = [this.openskyCredentialsFile, join(process.cwd(), 'credentials.json')];
+    try {
+      for (const path of candidates) {
+        if (!path || !existsSync(path)) {
+          continue;
+        }
+        const raw = await readFile(path, 'utf8');
+        const parsed = JSON.parse(raw) as {
+          clientId?: string;
+          clientSecret?: string;
+        };
+        if (!this.openskyClientId && parsed.clientId) {
+          this.openskyClientId = parsed.clientId.trim();
+        }
+        if (!this.openskyClientSecret && parsed.clientSecret) {
+          this.openskyClientSecret = parsed.clientSecret.trim();
+        }
+        if (this.openskyClientId || this.openskyClientSecret) {
+          return;
+        }
+      }
+    } catch (error) {
+      throw error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  private async enrichRoute(track: AdsbTrack): Promise<void> {
+    try {
+      if (!this.openskyEnabled || !this.openskyClientId || !this.openskyClientSecret) {
+        return;
+      }
+
+      const cached = this.routeCache.get(track.icao);
+      const now = Date.now();
+      if (cached && now - cached.ts < AdsbService.ROUTE_CACHE_TTL_MS) {
+        if (cached.dep && !track.dep) track.dep = cached.dep;
+        if (cached.dest && !track.dest) track.dest = cached.dest;
+        this.syncTrackRoute(track);
+        return;
+      }
+
+      const route = await this.fetchOpenSkyRoute(track.icao);
+      if (!route) {
+        return;
+      }
+
+      this.routeCache.set(track.icao, { dep: route.dep, dest: route.dest, ts: now });
+      if (route.dep && !track.dep) {
+        track.dep = route.dep;
+      }
+      if (route.dest && !track.dest) {
+        track.dest = route.dest;
+      }
+      this.syncTrackRoute(track);
+    } catch (error) {
+      this.logger.debug(
+        `OpenSky enrichment failed for ${track.icao}: ${error instanceof Error ? error.message : error}`,
+      );
+    }
+  }
+
+  private syncTrackRoute(track: AdsbTrack): void {
+    const current = this.tracks.get(track.id);
+    if (current) {
+      current.dep = track.dep ?? current.dep ?? null;
+      current.dest = track.dest ?? current.dest ?? null;
+    }
+    const log = this.sessionLog.get(track.id);
+    if (log) {
+      log.dep = track.dep ?? log.dep ?? null;
+      log.dest = track.dest ?? log.dest ?? null;
+      this.sessionLog.set(track.id, log);
+    }
+  }
+
+  private async fetchOpenSkyRoute(
+    icao: string,
+  ): Promise<{ dep: string | null; dest: string | null } | null> {
+    const end = Math.floor(Date.now() / 1000);
+    const begin = end - 6 * 3600;
+    const url = `https://opensky-network.org/api/flights/aircraft?icao24=${icao.toLowerCase()}&begin=${begin}&end=${end}`;
+
+    const auth = Buffer.from(`${this.openskyClientId}:${this.openskyClientSecret}`).toString(
+      'base64',
+    );
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${auth}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenSky ${response.status} ${response.statusText}`);
+    }
+
+    const flights = (await response.json()) as Array<{
+      estDepartureAirport?: string | null;
+      estArrivalAirport?: string | null;
+    }>;
+    if (!Array.isArray(flights) || flights.length === 0) {
+      return null;
+    }
+
+    const latest = flights[flights.length - 1];
+    const dep = typeof latest.estDepartureAirport === 'string' ? latest.estDepartureAirport : null;
+    const dest = typeof latest.estArrivalAirport === 'string' ? latest.estArrivalAirport : null;
+    if (!dep && !dest) {
+      return null;
+    }
+    return { dep: dep ?? null, dest: dest ?? null };
+  }
+
+  private extractRoute(
+    entry: Dump1090Aircraft,
+    existing?: AdsbTrack,
+  ): { dep: string | null; dest: string | null } {
+    const candidates = [
+      typeof entry.dep === 'string' ? entry.dep.trim() : null,
+      typeof entry.dest === 'string' ? entry.dest.trim() : null,
+    ];
+
+    const departure =
+      candidates[0] && candidates[0].length > 0 ? candidates[0] : (existing?.dep ?? null);
+    const destination =
+      candidates[1] && candidates[1].length > 0 ? candidates[1] : (existing?.dest ?? null);
+
+    if (departure && destination) {
+      return { dep: departure, dest: destination };
+    }
+
+    const estDep =
+      typeof (entry as Record<string, unknown>).estDepartureAirport === 'string'
+        ? ((entry as Record<string, unknown>).estDepartureAirport as string).trim()
+        : null;
+    const estArr =
+      typeof (entry as Record<string, unknown>).estArrivalAirport === 'string'
+        ? ((entry as Record<string, unknown>).estArrivalAirport as string).trim()
+        : null;
+
+    const fromField =
+      typeof (entry as Record<string, unknown>).from === 'string'
+        ? ((entry as Record<string, unknown>).from as string).trim()
+        : null;
+    const toField =
+      typeof (entry as Record<string, unknown>).to === 'string'
+        ? ((entry as Record<string, unknown>).to as string).trim()
+        : null;
+
+    const route = typeof entry.r === 'string' ? entry.r.trim() : null;
+    let routeDep: string | null = null;
+    let routeDest: string | null = null;
+    if (route && route.length >= 6) {
+      if (route.includes(' ') || route.includes('-') || route.includes('/')) {
+        const parts = route.split(/[\s/-]+/).filter((p) => p.length > 0);
+        if (parts.length >= 2) {
+          routeDep = parts[0];
+          routeDest = parts[1];
+        }
+      } else if (route.length === 6) {
+        routeDep = route.slice(0, 3);
+        routeDest = route.slice(3, 6);
+      }
+    }
+
+    return {
+      dep: departure ?? fromField ?? estDep ?? routeDep ?? existing?.dep ?? null,
+      dest: destination ?? toField ?? estArr ?? routeDest ?? existing?.dest ?? null,
+    };
   }
 }

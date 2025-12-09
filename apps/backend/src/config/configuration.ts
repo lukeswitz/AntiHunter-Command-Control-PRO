@@ -167,10 +167,15 @@ export default () => ({
     recordInventory: process.env.DRONES_RECORD_INVENTORY === 'true',
   },
   adsb: {
-    enabled: process.env.ADSB_ENABLED === 'true',
+    enabled: process.env.ADSB_ENABLED !== undefined ? process.env.ADSB_ENABLED === 'true' : true,
     feedUrl: process.env.ADSB_FEED_URL ?? 'http://127.0.0.1:8080/data/aircraft.json',
     pollIntervalMs: parseNumberEnv(process.env.ADSB_POLL_INTERVAL_MS, 15000),
     geofencesEnabled: process.env.ADSB_GEOFENCES_ENABLED === 'true',
+    openskyEnabled: process.env.ADSB_OPENSKY_ENABLED === 'true',
+    openskyClientId: process.env.ADSB_OPENSKY_CLIENT_ID ?? process.env.ADSB_OPENSKY_USERNAME,
+    openskyClientSecret:
+      process.env.ADSB_OPENSKY_CLIENT_SECRET ?? process.env.ADSB_OPENSKY_PASSWORD,
+    openskyCredentialsPath: process.env.ADSB_OPENSKY_CREDENTIALS_PATH,
   },
   acars: {
     enabled: process.env.ACARS_ENABLED === 'true',

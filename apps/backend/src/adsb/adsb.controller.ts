@@ -45,6 +45,9 @@ export class AdsbController {
       feedUrl?: string;
       intervalMs?: number;
       geofencesEnabled?: boolean;
+      openskyEnabled?: boolean;
+      openskyClientId?: string | null;
+      openskyClientSecret?: string | null;
     },
   ) {
     return this.adsbService.updateConfig(body);
@@ -77,5 +80,20 @@ export class AdsbController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadAircraftDatabaseAlias(@UploadedFile() file?: Express.Multer.File) {
     return this.uploadAircraftDatabase(file);
+  }
+
+  @Post('opensky/credentials')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadOpenskyCredentials(@UploadedFile() file?: Express.Multer.File) {
+    if (!file || !file.buffer || !file.originalname) {
+      throw new BadRequestException('No file uploaded');
+    }
+    try {
+      return await this.adsbService.saveOpenskyCredentials(file.originalname, file.buffer);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Invalid credentials file',
+      );
+    }
   }
 }
