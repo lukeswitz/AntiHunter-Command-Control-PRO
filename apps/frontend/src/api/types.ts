@@ -327,6 +327,14 @@ export interface AdsbStatus {
   lastError?: string | null;
   trackCount: number;
   aircraftDbCount?: number;
+  openskyStatus?: {
+    enabled: boolean;
+    clientIdPresent: boolean;
+    lastFetchAt?: string | null;
+    lastSuccessAt?: string | null;
+    lastError?: string | null;
+    failureCount?: number;
+  };
 }
 
 export interface AcarsMessage {

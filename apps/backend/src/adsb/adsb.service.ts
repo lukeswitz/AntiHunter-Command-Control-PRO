@@ -106,9 +106,13 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
   private planespottersEnabled: boolean;
   private openskyAccessToken?: string;
   private openskyTokenExpiryMs = 0;
+  private lastOpenskyError: string | null = null;
+  private lastOpenskyRouteFetchAt: string | null = null;
+  private lastOpenskyRouteSuccessAt: string | null = null;
+  private openskyFailureCount = 0;
   private readonly routeCache: Map<
     string,
-    { dep: string | null; dest: string | null; ts: number }
+    { dep: string | null; dest: string | null; ts: number; empty: boolean; retryAt: number }
   > = new Map();
   private static readonly ROUTE_CACHE_TTL_MS = 10 * 60 * 1000;
   private readonly photoCache: Map<
@@ -208,6 +212,14 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       aircraftDbCount: this.aircraftDbCount,
       openskyEnabled: this.openskyEnabled,
       openskyClientId: this.openskyClientId ?? null,
+      openskyStatus: {
+        enabled: this.openskyEnabled,
+        clientIdPresent: Boolean(this.openskyClientId && this.openskyClientSecret),
+        lastFetchAt: this.lastOpenskyRouteFetchAt,
+        lastSuccessAt: this.lastOpenskyRouteSuccessAt,
+        lastError: this.lastOpenskyError,
+        failureCount: this.openskyFailureCount,
+      },
       // Note: planespottersEnabled is intentionally not exposed to clients to avoid toggling in UI yet
     };
   }
@@ -859,19 +871,43 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
 
       const cached = this.routeCache.get(track.icao);
       const now = Date.now();
-      if (cached && now - cached.ts < AdsbService.ROUTE_CACHE_TTL_MS) {
-        if (cached.dep && !track.dep) track.dep = cached.dep;
-        if (cached.dest && !track.dest) track.dest = cached.dest;
-        this.syncTrackRoute(track);
-        return;
+      if (cached) {
+        if (cached.empty && now < cached.retryAt) {
+          return;
+        }
+        if (!cached.empty && now - cached.ts < AdsbService.ROUTE_CACHE_TTL_MS) {
+          if (cached.dep && !track.dep) track.dep = cached.dep;
+          if (cached.dest && !track.dest) track.dest = cached.dest;
+          this.syncTrackRoute(track);
+          return;
+        }
       }
 
+      this.lastOpenskyRouteFetchAt = new Date().toISOString();
       const route = await this.fetchOpenSkyRoute(track.icao);
       if (!route) {
+        this.routeCache.set(track.icao, {
+          dep: null,
+          dest: null,
+          ts: now,
+          empty: true,
+          retryAt: now + Math.min(AdsbService.ROUTE_CACHE_TTL_MS, 10 * 60 * 1000),
+        });
+        this.lastOpenskyError = 'OpenSky returned no route';
+        this.openskyFailureCount += 1;
         return;
       }
 
-      this.routeCache.set(track.icao, { dep: route.dep, dest: route.dest, ts: now });
+      this.routeCache.set(track.icao, {
+        dep: route.dep,
+        dest: route.dest,
+        ts: now,
+        empty: false,
+        retryAt: now + AdsbService.ROUTE_CACHE_TTL_MS,
+      });
+      this.lastOpenskyRouteSuccessAt = new Date().toISOString();
+      this.lastOpenskyError = null;
+      this.openskyFailureCount = 0;
       track.routeSource = 'opensky';
       if (route.dep && !track.dep) track.dep = route.dep;
       if (route.dest && !track.dest) track.dest = route.dest;
@@ -884,6 +920,8 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       this.enrichAirportMetadata(track);
       this.syncTrackRoute(track);
     } catch (error) {
+      this.lastOpenskyError = error instanceof Error ? error.message : String(error);
+      this.openskyFailureCount += 1;
       this.logger.debug(
         `OpenSky enrichment failed for ${track.icao}: ${error instanceof Error ? error.message : error}`,
       );
@@ -1038,11 +1076,15 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       throw new Error('OpenSky credentials not configured');
     }
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await this.fetchWithTimeout(
+      url,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       },
-    });
+      5000,
+    );
 
     if ((response.status === 401 || response.status === 403) && attempt < 1) {
       this.openskyAccessToken = undefined;
@@ -1088,6 +1130,20 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     this.openskyAccessToken = payload.access_token;
     this.openskyTokenExpiryMs = Date.now() + Math.max(30_000, ttlMs - 30_000);
     return this.openskyAccessToken;
+  }
+
+  private async fetchWithTimeout(
+    url: string,
+    init: RequestInit,
+    timeoutMs = 5000,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private extractRoute(

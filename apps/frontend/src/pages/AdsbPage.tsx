@@ -386,6 +386,23 @@ export function AdsbPage() {
                         />
                         <span />
                       </label>
+                      <div className="form-hint">
+                        Status: {adsbStatus?.openskyStatus?.enabled ? 'Enabled' : 'Disabled'}{' '}
+                        {adsbStatus?.openskyStatus?.clientIdPresent
+                          ? '(credentials loaded)'
+                          : '(no credentials)'}
+                      </div>
+                      {adsbStatus?.openskyStatus?.lastSuccessAt ? (
+                        <div className="form-hint">
+                          Last OpenSky route success:{' '}
+                          {new Date(adsbStatus.openskyStatus.lastSuccessAt).toLocaleString()}
+                        </div>
+                      ) : null}
+                      {adsbStatus?.openskyStatus?.lastError ? (
+                        <div className="form-error">
+                          OpenSky error: {adsbStatus.openskyStatus.lastError}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="config-row">
                       <span className="config-label">Upload credentials.json</span>
