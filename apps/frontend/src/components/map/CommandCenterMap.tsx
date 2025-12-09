@@ -1156,7 +1156,6 @@ export function CommandCenterMap({
                           style={{ borderRadius: 4, objectFit: 'cover' }}
                           loading="lazy"
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
                           onError={(event) => {
                             const fallback = photoHref && photoHref !== displaySrc ? photoHref : '';
                             if (fallback) {

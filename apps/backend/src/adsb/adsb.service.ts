@@ -625,6 +625,10 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       this.sessionLog.set(id, track);
     });
 
+    if (enrichTasks.length > 0) {
+      await Promise.allSettled(enrichTasks);
+    }
+
     this.lastPollAt = new Date().toISOString();
     this.lastError = null;
     this.evaluateGeofences(this.tracks);
@@ -632,10 +636,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       { type: 'adsb.tracks', tracks: Array.from(nextTracks.values()) },
       { skipBus: true },
     );
-
-    if (enrichTasks.length > 0) {
-      await Promise.allSettled(enrichTasks);
-    }
   }
 
   private async refreshGeofences(): Promise<void> {
@@ -895,7 +895,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     if (!hex) return;
     const now = Date.now();
     const cached = this.photoCache.get(hex);
-    if (cached && now - cached.ts < AdsbService.PHOTO_CACHE_TTL_MS) {
+    const cachedFresh = cached && now - cached.ts < AdsbService.PHOTO_CACHE_TTL_MS;
+    const cachedHasImage = cached?.thumb || cached?.url;
+    if (cachedFresh && cachedHasImage) {
       this.applyPhoto(track, cached);
       return;
     }
@@ -912,7 +914,14 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       this.photoCache.set(hex, record);
       this.applyPhoto(track, record);
     } catch (error) {
-      this.photoCache.set(hex, { url: null, thumb: null, author: null, sourceUrl: null, ts: now });
+      // Cache only the failure timestamp; allow retries so images can recover if API was temporarily unavailable.
+      this.photoCache.set(hex, {
+        url: null,
+        thumb: null,
+        author: null,
+        sourceUrl: null,
+        ts: now,
+      });
       this.logger.debug(
         `Planespotters lookup failed for ${hex}: ${error instanceof Error ? error.message : error}`,
       );
@@ -1215,9 +1224,9 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     }
     const payload = (await response.json()) as {
       photos?: Array<{
-        thumbnail?: string;
-        thumbnail_large?: string;
-        large?: string;
+        thumbnail?: { src?: string };
+        thumbnail_large?: { src?: string };
+        large?: { src?: string };
         link?: string;
         photographer?: string;
       }>;
@@ -1228,8 +1237,13 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       return null;
     }
     return {
-      url: photo.large ?? photo.thumbnail_large ?? null,
-      thumb: photo.thumbnail ?? photo.thumbnail_large ?? photo.large ?? null,
+      url: photo.large?.src ?? photo.thumbnail_large?.src ?? photo.thumbnail?.src ?? null,
+      thumb:
+        photo.thumbnail?.src ??
+        photo.thumbnail_large?.src ??
+        photo.large?.src ??
+        photo.link ??
+        null,
       author: photo.photographer ?? null,
       sourceUrl: photo.link ?? null,
     };
