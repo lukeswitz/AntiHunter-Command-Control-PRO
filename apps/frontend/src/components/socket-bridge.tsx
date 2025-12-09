@@ -161,11 +161,14 @@ export function SocketBridge() {
 
     const handleEvent = (payload: unknown) => {
       if (isAdsbTracksEvent(payload)) {
-        const filteredTracks = payload.tracks.filter((track) => {
-          const hasId =
-            (track.callsign && track.callsign.trim()) || (track.reg && track.reg.trim());
-          return Boolean(hasId);
-        });
+        // Keep only tracks that can be plotted (valid position and id); do NOT drop
+        // tracks just because callsign/registration is missing.
+        const filteredTracks = payload.tracks.filter(
+          (track) =>
+            typeof track.id === 'string' &&
+            Number.isFinite(track.lat) &&
+            Number.isFinite(track.lon),
+        );
 
         // Update ADSB trails
         const activeIds = new Set<string>();
