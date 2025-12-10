@@ -225,9 +225,26 @@ export function MapPage() {
     toggleAdsb,
     toggleAcars,
   } = useMapPreferences();
+  const showAdsbTracksLowRes = useMapPreferences((state) => state.showAdsbTracksLowRes);
+  const showAdsbPhotosLowRes = useMapPreferences((state) => state.showAdsbPhotosLowRes);
   const fitEnabled = useMapPreferences((state) => state.fitEnabled);
   const setMapStyle = useMapPreferences((state) => state.setMapStyle);
   const setFitEnabled = useMapPreferences((state) => state.setFitEnabled);
+  const [isCompactWidth, setIsCompactWidth] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 1200;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 1200px)');
+    const handler = (event: MediaQueryListEvent | MediaQueryList) => {
+      setIsCompactWidth(event.matches);
+    };
+    handler(media);
+    media.addEventListener('change', handler);
+    return () => media.removeEventListener('change', handler);
+  }, []);
   const adsbTracksQuery = useQuery({
     queryKey: ['adsb', 'tracks'],
     queryFn: getAdsbTracks,
@@ -246,6 +263,10 @@ export function MapPage() {
         ? adsbTracksQuery.data.filter((track) => hasValidPosition(track.lat, track.lon))
         : [],
     [adsbAddonEnabled, adsbEnabled, adsbTracksQuery.data],
+  );
+  const filteredAdsbTracksForCard = useMemo(
+    () => (isCompactWidth && !showAdsbTracksLowRes ? [] : adsbTracks),
+    [adsbTracks, isCompactWidth, showAdsbTracksLowRes],
   );
 
   const acarsMessagesQuery = useQuery({
@@ -598,7 +619,7 @@ export function MapPage() {
 
   const [adsbTracksForCard, setAdsbTracksForCard] = useState<typeof adsbTracks>([]);
   useEffect(() => {
-    const available = adsbAddonEnabled && adsbEnabled ? adsbTracks : [];
+    const available = adsbAddonEnabled && adsbEnabled ? filteredAdsbTracksForCard : [];
     setAdsbTracksForCard(available);
     if (available.length === 0) {
       setActiveAdsbId(null);
@@ -609,7 +630,7 @@ export function MapPage() {
       setActiveAdsbId(available[0].id);
       setAdsbCardVisible(true);
     }
-  }, [adsbAddonEnabled, adsbEnabled, adsbTracks, activeAdsbId]);
+  }, [adsbAddonEnabled, adsbEnabled, filteredAdsbTracksForCard, activeAdsbId]);
 
   const droneStatusMutation = useMutation<
     Drone,
@@ -965,6 +986,7 @@ export function MapPage() {
             uncorrelatedAcarsMessages={
               acarsAddonEnabled && acarsEnabled ? uncorrelatedAcarsMessages : []
             }
+            hideAdsbPhotos={isCompactWidth && !showAdsbPhotosLowRes}
             followEnabled={followEnabled}
             showCoverage={coverageEnabled}
             mapStyle={mapStyle}

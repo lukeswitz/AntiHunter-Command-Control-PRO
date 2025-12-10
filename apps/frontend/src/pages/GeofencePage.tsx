@@ -29,12 +29,22 @@ export function GeofencePage() {
     void loadGeofences();
   }, [loadGeofences]);
 
+  const uniqueGeofences = useMemo(() => {
+    const map = new Map<string, (typeof geofences)[number]>();
+    geofences.forEach((g) => {
+      if (!map.has(g.id)) {
+        map.set(g.id, g);
+      }
+    });
+    return Array.from(map.values());
+  }, [geofences]);
+
   const filteredGeofences = useMemo(() => {
     if (!search.trim()) {
-      return geofences;
+      return uniqueGeofences;
     }
     const term = search.trim().toLowerCase();
-    return geofences.filter((geofence) => {
+    return uniqueGeofences.filter((geofence) => {
       const siteLabel = geofence.site?.name ?? geofence.siteId ?? 'local';
       return (
         (geofence.name ?? '').toLowerCase().includes(term) ||
@@ -42,7 +52,7 @@ export function GeofencePage() {
         (geofence.alarm.message ?? '').toLowerCase().includes(term)
       );
     });
-  }, [geofences, search]);
+  }, [uniqueGeofences, search]);
 
   const sortedGeofences = useMemo(() => {
     const multiplier = sortDirection === 'asc' ? 1 : -1;

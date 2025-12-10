@@ -83,6 +83,10 @@ export function AdsbPage() {
   const [log, setLog] = useState<Map<string, LogEntry>>(new Map());
   const adsbMuted = useMapPreferences((state) => state.adsbMuted);
   const toggleAdsbMuted = useMapPreferences((state) => state.toggleAdsbMuted);
+  const showAdsbTracksLowRes = useMapPreferences((state) => state.showAdsbTracksLowRes);
+  const toggleShowAdsbTracksLowRes = useMapPreferences((state) => state.toggleShowAdsbTracksLowRes);
+  const showAdsbPhotosLowRes = useMapPreferences((state) => state.showAdsbPhotosLowRes);
+  const toggleShowAdsbPhotosLowRes = useMapPreferences((state) => state.toggleShowAdsbPhotosLowRes);
   const openskyLastError = adsbStatus?.openskyStatus?.lastError ?? null;
   const openskyCooldownUntil = adsbStatus?.openskyStatus?.cooldownUntil ?? null;
   const openskyErrorMessage = useMemo(() => {
@@ -492,6 +496,32 @@ export function AdsbPage() {
                         <span />
                       </label>
                       <p className="form-hint">Suppress ADS-B info messages in the event feed.</p>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Show ADS-B tracks on small screens</span>
+                      <label className="switch" aria-label="Toggle ADS-B tracks on low resolution">
+                        <input
+                          type="checkbox"
+                          checked={showAdsbTracksLowRes}
+                          onChange={toggleShowAdsbTracksLowRes}
+                        />
+                        <span />
+                      </label>
+                      <p className="form-hint">Applies when the viewport is below ~1200px.</p>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Show aircraft photos on small screens</span>
+                      <label className="switch" aria-label="Toggle ADS-B photos on low resolution">
+                        <input
+                          type="checkbox"
+                          checked={showAdsbPhotosLowRes}
+                          onChange={toggleShowAdsbPhotosLowRes}
+                        />
+                        <span />
+                      </label>
+                      <p className="form-hint">
+                        Applies to ADS-B tooltips when below ~1200px width.
+                      </p>
                     </div>
                     <div className="config-row">
                       <span className="config-label">Last poll</span>

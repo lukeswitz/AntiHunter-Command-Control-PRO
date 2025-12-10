@@ -688,6 +688,7 @@ interface CommandCenterMapProps {
   adsbTrails?: Record<string, AdsbTrailPoint[]>;
   acarsMessagesByIcao?: Map<string, AcarsMessage[]>;
   uncorrelatedAcarsMessages?: AcarsMessage[];
+  hideAdsbPhotos?: boolean;
   geofences: Geofence[];
   geofenceHighlights: Record<string, number>;
   mapStyle: string;
@@ -734,6 +735,7 @@ export function CommandCenterMap({
   adsbTrails = {},
   acarsMessagesByIcao = new Map(),
   uncorrelatedAcarsMessages = [],
+  hideAdsbPhotos = false,
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const baseLayerKeys = useMemo(() => BASE_LAYERS.map((layer) => layer.key), []);
@@ -753,6 +755,16 @@ export function CommandCenterMap({
     });
     return active;
   }, [_geofenceHighlights]);
+
+  const uniqueGeofences = useMemo(() => {
+    const map = new Map<string, Geofence>();
+    geofences.forEach((geofence) => {
+      if (!map.has(geofence.id)) {
+        map.set(geofence.id, geofence);
+      }
+    });
+    return Array.from(map.values());
+  }, [geofences]);
 
   useEffect(() => {
     if (mapStyle !== activeBaseLayerKey && onMapStyleChange) {
@@ -878,7 +890,7 @@ export function CommandCenterMap({
         baseRadius={effectiveRadius}
       />
 
-      {geofences.map((geofence) => {
+      {uniqueGeofences.map((geofence) => {
         if (geofence.polygon.length < 3) {
           return null;
         }
@@ -1087,8 +1099,12 @@ export function CommandCenterMap({
             >
               <Tooltip direction="auto" offset={[0, 0]} opacity={0.95} className="tooltip--drone" permanent={false}>
                 <div className="drone-tooltip">
-                  <div className="badge badge--inline">Source: ADS-B</div>
-                  <strong>{track.callsign ?? track.icao}</strong>
+                  <div className="adsb-tooltip-header">
+                    <div className="badge badge--inline">Source: ADS-B</div>
+                    <strong className="adsb-tooltip-callsign">
+                      {track.callsign ?? track.icao}
+                    </strong>
+                  </div>
                   <div className="muted">{track.icao}</div>
                   <div>
                     Location: {track.lat.toFixed(5)}, {track.lon.toFixed(5)}
@@ -1146,7 +1162,7 @@ export function CommandCenterMap({
                     );
                     const photoSrc = normalizePhotoUrl(track.photoThumbUrl ?? track.photoUrl ?? '');
                     const displaySrc = photoSrc || photoHref;
-                    if (!displaySrc) return null;
+                    if (!displaySrc || hideAdsbPhotos) return null;
                     return (
                       <div className="adsb-tooltip-photo">
                         <img

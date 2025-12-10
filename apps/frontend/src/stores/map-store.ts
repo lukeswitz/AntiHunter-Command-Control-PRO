@@ -13,6 +13,8 @@ interface MapPreferencesState {
   acarsEnabled: boolean;
   acarsMuted: boolean;
   mapStyle: string;
+  showAdsbTracksLowRes: boolean;
+  showAdsbPhotosLowRes: boolean;
   setFitEnabled: (value: boolean) => void;
   toggleTrails: () => void;
   toggleRadius: () => void;
@@ -24,6 +26,8 @@ interface MapPreferencesState {
   toggleAcars: () => void;
   toggleAcarsMuted: () => void;
   setMapStyle: (style: string) => void;
+  toggleShowAdsbTracksLowRes: () => void;
+  toggleShowAdsbPhotosLowRes: () => void;
 }
 
 const DEFAULT_STATE: Pick<
@@ -37,6 +41,8 @@ const DEFAULT_STATE: Pick<
   | 'adsbMuted'
   | 'acarsEnabled'
   | 'acarsMuted'
+  | 'showAdsbTracksLowRes'
+  | 'showAdsbPhotosLowRes'
   | 'mapStyle'
   | 'fitEnabled'
 > = {
@@ -50,6 +56,8 @@ const DEFAULT_STATE: Pick<
   adsbMuted: false,
   acarsEnabled: false,
   acarsMuted: false,
+  showAdsbTracksLowRes: true,
+  showAdsbPhotosLowRes: true,
   mapStyle: 'osm',
 };
 
@@ -68,10 +76,14 @@ export const useMapPreferences = create<MapPreferencesState>()(
       toggleAcars: () => set((state) => ({ acarsEnabled: !state.acarsEnabled })),
       toggleAcarsMuted: () => set((state) => ({ acarsMuted: !state.acarsMuted })),
       setMapStyle: (style) => set({ mapStyle: style }),
+      toggleShowAdsbTracksLowRes: () =>
+        set((state) => ({ showAdsbTracksLowRes: !state.showAdsbTracksLowRes })),
+      toggleShowAdsbPhotosLowRes: () =>
+        set((state) => ({ showAdsbPhotosLowRes: !state.showAdsbPhotosLowRes })),
     }),
     {
       name: 'map-preferences',
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         fitEnabled: state.fitEnabled,
         trailsEnabled: state.trailsEnabled,
@@ -83,6 +95,8 @@ export const useMapPreferences = create<MapPreferencesState>()(
         adsbMuted: state.adsbMuted,
         acarsEnabled: state.acarsEnabled,
         acarsMuted: state.acarsMuted,
+        showAdsbTracksLowRes: state.showAdsbTracksLowRes,
+        showAdsbPhotosLowRes: state.showAdsbPhotosLowRes,
         mapStyle: state.mapStyle,
       }),
     },
