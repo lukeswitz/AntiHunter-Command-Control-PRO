@@ -963,7 +963,7 @@ export function CommandCenterMap({
             position={position}
             icon={createNodeIcon(node, indicator, alertColors)}
           >
-            <Tooltip direction="top" offset={[0, -12]} opacity={0.9}>
+            <Tooltip direction="auto" offset={[0, 0]} opacity={0.9} permanent={false}>
               <div className="node-tooltip">
                 <strong>{formatNodeLabel(node)}</strong>
                 {node.siteName || node.siteId ? (
@@ -1022,7 +1022,7 @@ export function CommandCenterMap({
                 />
               ) : null}
               <Marker position={position} icon={createTargetIcon(target)}>
-                <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
+                <Tooltip direction="auto" offset={[0, 0]} opacity={0.95} permanent={false}>
                   <div className="target-tooltip">
                     <strong>{target.mac ?? target.id}</strong>
                     {target.name && <div>Name: {target.name}</div>}
@@ -1085,7 +1085,7 @@ export function CommandCenterMap({
                 click: () => onAdsbSelect?.(track),
               }}
             >
-              <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
+              <Tooltip direction="auto" offset={[0, 0]} opacity={0.95} className="tooltip--drone" permanent={false}>
                 <div className="drone-tooltip">
                   <div className="badge badge--inline">Source: ADS-B</div>
                   <strong>{track.callsign ?? track.icao}</strong>
@@ -1215,7 +1215,7 @@ export function CommandCenterMap({
         const position: LatLngExpression = [message.lat!, message.lon!];
         return (
           <Marker key={`acars-${message.id}`} position={position} icon={createAcarsIcon(message)}>
-            <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
+            <Tooltip direction="auto" offset={[0, 0]} opacity={0.95} className="tooltip--drone" permanent={false}>
               <div className="drone-tooltip">
                 <div className="badge badge--inline" style={{ background: '#f59e0b' }}>
                   Source: ACARS (Uncorrelated)
@@ -1263,7 +1263,7 @@ export function CommandCenterMap({
               />
             ))}
             <Marker position={[overlay.lat, overlay.lon]} icon={trackingEstimateIcon}>
-              <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
+              <Tooltip direction="auto" offset={[0, 0]} opacity={0.95} permanent={false}>
                 <div className="tracking-tooltip">
                   <strong>{overlay.label ?? overlay.mac}</strong>
                   <div>Tracking estimate</div>
@@ -1339,10 +1339,11 @@ export function CommandCenterMap({
                   }}
                 >
                   <Tooltip
-                    direction="top"
-                    offset={[0, -10]}
+                    direction="auto"
+                    offset={[0, 0]}
                     opacity={0.95}
                     className="tooltip--drone tooltip--drone-operator"
+                    permanent={false}
                   >
                     <div className="drone-operator-tooltip">
                       <strong>Drone Operator</strong>
@@ -1385,7 +1386,7 @@ export function CommandCenterMap({
                 click: () => onDroneSelect?.(drone.id),
               }}
             >
-              <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
+              <Tooltip direction="auto" offset={[0, 0]} opacity={0.95} className="tooltip--drone" permanent={false}>
                 <div className="drone-tooltip">
                   <strong>Drone {drone.droneId ?? drone.id}</strong>
                   {drone.faa?.makeName || drone.faa?.modelName ? (

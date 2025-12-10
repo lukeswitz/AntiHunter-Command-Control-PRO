@@ -1153,6 +1153,48 @@ body.theme-dark .control-chip[disabled] {
   font-weight: 700;
 }
 
+/* Responsive tooltip sizing for smaller screens */
+@media (max-width: 900px) {
+  .leaflet-tooltip,
+  .leaflet-tooltip.tooltip--drone {
+    max-width: 280px !important;
+    min-width: 180px !important;
+  }
+
+  .drone-tooltip,
+  .drone-operator-tooltip {
+    max-width: 260px;
+    min-width: 160px;
+    font-size: 0.75rem;
+  }
+
+  .adsb-tooltip-photo {
+    max-width: 140px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .leaflet-tooltip,
+  .leaflet-tooltip.tooltip--drone {
+    max-width: 240px !important;
+    min-width: 140px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .drone-tooltip,
+  .drone-operator-tooltip {
+    max-width: 220px;
+    min-width: 120px;
+    font-size: 0.7rem;
+    gap: 0.15rem;
+  }
+
+  /* Hide photos on very small screens to save space */
+  .adsb-tooltip-photo {
+    display: none !important;
+  }
+}
+
 .drone-floating-card {
   position: fixed;
   inset: auto 0 0 0;
@@ -1303,11 +1345,11 @@ body.theme-dark .control-chip[disabled] {
     right: 50%;
     transform: translate(50%, calc(100% + 2rem));
     width: min(640px, calc(100vw - 2rem));
-    max-height: 65vh;
+    max-height: 50vh;
   }
 
   .adsb-floating-card__table-wrapper {
-    max-height: 220px;
+    max-height: 180px;
   }
 
   .drone-floating-card--visible {
@@ -1321,8 +1363,13 @@ body.theme-dark .control-chip[disabled] {
     inset: auto 0 0 0;
     width: 100%;
     right: 0;
+    max-height: 45vh;
     border-radius: 1rem 1rem 0 0;
     padding: 0.75rem 1rem 1rem;
+  }
+
+  .adsb-floating-card__table-wrapper {
+    max-height: 150px;
   }
 
   .drone-floating-card__table {

@@ -902,14 +902,36 @@ export function MapPage() {
             >
               <MdVisibility /> Targets
             </button>
-            {adsbAddonEnabled ? (
+            {freshDrones.length > 0 ? (
               <button
                 type="button"
-                className={`control-chip ${adsbEnabled ? 'is-active' : ''}`}
-                onClick={toggleAdsb}
+                className={`control-chip ${droneCardVisible ? 'is-active' : ''}`}
+                onClick={() => setDroneCardVisible(!droneCardVisible)}
+                title={droneCardVisible ? 'Hide drone panel' : 'Show drone panel'}
               >
-                <MdRadar /> ADS-B
+                {droneCardVisible ? <MdClose /> : <MdVisibility />} Drones
               </button>
+            ) : null}
+            {adsbAddonEnabled ? (
+              <>
+                <button
+                  type="button"
+                  className={`control-chip ${adsbEnabled ? 'is-active' : ''}`}
+                  onClick={toggleAdsb}
+                >
+                  <MdRadar /> ADS-B
+                </button>
+                {adsbEnabled && adsbTracksForCard.length > 0 ? (
+                  <button
+                    type="button"
+                    className={`control-chip ${adsbCardVisible ? 'is-active' : ''}`}
+                    onClick={() => setAdsbCardVisible(!adsbCardVisible)}
+                    title={adsbCardVisible ? 'Hide ADS-B panel' : 'Show ADS-B panel'}
+                  >
+                    {adsbCardVisible ? <MdClose /> : <MdVisibility />} Panel
+                  </button>
+                ) : null}
+              </>
             ) : null}
             {acarsAddonEnabled ? (
               <button
