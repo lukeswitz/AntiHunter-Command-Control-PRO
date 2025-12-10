@@ -1197,18 +1197,12 @@ body.theme-dark .control-chip[disabled] {
 
 .drone-floating-card {
   position: fixed;
-  inset: auto 0 0 0;
-  width: 100%;
-  max-height: min(85vh, 820px);
   display: flex;
   flex-direction: column;
   gap: 0;
   background: var(--color-panel);
-  border-top: 1px solid var(--color-panel-border);
-  border-radius: 1.25rem 1.25rem 0 0;
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.6);
-  padding: 1.25rem 2rem 1.25rem;
-  transform: translateY(calc(100% + 2rem));
+  border: 1px solid var(--color-panel-border);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
   opacity: 0;
   pointer-events: none;
   transition:
@@ -1217,10 +1211,51 @@ body.theme-dark .control-chip[disabled] {
   z-index: 600;
 }
 
-.drone-floating-card--visible {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
+/* Desktop: Right side panel */
+@media (min-width: 1024px) {
+  .drone-floating-card {
+    top: 5rem;
+    right: 0;
+    bottom: 1rem;
+    width: min(480px, 35vw);
+    max-height: calc(100vh - 6rem);
+    border-radius: 1rem 0 0 1rem;
+    padding: 1rem 1.5rem;
+    transform: translateX(calc(100% + 2rem));
+  }
+
+  .drone-floating-card--visible {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .adsb-floating-card__table-wrapper {
+    max-height: calc(100vh - 16rem);
+  }
+}
+
+/* Tablets and below: Bottom panel */
+@media (max-width: 1023px) {
+  .drone-floating-card {
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: min(60vh, 520px);
+    border-radius: 1.25rem 1.25rem 0 0;
+    border-top: 1px solid var(--color-panel-border);
+    padding: 1.25rem 2rem 1.25rem;
+    transform: translateY(calc(100% + 2rem));
+  }
+
+  .drone-floating-card--visible {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .adsb-floating-card__table-wrapper {
+    max-height: 320px;
+  }
 }
 
 .drone-floating-card__header {
@@ -1329,42 +1364,21 @@ body.theme-dark .control-chip[disabled] {
   font-size: 0.75rem;
 }
 
-@media (max-width: 1200px) {
-  .drone-floating-card {
-    max-height: 70vh;
-    padding: 1rem 1.25rem 1rem;
-  }
-
-  .adsb-floating-card__table-wrapper {
-    max-height: 280px;
-  }
-}
-
+/* Smaller tablet adjustments */
 @media (max-width: 900px) {
   .drone-floating-card {
-    right: 50%;
-    transform: translate(50%, calc(100% + 2rem));
-    width: min(640px, calc(100vw - 2rem));
     max-height: 50vh;
   }
 
   .adsb-floating-card__table-wrapper {
-    max-height: 180px;
-  }
-
-  .drone-floating-card--visible {
-    transform: translate(50%, 0);
+    max-height: 220px;
   }
 }
 
+/* Mobile adjustments */
 @media (max-width: 640px) {
   .drone-floating-card {
-    position: fixed;
-    inset: auto 0 0 0;
-    width: 100%;
-    right: 0;
     max-height: 45vh;
-    border-radius: 1rem 1rem 0 0;
     padding: 0.75rem 1rem 1rem;
   }
 
