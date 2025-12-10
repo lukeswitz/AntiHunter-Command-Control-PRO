@@ -2663,6 +2663,57 @@ body.theme-dark .control-chip[disabled] {
   background: #ef4444;
   color: #ffffff;
 }
+
+@media (max-width: 1366px) {
+  .panel__header {
+    padding: 0.75rem 0.9rem;
+  }
+  .panel__title {
+    font-size: 1.2rem;
+  }
+  .panel__subtitle {
+    font-size: 0.9rem;
+  }
+  .config-card {
+    padding: 0.75rem 0.9rem;
+    gap: 0.5rem;
+  }
+  .config-card header h2 {
+    font-size: 0.95rem;
+  }
+  .config-card header p {
+    font-size: 0.82rem;
+  }
+  .config-card__body {
+    gap: 0.5rem;
+  }
+  .config-row span {
+    font-size: 0.82rem;
+  }
+  .submit-button {
+    padding: 0.45rem 0.95rem;
+    font-size: 0.85rem;
+  }
+  .control-chip {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    gap: 0.45rem;
+  }
+  .config-menu__item {
+    padding: 0.65rem 0.75rem;
+  }
+  .config-menu__label {
+    font-size: 0.95rem;
+  }
+  .config-menu__description {
+    font-size: 0.8rem;
+  }
+  .adsb-log-table th,
+  .adsb-log-table td {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.82rem;
+  }
+}
 @media (max-width: 1180px) {
   .app-content {
     grid-template-columns: 64px minmax(0, 1fr);
