@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 
 import type { AdsbTrack } from '../api/types';
+import { detectAdsbAircraftType } from './map/CommandCenterMap';
 
 interface AdsbFloatingCardProps {
   tracks: AdsbTrack[];
@@ -84,6 +85,15 @@ export function AdsbFloatingCard({
             <tbody>
               {sorted.map((track) => {
                 const isActive = activeId === track.id;
+                const typeInfo = detectAdsbAircraftType(
+                  track.category,
+                  track.aircraftType,
+                  track.typeCode,
+                  track.categoryDescription,
+                  track.callsign,
+                  track.reg,
+                  track.icao,
+                );
                 return (
                   <tr
                     key={track.id}
@@ -111,7 +121,7 @@ export function AdsbFloatingCard({
                     </td>
                     <td>{track.reg ?? '--'}</td>
                     <td>
-                      {track.country ?? '--'}
+                      {track.country ?? '--'} {typeInfo.isMilitary ? '★' : ''}
                       <div className="muted">
                         {track.category ?? track.categoryDescription ?? '--'}
                       </div>

@@ -61,30 +61,54 @@ function randomHex(length = 6) {
   return out;
 }
 
+/**
+ * Generate ICAO hex code based on aircraft type.
+ * US Military: AE0000-AEFFFF
+ * US Civilian: A00000-ADFFFF (approximation)
+ */
+function generateIcaoHex(category, isMilitary = false) {
+  if (isMilitary || category === 'A6') {
+    // US Military range: AE0000-AEFFFF
+    const min = 0xAE0000;
+    const max = 0xAEFFFF;
+    const hex = Math.floor(Math.random() * (max - min + 1)) + min;
+    return hex.toString(16).toUpperCase().padStart(6, '0');
+  }
+
+  // US Civilian range: A00000-ADFFFF
+  const min = 0xA00000;
+  const max = 0xADFFFF;
+  const hex = Math.floor(Math.random() * (max - min + 1)) + min;
+  return hex.toString(16).toUpperCase().padStart(6, '0');
+}
+
 const AIRCRAFT_TYPES = [
   // Regular planes (A1-A4)
-  { category: 'A1', callsign: 'N172CP', type: 'C172', description: 'Light aircraft', altRange: [2000, 8000], speedRange: [90, 130] },
-  { category: 'A2', callsign: 'SKW789', type: 'CRJ7', description: 'Small commercial', altRange: [25000, 30000], speedRange: [350, 400] },
-  { category: 'A3', callsign: 'UAL123', type: 'B738', description: 'Large commercial', altRange: [30000, 38000], speedRange: [420, 480] },
-  { category: 'A4', callsign: 'DAL456', type: 'A321', description: 'Large commercial', altRange: [30000, 38000], speedRange: [420, 480] },
+  { category: 'A1', callsign: 'N172CP', type: 'C172', description: 'Light aircraft', altRange: [2000, 8000], speedRange: [90, 130], isMilitary: false },
+  { category: 'A2', callsign: 'SKW789', type: 'CRJ7', description: 'Small commercial', altRange: [25000, 30000], speedRange: [350, 400], isMilitary: false },
+  { category: 'A3', callsign: 'UAL123', type: 'B738', description: 'Large commercial', altRange: [30000, 38000], speedRange: [420, 480], isMilitary: false },
+  { category: 'A4', callsign: 'DAL456', type: 'A321', description: 'Large commercial', altRange: [30000, 38000], speedRange: [420, 480], isMilitary: false },
   // Heavy aircraft (A5)
-  { category: 'A5', callsign: 'QFA12', type: 'A380', description: 'Heavy aircraft (>300,000 lbs)', altRange: [35000, 41000], speedRange: [460, 510] },
-  { category: 'A5', callsign: 'BAW101', type: 'B77W', description: 'Heavy aircraft (>300,000 lbs)', altRange: [35000, 41000], speedRange: [460, 510] },
-  // High performance / Fighter (A6)
-  { category: 'A6', callsign: 'VIPER01', type: 'F16', description: 'High performance military', altRange: [15000, 25000], speedRange: [400, 600] },
-  { category: 'A6', callsign: 'RAPTOR', type: 'F22', description: 'High performance military', altRange: [15000, 30000], speedRange: [400, 700] },
+  { category: 'A5', callsign: 'QFA12', type: 'A380', description: 'Heavy aircraft (>300,000 lbs)', altRange: [35000, 41000], speedRange: [460, 510], isMilitary: false },
+  { category: 'A5', callsign: 'BAW101', type: 'B77W', description: 'Heavy aircraft (>300,000 lbs)', altRange: [35000, 41000], speedRange: [460, 510], isMilitary: false },
+  // High performance / Fighter (A6) - MILITARY
+  { category: 'A6', callsign: 'VIPER01', type: 'F16', description: 'High performance military', altRange: [15000, 25000], speedRange: [400, 600], isMilitary: true },
+  { category: 'A6', callsign: 'RAPTOR', type: 'F22', description: 'High performance military', altRange: [15000, 30000], speedRange: [400, 700], isMilitary: true },
   // Helicopters (A7)
-  { category: 'A7', callsign: 'LIFE1', type: 'H60', description: 'Rotorcraft', altRange: [500, 2000], speedRange: [100, 160] },
-  { category: 'A7', callsign: 'ARMY23', type: 'AH64', description: 'Military rotorcraft', altRange: [300, 1500], speedRange: [100, 180] },
+  { category: 'A7', callsign: 'LIFE1', type: 'H60', description: 'Rotorcraft', altRange: [500, 2000], speedRange: [100, 160], isMilitary: false },
+  { category: 'A7', callsign: 'ARMY23', type: 'AH64', description: 'Military rotorcraft', altRange: [300, 1500], speedRange: [100, 180], isMilitary: true },
+  // Military transports with callsigns
+  { category: 'A5', callsign: 'RCH123', type: 'C17', description: 'Heavy military transport', altRange: [28000, 35000], speedRange: [400, 460], isMilitary: true },
+  { category: 'A3', callsign: 'REACH45', type: 'C130', description: 'Military transport', altRange: [20000, 28000], speedRange: [300, 360], isMilitary: true },
   // Gliders (B1)
-  { category: 'B1', callsign: 'GLIDE3', type: 'ASW20', description: 'Glider/Sailplane', altRange: [3000, 12000], speedRange: [50, 90] },
+  { category: 'B1', callsign: 'GLIDE3', type: 'ASW20', description: 'Glider/Sailplane', altRange: [3000, 12000], speedRange: [50, 90], isMilitary: false },
   // Balloons (B2)
-  { category: 'B2', callsign: 'BALLN1', type: 'BALL', description: 'Balloon/Airship', altRange: [2000, 8000], speedRange: [5, 25] },
-  // UAVs/Drones (B6) 
-  { category: 'B6', callsign: 'DRONE1', type: 'MQ9', description: 'Unmanned aerial system', altRange: [8000, 15000], speedRange: [120, 200] },
-  { category: 'B6', callsign: 'PRED01', type: 'MQ1', description: 'Unmanned aerial system', altRange: [8000, 15000], speedRange: [100, 180] },
+  { category: 'B2', callsign: 'BALLN1', type: 'BALL', description: 'Balloon/Airship', altRange: [2000, 8000], speedRange: [5, 25], isMilitary: false },
+  // UAVs/Drones (B6) - Can be military
+  { category: 'B6', callsign: 'DRONE1', type: 'MQ9', description: 'Unmanned aerial system', altRange: [8000, 15000], speedRange: [120, 200], isMilitary: true },
+  { category: 'B6', callsign: 'PRED01', type: 'MQ1', description: 'Unmanned aerial system', altRange: [8000, 15000], speedRange: [100, 180], isMilitary: true },
   // Ground vehicles (C1)
-  { category: 'C1', callsign: 'TRUCK5', type: 'GRND', description: 'Ground vehicle - emergency', altRange: [0, 0], speedRange: [10, 40] },
+  { category: 'C1', callsign: 'TRUCK5', type: 'GRND', description: 'Ground vehicle - emergency', altRange: [0, 0], speedRange: [10, 40], isMilitary: false },
 ];
 
 function randomCallsign() {
@@ -169,7 +193,7 @@ function createAircraft(index) {
   const flight = sample?.flight ?? aircraftType.callsign + Math.floor(Math.random() * 100);
 
   return {
-    hex: randomHex(),
+    hex: generateIcaoHex(aircraftType.category, aircraftType.isMilitary),
     flight,
     reg,
     lat: null,
@@ -186,6 +210,7 @@ function createAircraft(index) {
     dest: aircraftType.category.startsWith('A') && !['A6', 'A7'].includes(aircraftType.category) ? dest : null,
     _drift: (Math.random() - 0.5) * 1.5,
     _altRange: aircraftType.altRange,
+    _isMilitary: aircraftType.isMilitary,
   };
 }
 

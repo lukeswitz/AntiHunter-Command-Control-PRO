@@ -368,6 +368,7 @@ function createAdsbIcon(track: AdsbTrack, hasAcarsMessages = false): DivIcon {
     track.categoryDescription,
     track.callsign,
     track.reg,
+    track.icao,
   );
   const config = ADSB_TYPE_CONFIG[typeInfo.type];
   const markerClass = `adsb-marker--${typeInfo.type}`;
@@ -378,10 +379,24 @@ function createAdsbIcon(track: AdsbTrack, hasAcarsMessages = false): DivIcon {
   const militaryBadge = typeInfo.isMilitary
     ? '<span class="adsb-marker__military-badge" title="Military aircraft">★</span>'
     : '';
+
+  // Build tooltip with aircraft info
+  const tooltipParts = [
+    track.callsign ?? track.icao,
+    config.label,
+  ];
+  if (typeInfo.isMilitary) {
+    tooltipParts.push('MILITARY');
+  }
+  if (track.alt) {
+    tooltipParts.push(`${track.alt.toFixed(0)}ft`);
+  }
+  const tooltip = escapeHtml(tooltipParts.join(' | '));
+
   return divIcon({
     html: `<div class="adsb-marker ${markerClass}" style="--adsb-color:${config.color};${
       rotation != null ? `--adsb-rotation:${rotation}deg;` : ''
-    }"><span class="adsb-marker__icon" aria-hidden="true">${config.svg}</span><span class="adsb-marker__label">${label}${militaryBadge}${acarsBadge}</span></div>`,
+    }" title="${tooltip}"><span class="adsb-marker__icon" aria-hidden="true">${config.svg}</span><span class="adsb-marker__label">${label}${militaryBadge}${acarsBadge}</span></div>`,
     className: 'adsb-marker-wrapper',
     iconSize: [40, 48],
     iconAnchor: [20, 16],
@@ -406,32 +421,42 @@ export function detectAdsbAircraftType(
   categoryDescription?: string | null,
   callsign?: string | null,
   registration?: string | null,
+  icaoHex?: string | null,
 ): AdsbTypeInfo {
   const tokens = [category, aircraftType, typeCode, categoryDescription, callsign, registration]
     .map((token) => token?.trim().toUpperCase())
     .filter((token): token is string => Boolean(token));
 
-  // Check for military indicators in callsign and registration
-  const callsignUpper = callsign?.trim().toUpperCase();
-  const regUpper = registration?.trim().toUpperCase();
+  // ICAO hex code (Mode-S address) is the definitive method to detect military aircraft
+  // Each country has allocated ranges, with military using specific sub-ranges
   let isMilitary = false;
+  const icaoHexUpper = icaoHex?.trim().toUpperCase();
 
-  if (callsignUpper) {
-    // Common military callsign prefixes
-    const militaryCallsigns = [
-      'RCH', 'REACH', 'EVAC', 'CONVOY', 'TITAN', 'SPAR', 'VENUS', 'CLUB',
-      'NAVY', 'ARMY', 'AIR FORCE', 'USAF', 'USN', 'USMC', 'USCG',
-      'OTIS', 'CHIEF', 'SPUR', 'PITT', 'BOXER', 'VALOR', 'TORCH',
-      'DUMP', 'TANK', 'HAWK', 'VIPER', 'FURY', 'CHAOS', 'MAGIC',
-      'PAT', 'PATROL', 'GUARD', 'EASY', 'RACER', 'HUNTER'
-    ];
-    isMilitary = militaryCallsigns.some(prefix => callsignUpper.startsWith(prefix));
+  if (icaoHexUpper && /^[0-9A-F]{6}$/i.test(icaoHexUpper)) {
+    // US Military: AE0000-AEFFFF
+    if (icaoHexUpper >= 'AE0000' && icaoHexUpper <= 'AEFFFF') {
+      isMilitary = true;
+    }
+    // Add other country military ranges as needed:
+    // Canada military: Often in C00000-C3FFFF range
+    // UK military: Often in 400000-43FFFF range
+    // NATO: Various ranges
   }
 
-  if (!isMilitary && regUpper) {
-    // Military registration patterns (various countries)
-    isMilitary = /^(N[0-9]{1,5}[A-Z]{0,2}|[0-9]{2}-[0-9]{4,5}|[A-Z]{1,2}-[0-9]{3,4})$/.test(regUpper) === false &&
-                 (regUpper.includes('AF') || regUpper.includes('FORCE') || regUpper.includes('MIL'));
+  // Fallback: Check callsign patterns if ICAO hex range check didn't catch it
+  if (!isMilitary) {
+    const callsignUpper = callsign?.trim().toUpperCase();
+    if (callsignUpper) {
+      // Common military callsign prefixes
+      const militaryCallsigns = [
+        'RCH', 'REACH', 'EVAC', 'CONVOY', 'TITAN', 'SPAR', 'VENUS', 'CLUB',
+        'NAVY', 'ARMY', 'AIR FORCE', 'USAF', 'USN', 'USMC', 'USCG',
+        'OTIS', 'CHIEF', 'SPUR', 'PITT', 'BOXER', 'VALOR', 'TORCH',
+        'DUMP', 'TANK', 'HAWK', 'VIPER', 'FURY', 'CHAOS', 'MAGIC',
+        'PAT', 'PATROL', 'GUARD', 'EASY', 'RACER', 'HUNTER', 'AIR FORCE ONE'
+      ];
+      isMilitary = militaryCallsigns.some(prefix => callsignUpper.startsWith(prefix));
+    }
   }
 
   // Check category codes first (most reliable)
