@@ -381,10 +381,7 @@ function createAdsbIcon(track: AdsbTrack, hasAcarsMessages = false): DivIcon {
     : '';
 
   // Build tooltip with aircraft info
-  const tooltipParts = [
-    track.callsign ?? track.icao,
-    config.label,
-  ];
+  const tooltipParts = [track.callsign ?? track.icao, config.label];
   if (typeInfo.isMilitary) {
     tooltipParts.push('MILITARY');
   }
@@ -449,13 +446,44 @@ export function detectAdsbAircraftType(
     if (callsignUpper) {
       // Common military callsign prefixes
       const militaryCallsigns = [
-        'RCH', 'REACH', 'EVAC', 'CONVOY', 'TITAN', 'SPAR', 'VENUS', 'CLUB',
-        'NAVY', 'ARMY', 'AIR FORCE', 'USAF', 'USN', 'USMC', 'USCG',
-        'OTIS', 'CHIEF', 'SPUR', 'PITT', 'BOXER', 'VALOR', 'TORCH',
-        'DUMP', 'TANK', 'HAWK', 'VIPER', 'FURY', 'CHAOS', 'MAGIC',
-        'PAT', 'PATROL', 'GUARD', 'EASY', 'RACER', 'HUNTER', 'AIR FORCE ONE'
+        'RCH',
+        'REACH',
+        'EVAC',
+        'CONVOY',
+        'TITAN',
+        'SPAR',
+        'VENUS',
+        'CLUB',
+        'NAVY',
+        'ARMY',
+        'AIR FORCE',
+        'USAF',
+        'USN',
+        'USMC',
+        'USCG',
+        'OTIS',
+        'CHIEF',
+        'SPUR',
+        'PITT',
+        'BOXER',
+        'VALOR',
+        'TORCH',
+        'DUMP',
+        'TANK',
+        'HAWK',
+        'VIPER',
+        'FURY',
+        'CHAOS',
+        'MAGIC',
+        'PAT',
+        'PATROL',
+        'GUARD',
+        'EASY',
+        'RACER',
+        'HUNTER',
+        'AIR FORCE ONE',
       ];
-      isMilitary = militaryCallsigns.some(prefix => callsignUpper.startsWith(prefix));
+      isMilitary = militaryCallsigns.some((prefix) => callsignUpper.startsWith(prefix));
     }
   }
 
@@ -1153,6 +1181,9 @@ export function CommandCenterMap({
           track.aircraftType,
           track.typeCode,
           track.categoryDescription,
+          track.callsign,
+          track.reg,
+          track.icao,
         );
         const config = ADSB_TYPE_CONFIG[typeInfo.type];
         const trailColor = config.color;

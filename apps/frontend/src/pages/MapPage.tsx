@@ -935,7 +935,7 @@ export function MapPage() {
             >
               <MdVisibility /> Targets
             </button>
-            {(freshDrones.length > 0 || adsbTracksForCard.length > 0) ? (
+            {freshDrones.length > 0 || adsbTracksForCard.length > 0 ? (
               <button
                 type="button"
                 className={`control-chip ${tracksUiVisible ? 'is-active' : ''}`}
