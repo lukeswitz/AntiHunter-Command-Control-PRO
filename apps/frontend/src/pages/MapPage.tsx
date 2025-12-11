@@ -925,13 +925,15 @@ export function MapPage() {
             >
               <MdVisibility /> Targets
             </button>
-            <button
-              type="button"
-              className={`control-chip ${tracksUiVisible ? 'is-active' : ''}`}
-              onClick={() => setTracksUiVisible(!tracksUiVisible)}
-            >
-              <MdViewList /> Tracks
-            </button>
+            {(freshDrones.length > 0 || adsbTracksForCard.length > 0) ? (
+              <button
+                type="button"
+                className={`control-chip ${tracksUiVisible ? 'is-active' : ''}`}
+                onClick={() => setTracksUiVisible(!tracksUiVisible)}
+              >
+                <MdViewList /> Tracks
+              </button>
+            ) : null}
             {adsbAddonEnabled ? (
               <button
                 type="button"
