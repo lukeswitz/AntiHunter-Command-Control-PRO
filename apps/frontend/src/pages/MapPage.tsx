@@ -731,9 +731,19 @@ export function MapPage() {
 
   const handleAdsbCardClose = useCallback(() => {
     setAdsbCardVisible(false);
-  }, []);
+    // If both cards are now closed, also hide the tracks UI
+    if (!droneCardVisible) {
+      setTracksUiVisible(false);
+    }
+  }, [droneCardVisible]);
 
-  const handleDroneCardClose = useCallback(() => setDroneCardVisible(false), []);
+  const handleDroneCardClose = useCallback(() => {
+    setDroneCardVisible(false);
+    // If both cards are now closed, also hide the tracks UI
+    if (!adsbCardVisible) {
+      setTracksUiVisible(false);
+    }
+  }, [adsbCardVisible]);
 
   useEffect(() => {
     if (geofenceHighlightCount === 0) {
@@ -929,7 +939,19 @@ export function MapPage() {
               <button
                 type="button"
                 className={`control-chip ${tracksUiVisible ? 'is-active' : ''}`}
-                onClick={() => setTracksUiVisible(!tracksUiVisible)}
+                onClick={() => {
+                  const nextVisible = !tracksUiVisible;
+                  setTracksUiVisible(nextVisible);
+                  // When showing tracks, also restore individual card visibility
+                  if (nextVisible) {
+                    if (freshDrones.length > 0) {
+                      setDroneCardVisible(true);
+                    }
+                    if (adsbTracksForCard.length > 0) {
+                      setAdsbCardVisible(true);
+                    }
+                  }
+                }}
               >
                 <MdViewList /> Tracks
               </button>
