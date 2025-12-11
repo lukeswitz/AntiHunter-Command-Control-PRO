@@ -1024,6 +1024,24 @@ export function MapPage() {
             onAdsbSelect={handleAdsbSelect}
           />
         </div>
+        <AdsbFloatingCard
+          tracks={adsbTracksForCard}
+          activeId={activeAdsbId}
+          visible={tracksUiVisible && adsbCardVisible && adsbTracksForCard.length > 0}
+          onClose={handleAdsbCardClose}
+          onSelect={handleAdsbSelect}
+        />
+        <DroneFloatingCard
+          drones={freshDrones}
+          activeDroneId={activeDroneId}
+          visible={tracksUiVisible && droneCardVisible && freshDrones.length > 0}
+          onClose={handleDroneCardClose}
+          onSelect={handleDroneSelect}
+          onStatusChange={canManageDrones ? handleDroneStatusChange : undefined}
+          statusOptions={DRONE_STATUS_OPTIONS}
+          isStatusUpdating={isUpdatingDrone}
+          canManage={canManageDrones}
+        />
         <footer className="map-footer">
           <section className="map-footer__views">
             <div className="map-footer__views-controls">
@@ -1122,24 +1140,6 @@ export function MapPage() {
           </div>
         </footer>
       </section>
-      <AdsbFloatingCard
-        tracks={adsbTracksForCard}
-        activeId={activeAdsbId}
-        visible={tracksUiVisible && adsbCardVisible && adsbTracksForCard.length > 0}
-        onClose={handleAdsbCardClose}
-        onSelect={handleAdsbSelect}
-      />
-      <DroneFloatingCard
-        drones={freshDrones}
-        activeDroneId={activeDroneId}
-        visible={tracksUiVisible && droneCardVisible && freshDrones.length > 0}
-        onClose={handleDroneCardClose}
-        onSelect={handleDroneSelect}
-        onStatusChange={canManageDrones ? handleDroneStatusChange : undefined}
-        statusOptions={DRONE_STATUS_OPTIONS}
-        isStatusUpdating={isUpdatingDrone}
-        canManage={canManageDrones}
-      />
     </>
   );
 }
