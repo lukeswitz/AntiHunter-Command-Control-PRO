@@ -1,4 +1,4 @@
-import { Body, Controller, forwardRef, Get, Inject, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, forwardRef, Get, Inject, Param, Patch, Post } from '@nestjs/common';
 import { Role } from '@prisma/client';
 
 import { DronesService } from './drones.service';
@@ -42,5 +42,19 @@ export class DronesController {
       faa: snapshot.faa ?? null,
     });
     return snapshot;
+  }
+
+  @Delete(':id')
+  @Roles(Role.OPERATOR, Role.ADMIN)
+  async delete(@Param('id') id: string) {
+    await this.dronesService.remove(id);
+    return { success: true };
+  }
+
+  @Post('clear')
+  @Roles(Role.ADMIN)
+  async clearAll() {
+    await this.dronesService.clearAll();
+    return { success: true };
   }
 }

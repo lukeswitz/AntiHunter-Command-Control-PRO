@@ -1364,8 +1364,8 @@ body.theme-dark .control-chip[disabled] {
   }
 }
 
-/* On small screens, dock floating cards under the map instead of overlaying */
-@media (max-width: 1180px) {
+/* On small and medium screens, dock floating cards under the map instead of overlaying */
+@media (max-width: 1400px) {
   .drone-floating-card {
     position: static;
     display: none;
@@ -2801,7 +2801,7 @@ body.theme-dark .control-chip[disabled] {
   }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1400px) {
   .drone-floating-card {
     position: static;
     display: none;

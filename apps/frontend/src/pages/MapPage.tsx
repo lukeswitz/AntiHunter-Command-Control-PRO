@@ -15,6 +15,7 @@ import {
   MdClose,
   MdRadar,
   MdSettingsInputAntenna,
+  MdViewList,
 } from 'react-icons/md';
 
 import { getAcarsMessages } from '../api/acars';
@@ -604,6 +605,7 @@ export function MapPage() {
   const [droneCardVisible, setDroneCardVisible] = useState(false);
   const [activeAdsbId, setActiveAdsbId] = useState<string | null>(null);
   const [adsbCardVisible, setAdsbCardVisible] = useState(false);
+  const [tracksUiVisible, setTracksUiVisible] = useState(true);
 
   useEffect(() => {
     if (freshDrones.length === 0) {
@@ -923,6 +925,13 @@ export function MapPage() {
             >
               <MdVisibility /> Targets
             </button>
+            <button
+              type="button"
+              className={`control-chip ${tracksUiVisible ? 'is-active' : ''}`}
+              onClick={() => setTracksUiVisible(!tracksUiVisible)}
+            >
+              <MdViewList /> Tracks
+            </button>
             {adsbAddonEnabled ? (
               <button
                 type="button"
@@ -1092,14 +1101,14 @@ export function MapPage() {
       <AdsbFloatingCard
         tracks={adsbTracksForCard}
         activeId={activeAdsbId}
-        visible={adsbCardVisible && adsbTracksForCard.length > 0}
+        visible={tracksUiVisible && adsbCardVisible && adsbTracksForCard.length > 0}
         onClose={handleAdsbCardClose}
         onSelect={handleAdsbSelect}
       />
       <DroneFloatingCard
         drones={freshDrones}
         activeDroneId={activeDroneId}
-        visible={droneCardVisible && freshDrones.length > 0}
+        visible={tracksUiVisible && droneCardVisible && freshDrones.length > 0}
         onClose={handleDroneCardClose}
         onSelect={handleDroneSelect}
         onStatusChange={canManageDrones ? handleDroneStatusChange : undefined}
