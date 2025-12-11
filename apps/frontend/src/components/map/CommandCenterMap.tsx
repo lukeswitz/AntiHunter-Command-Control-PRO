@@ -1180,7 +1180,9 @@ export function CommandCenterMap({
               <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
                 <div className="drone-tooltip">
                   <div className="adsb-tooltip-header">
-                    <div className="badge badge--inline">Source: ADS-B</div>
+                    <div className="badge badge--inline">
+                      Source: ADS-B{typeInfo.isMilitary ? ' | ★ MIL' : ''}
+                    </div>
                     <strong className="adsb-tooltip-callsign">
                       {track.callsign ?? track.icao}
                     </strong>
@@ -1190,9 +1192,6 @@ export function CommandCenterMap({
                     Location: {track.lat.toFixed(5)}, {track.lon.toFixed(5)}
                   </div>
                   <div>Type: {typeInfo.label}</div>
-                  {typeInfo.isMilitary ? (
-                    <div className="badge badge--warning">Classification: Military</div>
-                  ) : null}
                   {(() => {
                     const depLabel = buildAirportLabel(track.depIata, track.depIcao ?? track.dep);
                     const destLabel = buildAirportLabel(

@@ -146,15 +146,6 @@ const sampleRegistrations = [
   { reg: 'N999ZZ', flight: 'SWA202' },
 ];
 
-function shuffleArray(arr) {
-  const shuffled = [...arr];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
 // Get unique categories first, then fill randomly
 function getShuffledTypes(count) {
   const byCategory = new Map();
@@ -164,15 +155,30 @@ function getShuffledTypes(count) {
   });
 
   const result = [];
-  // One from each category first
-  for (const types of byCategory.values()) {
-    result.push(types[Math.floor(Math.random() * types.length)]);
+
+  // First 5 slots MUST be civilian for ACARS sample registrations
+  const civilianTypes = AIRCRAFT_TYPES.filter(t => !t.isMilitary);
+  for (let i = 0; i < Math.min(5, count); i++) {
+    result.push(civilianTypes[Math.floor(Math.random() * civilianTypes.length)]);
   }
+
+  // One from each category for remaining slots
+  const categoriesAdded = new Set(result.map(t => t.category));
+  for (const types of byCategory.values()) {
+    if (result.length >= count) break;
+    const cat = types[0].category;
+    if (!categoriesAdded.has(cat)) {
+      result.push(types[Math.floor(Math.random() * types.length)]);
+      categoriesAdded.add(cat);
+    }
+  }
+
   // Fill remaining slots randomly
   while (result.length < count) {
     result.push(AIRCRAFT_TYPES[Math.floor(Math.random() * AIRCRAFT_TYPES.length)]);
   }
-  return shuffleArray(result).slice(0, count);
+
+  return result.slice(0, count);
 }
 
 const shuffledTypes = getShuffledTypes(options.count);
