@@ -6,6 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only --ignore-watch node_modules src/main.ts",
     "dev:single": "ts-node-dev --respawn --transpile-only --ignore-watch node_modules src/main.ts",
     "dev:cluster": "ts-node-dev --respawn --transpile-only --ignore-watch node_modules src/main.cluster.ts",
+    "dev:silent": "SILENT=true ts-node-dev --respawn --transpile-only --ignore-watch node_modules src/main.ts",
     "start": "node dist/main.js",
     "start:cluster": "node dist/main.cluster.js",
     "build": "tsc -p tsconfig.build.json",
