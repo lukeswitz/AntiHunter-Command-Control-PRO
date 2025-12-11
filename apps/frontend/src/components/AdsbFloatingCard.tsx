@@ -71,7 +71,8 @@ export function AdsbFloatingCard({
                 <th>Airports</th>
                 <th>Times</th>
                 <th>Reg</th>
-                <th>Country/Type</th>
+                <th>Country</th>
+                <th>Type</th>
                 <th>Airframe</th>
                 <th>Alt</th>
                 <th>Speed</th>
@@ -121,11 +122,10 @@ export function AdsbFloatingCard({
                     </td>
                     <td>{track.reg ?? '--'}</td>
                     <td>
-                      {track.country ?? '--'} {typeInfo.isMilitary ? '★' : ''}
-                      <div className="muted">
-                        {track.category ?? track.categoryDescription ?? '--'}
-                      </div>
+                      {track.country ?? '--'}{' '}
+                      {typeInfo.isMilitary ? <span title="Military aircraft">★</span> : ''}
                     </td>
+                    <td>{track.category ?? track.categoryDescription ?? '--'}</td>
                     <td>
                       {track.model ?? track.aircraftType ?? track.typeCode ?? '--'}
                       <div className="muted">{track.manufacturer ?? ''}</div>
