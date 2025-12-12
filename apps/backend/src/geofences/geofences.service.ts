@@ -32,6 +32,7 @@ export interface GeofenceResponse {
   appliesToAdsb: boolean;
   appliesToDrones: boolean;
   appliesToTargets: boolean;
+  appliesToDevices: boolean;
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -64,6 +65,7 @@ export interface GeofenceUpsertPayload {
   appliesToAdsb?: boolean;
   appliesToDrones?: boolean;
   appliesToTargets?: boolean;
+  appliesToDevices?: boolean;
   createdBy?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -150,6 +152,7 @@ export class GeofencesService {
       appliesToAdsb: dto.appliesToAdsb ?? true,
       appliesToDrones: dto.appliesToDrones ?? true,
       appliesToTargets: dto.appliesToTargets ?? true,
+      appliesToDevices: dto.appliesToDevices ?? true,
       createdBy: createdBy ?? null,
     };
 
@@ -220,6 +223,9 @@ export class GeofencesService {
     if (dto.appliesToTargets !== undefined) {
       data.appliesToTargets = dto.appliesToTargets;
     }
+    if (dto.appliesToDevices !== undefined) {
+      data.appliesToDevices = dto.appliesToDevices;
+    }
 
     const geofence = await this.prisma.geofence.update({
       where: { id },
@@ -283,6 +289,7 @@ export class GeofencesService {
       appliesToAdsb: payload.appliesToAdsb ?? true,
       appliesToDrones: payload.appliesToDrones ?? true,
       appliesToTargets: payload.appliesToTargets ?? true,
+      appliesToDevices: payload.appliesToDevices ?? true,
       createdBy: payload.createdBy ?? null,
       createdAt: payload.createdAt ? new Date(payload.createdAt) : undefined,
       updatedAt: payload.updatedAt ? new Date(payload.updatedAt) : undefined,
@@ -302,6 +309,7 @@ export class GeofencesService {
       appliesToAdsb: payload.appliesToAdsb ?? true,
       appliesToDrones: payload.appliesToDrones ?? true,
       appliesToTargets: payload.appliesToTargets ?? true,
+      appliesToDevices: payload.appliesToDevices ?? true,
       createdBy: payload.createdBy ?? null,
       updatedAt: payload.updatedAt ? new Date(payload.updatedAt) : new Date(),
     };
@@ -394,6 +402,7 @@ export class GeofencesService {
       appliesToAdsb: geofence.appliesToAdsb,
       appliesToDrones: geofence.appliesToDrones,
       appliesToTargets: geofence.appliesToTargets,
+      appliesToDevices: geofence.appliesToDevices,
       createdBy: geofence.createdBy ?? null,
       createdAt: geofence.createdAt.toISOString(),
       updatedAt: geofence.updatedAt.toISOString(),

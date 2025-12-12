@@ -15,6 +15,7 @@ import {
   MdClose,
   MdRadar,
   MdSettingsInputAntenna,
+  MdOutlinePolyline,
 } from 'react-icons/md';
 
 import { getAcarsMessages } from '../api/acars';
@@ -215,6 +216,7 @@ export function MapPage() {
     followEnabled,
     targetsEnabled,
     coverageEnabled,
+    geofencesEnabled,
     adsbEnabled,
     acarsEnabled,
     mapStyle,
@@ -222,6 +224,7 @@ export function MapPage() {
     toggleRadius,
     toggleFollow,
     toggleTargets,
+    toggleGeofences,
     toggleAdsb,
     toggleAcars,
   } = useMapPreferences();
@@ -923,6 +926,13 @@ export function MapPage() {
             >
               <MdVisibility /> Targets
             </button>
+            <button
+              type="button"
+              className={`control-chip ${geofencesEnabled ? 'is-active' : ''}`}
+              onClick={toggleGeofences}
+            >
+              <MdOutlinePolyline /> Geofences
+            </button>
             {adsbAddonEnabled ? (
               <button
                 type="button"
@@ -956,6 +966,7 @@ export function MapPage() {
             showRadius={radiusEnabled}
             showTrails={trailsEnabled}
             showTargets={targetsEnabled}
+            showGeofences={geofencesEnabled}
             adsbTracks={adsbAddonEnabled && adsbEnabled ? adsbTracks : []}
             adsbTrails={adsbTrails}
             acarsMessagesByIcao={

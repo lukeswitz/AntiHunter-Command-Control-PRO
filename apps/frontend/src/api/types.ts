@@ -450,6 +450,7 @@ export interface Geofence {
   appliesToAdsb: boolean;
   appliesToDrones: boolean;
   appliesToTargets: boolean;
+  appliesToDevices: boolean;
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -466,6 +467,7 @@ export interface CreateGeofenceRequest {
   appliesToAdsb?: boolean;
   appliesToDrones?: boolean;
   appliesToTargets?: boolean;
+  appliesToDevices?: boolean;
 }
 
 export interface UpdateGeofenceRequest {
@@ -478,6 +480,7 @@ export interface UpdateGeofenceRequest {
   appliesToAdsb?: boolean;
   appliesToDrones?: boolean;
   appliesToTargets?: boolean;
+  appliesToDevices?: boolean;
 }
 
 export interface FaaAircraftSummary {
