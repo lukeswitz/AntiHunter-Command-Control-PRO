@@ -4,6 +4,7 @@ import { TargetsService } from '../targets/targets.service';
 import { normalizeMac } from '../utils/mac';
 
 const EARTH_RADIUS_M = 6_371_000;
+const SPEED_OF_LIGHT_M_PER_S = 299_792_458; // meters per second
 const DETECTION_WINDOW_MS = 45_000;
 const PERSIST_INTERVAL_MS = 15_000;
 const PERSIST_DISTANCE_M = 8;
@@ -11,6 +12,7 @@ const MIN_BOOTSTRAP_CONFIDENCE = 0.18;
 const MIN_CONFIDENCE_FOR_PERSIST = 0.3;
 const SINGLE_NODE_CONFIDENCE_FLOOR = 0.22;
 const MAX_HISTORY_SIZE = 64;
+const MIN_NODES_FOR_TDOA = 3;
 
 type DetectionSource = 'node' | 'target';
 
@@ -24,6 +26,7 @@ export interface TargetTrackingInput {
   rssi?: number;
   siteId?: string | null;
   timestamp?: number;
+  detectionTimestamp?: number;
 }
 
 interface DetectionEntry {
@@ -36,6 +39,7 @@ interface DetectionEntry {
   rssi?: number;
   timestamp: number;
   source: DetectionSource;
+  detectionTimestamp?: number; // (microseconds)
 }
 
 interface InternalEstimate {
@@ -60,6 +64,7 @@ interface BaseEstimate {
   samples: number;
   uniqueNodes: number;
   spreadMeters: number;
+  method?: 'tdoa' | 'rssi' | 'hybrid';
   contributors: Array<{
     nodeId?: string;
     weight: number;
@@ -133,6 +138,7 @@ export class TargetTrackingService {
       rssi: this.toFinite(input.rssi),
       timestamp: now,
       source: measurementLat !== undefined && measurementLon !== undefined ? 'target' : 'node',
+      detectionTimestamp: this.toFinite(input.detectionTimestamp),
     });
 
     if (state.detections.length > MAX_HISTORY_SIZE) {
@@ -185,6 +191,9 @@ export class TargetTrackingService {
         estimate.lat,
         estimate.lon,
         estimate.siteId ?? undefined,
+        estimate.confidence,
+        estimate.spreadMeters,
+        estimate.method,
       );
 
       if (updated) {
@@ -201,6 +210,38 @@ export class TargetTrackingService {
   }
 
   private buildEstimate(state: TrackingState): BaseEstimate | null {
+    const { detections } = state;
+    if (!detections.length) {
+      return null;
+    }
+
+    // Try TDOA first if we have enough nodes with timestamps
+    const tdoaEstimate = this.tryTDOAEstimate(state);
+    const rssiEstimate = this.tryRSSIEstimate(state);
+
+    // Hybrid approach: combine TDOA and RSSI if both available
+    if (tdoaEstimate && rssiEstimate) {
+      this.logger.debug(
+        `Using hybrid triangulation (TDOA + RSSI) with ${tdoaEstimate.uniqueNodes} nodes`,
+      );
+      return this.combineEstimates(tdoaEstimate, rssiEstimate);
+    }
+
+    if (tdoaEstimate) {
+      this.logger.debug(
+        `Using TDOA triangulation with ${tdoaEstimate.uniqueNodes} nodes, confidence: ${(tdoaEstimate.confidence * 100).toFixed(1)}%`,
+      );
+    } else if (rssiEstimate) {
+      this.logger.debug(
+        `Using RSSI triangulation with ${rssiEstimate.uniqueNodes} nodes, confidence: ${(rssiEstimate.confidence * 100).toFixed(1)}%`,
+      );
+    }
+
+    // Fallback to whichever method succeeded
+    return tdoaEstimate ?? rssiEstimate;
+  }
+
+  private tryRSSIEstimate(state: TrackingState): BaseEstimate | null {
     const { detections } = state;
     if (!detections.length) {
       return null;
@@ -283,7 +324,260 @@ export class TargetTrackingService {
       samples: detections.length,
       uniqueNodes: uniqueNodes.size,
       spreadMeters,
+      method: 'rssi',
       contributors,
+    };
+  }
+
+  /**
+   * TDOA (Time Difference of Arrival) Triangulation
+   * Uses GPS-synchronized timestamps to calculate target position
+   */
+  private tryTDOAEstimate(state: TrackingState): BaseEstimate | null {
+    const { detections } = state;
+
+    // Filter detections with valid timestamps and GPS coordinates
+    const validDetections = detections.filter(
+      (d) =>
+        d.detectionTimestamp !== undefined &&
+        d.nodeLat !== undefined &&
+        d.nodeLon !== undefined &&
+        d.nodeId !== undefined,
+    );
+
+    if (validDetections.length < MIN_NODES_FOR_TDOA) {
+      return null;
+    }
+
+    // Sort by detection timestamp
+    validDetections.sort((a, b) => a.detectionTimestamp! - b.detectionTimestamp!);
+
+    // Use earliest detection as reference
+    const reference = validDetections[0];
+    const refLat = reference.nodeLat!;
+    const refLon = reference.nodeLon!;
+    const refTime = reference.detectionTimestamp!;
+
+    // Calculate TDOA measurements
+    interface TDOANode {
+      lat: number;
+      lon: number;
+      rangeDiff: number;
+      weight: number;
+      nodeId: string;
+      rssi?: number;
+    }
+
+    const tdoaNodes: TDOANode[] = [];
+
+    for (let i = 1; i < validDetections.length; i++) {
+      const detection = validDetections[i];
+      const timeDiff = (detection.detectionTimestamp! - refTime) / 1_000_000; // Convert μs to seconds
+      const rangeDiff = timeDiff * SPEED_OF_LIGHT_M_PER_S;
+
+      // Weight based on signal quality and time precision
+      const baseWeight = detection.weight ?? 1.0;
+      const timeWeight = Math.max(0.1, 1.0 - Math.abs(timeDiff) / 0.1); // Prefer closer time differences
+
+      tdoaNodes.push({
+        lat: detection.nodeLat!,
+        lon: detection.nodeLon!,
+        rangeDiff,
+        weight: baseWeight * timeWeight,
+        nodeId: detection.nodeId!,
+        rssi: detection.rssi,
+      });
+    }
+
+    // Weighted Least Squares TDOA solution
+    const result = this.solveTDOA(refLat, refLon, tdoaNodes);
+
+    if (!result) {
+      return null;
+    }
+
+    // Build contributors array
+    const contributors = [
+      {
+        nodeId: reference.nodeId,
+        weight: reference.weight,
+        maxRssi: reference.rssi,
+        lat: refLat,
+        lon: refLon,
+      },
+      ...tdoaNodes.map((node) => ({
+        nodeId: node.nodeId,
+        weight: Number(node.weight.toFixed(3)),
+        maxRssi: node.rssi,
+        lat: Number(node.lat.toFixed(6)),
+        lon: Number(node.lon.toFixed(6)),
+      })),
+    ];
+
+    const uniqueNodes = new Set(contributors.map((c) => c.nodeId));
+
+    return {
+      lat: result.lat,
+      lon: result.lon,
+      confidence: result.confidence,
+      totalWeight: tdoaNodes.reduce((sum, n) => sum + n.weight, reference.weight),
+      samples: validDetections.length,
+      uniqueNodes: uniqueNodes.size,
+      spreadMeters: result.spreadMeters,
+      method: 'tdoa',
+      contributors,
+    };
+  }
+
+  /**
+   * Solve TDOA equations using weighted least squares
+   */
+  private solveTDOA(
+    refLat: number,
+    refLon: number,
+    nodes: Array<{ lat: number; lon: number; rangeDiff: number; weight: number }>,
+  ): { lat: number; lon: number; confidence: number; spreadMeters: number } | null {
+    if (nodes.length < 2) {
+      return null;
+    }
+
+    // Initial guess: weighted centroid
+    const totalWeight = nodes.reduce((sum, n) => sum + n.weight, 1);
+    let estLat = (refLat + nodes.reduce((sum, n) => sum + n.lat * n.weight, 0)) / totalWeight;
+    let estLon = (refLon + nodes.reduce((sum, n) => sum + n.lon * n.weight, 0)) / totalWeight;
+
+    // Gauss-Newton iterations
+    const maxIterations = 10;
+    const convergenceThreshold = 0.1; // meters
+
+    for (let iter = 0; iter < maxIterations; iter++) {
+      let sumH11 = 0,
+        sumH12 = 0,
+        sumH22 = 0;
+      let sumG1 = 0,
+        sumG2 = 0;
+
+      // Distance from current estimate to reference
+      const r0 = this.distanceMeters(estLat, estLon, refLat, refLon);
+
+      for (const node of nodes) {
+        // Distance from current estimate to this node
+        const ri = this.distanceMeters(estLat, estLon, node.lat, node.lon);
+
+        // Expected range difference
+        const expectedDiff = ri - r0;
+        const residual = node.rangeDiff - expectedDiff;
+
+        // Partial derivatives (approximation using small delta)
+        const deltaLat = 0.00001; // ~1 meter
+        const deltaLon = 0.00001;
+
+        const r0_dLat = this.distanceMeters(estLat + deltaLat, estLon, refLat, refLon);
+        const ri_dLat = this.distanceMeters(estLat + deltaLat, estLon, node.lat, node.lon);
+        const dLat = (ri_dLat - r0_dLat - expectedDiff) / deltaLat;
+
+        const r0_dLon = this.distanceMeters(estLat, estLon + deltaLon, refLat, refLon);
+        const ri_dLon = this.distanceMeters(estLat, estLon + deltaLon, node.lat, node.lon);
+        const dLon = (ri_dLon - r0_dLon - expectedDiff) / deltaLon;
+
+        // Weighted normal equations
+        const w = node.weight;
+        sumH11 += w * dLat * dLat;
+        sumH12 += w * dLat * dLon;
+        sumH22 += w * dLon * dLon;
+        sumG1 += w * dLat * residual;
+        sumG2 += w * dLon * residual;
+      }
+
+      // Solve 2x2 system: H * delta = G
+      const det = sumH11 * sumH22 - sumH12 * sumH12;
+      if (Math.abs(det) < 1e-10) {
+        break; // Singular matrix
+      }
+
+      const deltaLat = (sumH22 * sumG1 - sumH12 * sumG2) / det;
+      const deltaLon = (sumH11 * sumG2 - sumH12 * sumG1) / det;
+
+      estLat += deltaLat;
+      estLon += deltaLon;
+
+      // Check convergence
+      const deltaMeters = Math.sqrt(
+        Math.pow(deltaLat * 111320, 2) + Math.pow(deltaLon * 111320 * Math.cos(this.toRadians(estLat)), 2),
+      );
+
+      if (deltaMeters < convergenceThreshold) {
+        break;
+      }
+    }
+
+    // Calculate spread and confidence
+    const r0Final = this.distanceMeters(estLat, estLon, refLat, refLon);
+    let sumWeightedError = 0;
+    let sumWeights = 0;
+
+    for (const node of nodes) {
+      const ri = this.distanceMeters(estLat, estLon, node.lat, node.lon);
+      const expectedDiff = ri - r0Final;
+      const error = Math.abs(node.rangeDiff - expectedDiff);
+      sumWeightedError += node.weight * error;
+      sumWeights += node.weight;
+    }
+
+    const avgError = sumWeights > 0 ? sumWeightedError / sumWeights : 1000;
+    const spreadMeters = avgError;
+
+    // Confidence based on error, number of nodes, and geometry
+    const errorFactor = 1 / (1 + avgError / 50); // Lower error = higher confidence
+    const nodeFactor = Math.min(1, nodes.length / 4); // More nodes = higher confidence
+    const confidence = this.clamp01(errorFactor * nodeFactor * 0.9);
+
+    return {
+      lat: this.clampLatitude(estLat),
+      lon: this.clampLongitude(estLon),
+      confidence,
+      spreadMeters,
+    };
+  }
+
+  /**
+   * Combine TDOA and RSSI estimates using weighted average
+   */
+  private combineEstimates(tdoa: BaseEstimate, rssi: BaseEstimate): BaseEstimate {
+    // Weight TDOA more heavily (70%) as it's more accurate
+    const tdoaWeight = 0.7;
+    const rssiWeight = 0.3;
+
+    const combinedLat = tdoa.lat * tdoaWeight + rssi.lat * rssiWeight;
+    const combinedLon = tdoa.lon * tdoaWeight + rssi.lon * rssiWeight;
+    const combinedConfidence = Math.max(tdoa.confidence, rssi.confidence) * 0.95;
+
+    // Merge contributors
+    const contributorMap = new Map<string, (typeof tdoa.contributors)[0]>();
+
+    for (const c of [...tdoa.contributors, ...rssi.contributors]) {
+      const existing = contributorMap.get(c.nodeId ?? 'unknown');
+      if (existing) {
+        existing.weight += c.weight ?? 0;
+        if (c.maxRssi !== undefined) {
+          existing.maxRssi =
+            existing.maxRssi !== undefined ? Math.max(existing.maxRssi, c.maxRssi) : c.maxRssi;
+        }
+      } else {
+        contributorMap.set(c.nodeId ?? 'unknown', { ...c });
+      }
+    }
+
+    return {
+      lat: this.clampLatitude(combinedLat),
+      lon: this.clampLongitude(combinedLon),
+      confidence: this.clamp01(combinedConfidence),
+      totalWeight: tdoa.totalWeight + rssi.totalWeight,
+      samples: Math.max(tdoa.samples, rssi.samples),
+      uniqueNodes: Math.max(tdoa.uniqueNodes, rssi.uniqueNodes),
+      spreadMeters: Math.min(tdoa.spreadMeters, rssi.spreadMeters),
+      method: 'hybrid',
+      contributors: Array.from(contributorMap.values()).sort((a, b) => b.weight - a.weight),
     };
   }
 

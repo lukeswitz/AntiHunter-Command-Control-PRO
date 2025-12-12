@@ -30,6 +30,8 @@ export interface SerialTargetDetected {
   channel?: number;
   lat?: number;
   lon?: number;
+  timestamp?: Date;
+  detectionTimestamp?: number; // Microseconds since epoch (for TDOA)
   raw: string;
 }
 

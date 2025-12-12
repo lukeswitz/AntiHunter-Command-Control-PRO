@@ -202,6 +202,9 @@ export class TargetsService {
     lat: number,
     lon: number,
     siteId?: string | null,
+    confidence?: number,
+    uncertainty?: number,
+    method?: string,
   ): Promise<boolean> {
     let normalizedMac: string;
     try {
@@ -217,12 +220,23 @@ export class TargetsService {
       updatedAt: new Date(),
     };
 
+    if (confidence !== undefined) {
+      data.trackingConfidence = confidence;
+    }
+    if (uncertainty !== undefined) {
+      data.trackingUncertainty = uncertainty;
+    }
+    if (method !== undefined) {
+      data.triangulationMethod = method;
+    }
+
     const where: Prisma.TargetWhereInput = { mac: normalizedMac };
     if (siteId !== undefined) {
       where.siteId = siteId ?? null;
     }
 
     try {
+      // Update target
       const result = await this.prisma.target.updateMany({
         where,
         data,
@@ -230,6 +244,25 @@ export class TargetsService {
       if (result.count > 0) {
         const updatedTargets = await this.prisma.target.findMany({ where });
         updatedTargets.forEach((target) => this.changes$.next({ type: 'upsert', target }));
+
+        // Also update inventory location
+        try {
+          await this.prisma.inventoryDevice.update({
+            where: { mac: normalizedMac },
+            data: {
+              lastLat: lat,
+              lastLon: lon,
+              updatedAt: new Date(),
+            },
+          });
+        } catch (inventoryError) {
+          // Inventory might not exist yet, which is okay
+          this.logger.debug(
+            `Could not update inventory location for ${normalizedMac}: ${
+              inventoryError instanceof Error ? inventoryError.message : String(inventoryError)
+            }`,
+          );
+        }
       }
       return result.count > 0;
     } catch (error) {

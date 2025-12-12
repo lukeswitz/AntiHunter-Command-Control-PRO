@@ -22,7 +22,7 @@ const TARGET_REGEX_TYPE_FIRST =
 const TARGET_REGEX_MAC_FIRST =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*Target:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)\s+Type:(?<type>\w+)(?:\s+Name:(?<name>[^ ]+))?(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 const TRI_TARGET_DATA_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*TARGET_DATA:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+Hits=(?<hits>\d+)\s+RSSI:(?<rssi>-?\d+)(?:\s+Type:(?<type>\w+))?\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)(?:\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?))?/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*TARGET_DATA:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+Hits=(?<hits>\d+)\s+RSSI:(?<rssi>-?\d+)(?:\s+Type:(?<type>\w+))?\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)(?:\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?))?(?:\s+TS=(?<ts>-?\d+(?:\.\d+)?))?/i;
 const DEVICE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+(?<band>[A-Za-z])\s+(?<rssi>-?\d+)(?:\s+C(?<channel>\d+))?(?:\s+N:(?<name>.+))?/i;
 const DRONE_REGEX =
@@ -67,6 +67,8 @@ const BASELINE_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*BASELINE_ACK:(?<status>[
 const TRI_RESULTS_START_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_START/i;
 const TRI_RESULTS_END_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_END/i;
 const TRI_RESULTS_NO_DATA_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS:NO_DATA/i;
+const TRI_FINAL_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATION_FINAL:\s*MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)\s+CONF=(?<conf>-?\d+(?:\.\d+)?)\s+UNC=(?<unc>-?\d+(?:\.\d+)?)/i;
 const TRI_COMPLETE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_COMPLETE:\s*(?:MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+)?Nodes=(?<nodes>\d+)\s*(?<rest>.+)?$/i;
 const RTC_SYNC_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*RTC_SYNC:(?<source>\S+)/i;
@@ -153,6 +155,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     const sourceNode = nodeId ?? m.groups.id;
     const lat = m.groups.lat ? Number(m.groups.lat) : undefined;
     const lon = m.groups.lon ? Number(m.groups.lon) : undefined;
+    const timestamp = m.groups.ts ? new Date(Number(m.groups.ts) * 1000) : undefined;
     const detected: SerialParseResult = {
       kind: 'target-detected',
       nodeId: sourceNode,
@@ -162,6 +165,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       name: m.groups.name,
       lat,
       lon,
+      timestamp,
       raw,
     };
     const alert: SerialParseResult = {
@@ -220,8 +224,23 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     const lon = Number(match.groups.lon);
     const hdop = match.groups.hdop ? Number(match.groups.hdop) : undefined;
     const type = match.groups.type;
+    // Preserve full microsecond precision for TDOA calculations
+    const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) * 1_000_000 : undefined;
+    const timestamp = match.groups.ts ? new Date(Number(match.groups.ts) * 1000) : undefined;
     const resolvedNodeId = nodeId ?? match.groups.id;
     return [
+      {
+        kind: 'target-detected',
+        nodeId: resolvedNodeId,
+        mac,
+        rssi,
+        type,
+        // DO NOT include lat/lon here - they represent the node's position, not the target's
+        // The target position will be calculated via TDOA triangulation
+        timestamp,
+        detectionTimestamp, // For TDOA calculations
+        raw,
+      },
       {
         kind: 'alert',
         level: 'NOTICE',
@@ -237,6 +256,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
           lat,
           lon,
           hdop,
+          detectionTimestamp,
         },
       },
     ];
@@ -845,6 +865,27 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
           message: payload,
           raw,
           data: { stage: 'no-data' },
+        },
+      ];
+    }
+    const final = TRI_FINAL_REGEX.exec(payload);
+    if (final?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'triangulation',
+          nodeId: id,
+          message: payload,
+          raw,
+          data: {
+            stage: 'final',
+            mac: final.groups.mac.toUpperCase(),
+            lat: Number(final.groups.lat),
+            lon: Number(final.groups.lon),
+            confidence: Number(final.groups.conf),
+            uncertainty: Number(final.groups.unc),
+          },
         },
       ];
     }

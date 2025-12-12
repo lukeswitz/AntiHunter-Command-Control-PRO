@@ -1,5 +1,6 @@
 {
-  "enabled": true,
+  "enabled": false,
   "udpHost": "127.0.0.1",
-  "udpPort": 15550
+  "udpPort": 15550,
+  "intervalMs": 5000
 }
