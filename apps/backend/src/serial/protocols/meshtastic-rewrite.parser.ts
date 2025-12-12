@@ -233,18 +233,6 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     const resolvedNodeId = nodeId ?? match.groups.id;
     return [
       {
-        kind: 'target-detected',
-        nodeId: resolvedNodeId,
-        mac,
-        rssi,
-        type,
-        // DO NOT include lat/lon here - they represent the node's position, not the target's
-        // The target position will be calculated via TDOA triangulation
-        timestamp,
-        detectionTimestamp, // For TDOA calculations
-        raw,
-      },
-      {
         kind: 'alert',
         level: 'NOTICE',
         category: 'triangulation',

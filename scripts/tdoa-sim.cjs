@@ -4,8 +4,8 @@
  * TDOA Simulator - Tests Time Difference of Arrival triangulation
  *
  * Simulates 4 static nodes detecting a single STATIC target (MAC: AA:BB:CC:DD:EE:FF)
- * positioned inside the node constellation. Each detection includes precise timestamps
- * calculated from signal propagation time to test TDOA accuracy.
+ * positioned inside the node constellation. Each detection includes RTC timestamps
+ * as 2-digit centiseconds (TS=00-99) calculated from signal propagation time.
  *
  * Usage: node scripts/tdoa-sim.cjs --token "<YOUR_ADMIN_JWT>"
  *
@@ -143,23 +143,43 @@ async function main() {
   console.log(`   MAC: ${TARGET_MAC}\n`);
   await delay(2000);
 
+  console.log('Creating target in database...');
+  const initialDetections = [];
+  for (const node of NODES) {
+    const dist = distance(targetLat, targetLon, node.lat, node.lon);
+    const rssi = Math.round(-65 - 20 * Math.log10(dist / 100));
+    initialDetections.push(
+      `${node.id}: Target: WiFi ${TARGET_MAC} RSSI:${rssi}`,
+    );
+  }
+  await send(initialDetections);
+  console.log(`  ✓ Target created from ${NODES.length} initial detections\n`);
+  await delay(2000);
+
+  console.log('Starting TDOA triangulation scan...\n');
+
   for (let i = 0; i < count; i++) {
     const baseTime = Date.now() / 1000;
     const lines = [];
 
-    console.log(`[${i + 1}/${count}] Detection ${i + 1}`);
+    console.log(`[${i + 1}/${count}] TDOA Detection ${i + 1}`);
 
     for (const node of NODES) {
       const dist = distance(targetLat, targetLon, node.lat, node.lon);
       const propTime = dist / SPEED_OF_LIGHT;
-      const ts = (baseTime + propTime).toFixed(6);
+      const fullTime = baseTime + propTime;
+      const fractionalSecond = fullTime - Math.floor(fullTime);
+      const centiseconds = Math.round(fractionalSecond * 100) % 100;
+      const ts = centiseconds.toString().padStart(2, '0');
       const rssi = Math.round(-65 - 20 * Math.log10(dist / 100));
 
       lines.push(
         `${node.id}: TARGET_DATA: ${TARGET_MAC} Hits=5 RSSI:${rssi} Type:WiFi GPS=${node.lat.toFixed(6)},${node.lon.toFixed(6)} HDOP=0.9 TS=${ts}`,
       );
 
-      console.log(`  ${node.id}: dist=${dist.toFixed(1)}m, propTime=${(propTime * 1e6).toFixed(2)}µs, RSSI=${rssi}dBm`);
+      console.log(
+        `  ${node.id}: dist=${dist.toFixed(1)}m, propTime=${(propTime * 1e6).toFixed(2)}µs, TS=${ts}, RSSI=${rssi}dBm`,
+      );
     }
 
     await send(lines);

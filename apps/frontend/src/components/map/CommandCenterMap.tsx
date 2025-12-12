@@ -320,6 +320,57 @@ function hexToRgb(hex: string): string {
   return `${r}, ${g}, ${b}`;
 }
 
+type TDOAQuality = 'high' | 'medium' | 'low' | 'none';
+
+interface TDOAQualityInfo {
+  quality: TDOAQuality;
+  color: string;
+  label: string;
+  icon: string;
+}
+
+function assessTDOAQuality(
+  confidence: number | null | undefined,
+  uncertainty: number | null | undefined,
+): TDOAQualityInfo {
+  if (confidence == null || uncertainty == null) {
+    return {
+      quality: 'none',
+      color: '#6b7280',
+      label: 'No Data',
+      icon: '○',
+    };
+  }
+
+  // High quality: >70% confidence <100m uncertainty
+  if (confidence > 0.7 && uncertainty < 100) {
+    return {
+      quality: 'high',
+      color: '#10b981',
+      label: 'High Quality',
+      icon: '●',
+    };
+  }
+
+  // Medium quality: >50% confidence <300m uncertainty
+  if (confidence > 0.5 && uncertainty < 300) {
+    return {
+      quality: 'medium',
+      color: '#f59e0b',
+      label: 'Medium Quality',
+      icon: '◐',
+    };
+  }
+
+  // Low quality: needs refinement
+  return {
+    quality: 'low',
+    color: '#ef4444',
+    label: 'Low Quality',
+    icon: '○',
+  };
+}
+
 function createNodeIcon(
   node: NodeSummary,
   severity: IndicatorSeverity,
@@ -1168,14 +1219,92 @@ export function CommandCenterMap({
                     <div>
                       Location: {target.lat.toFixed(5)}, {target.lon.toFixed(5)}
                     </div>
-                    {typeof target.trackingConfidence === 'number' && (
-                      <div>Confidence: {(target.trackingConfidence * 100).toFixed(1)}%</div>
-                    )}
-                    {typeof target.trackingUncertainty === 'number' && (
-                      <div>Uncertainty: {target.trackingUncertainty.toFixed(1)}m</div>
-                    )}
-                    {target.triangulationMethod && (
-                      <div>Method: {target.triangulationMethod.toUpperCase()}</div>
+                    {(typeof target.trackingConfidence === 'number' ||
+                      typeof target.trackingUncertainty === 'number') && (
+                      <>
+                        <div
+                          style={{
+                            marginTop: '0.5rem',
+                            paddingTop: '0.5rem',
+                            borderTop: '1px solid rgba(255, 255, 255, 0.15)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              marginBottom: '0.3rem',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: '1rem',
+                                color: assessTDOAQuality(
+                                  target.trackingConfidence,
+                                  target.trackingUncertainty,
+                                ).color,
+                              }}
+                            >
+                              {
+                                assessTDOAQuality(
+                                  target.trackingConfidence,
+                                  target.trackingUncertainty,
+                                ).icon
+                              }
+                            </span>
+                            <strong
+                              style={{
+                                color: assessTDOAQuality(
+                                  target.trackingConfidence,
+                                  target.trackingUncertainty,
+                                ).color,
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              {
+                                assessTDOAQuality(
+                                  target.trackingConfidence,
+                                  target.trackingUncertainty,
+                                ).label
+                              }
+                            </strong>
+                          </div>
+                          <div style={{ display: 'grid', gap: '0.2rem', fontSize: '0.75rem' }}>
+                            {typeof target.trackingConfidence === 'number' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ opacity: 0.75 }}>Confidence:</span>
+                                <span style={{ fontWeight: 600 }}>
+                                  {(target.trackingConfidence * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                            )}
+                            {typeof target.trackingUncertainty === 'number' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ opacity: 0.75 }}>Uncertainty:</span>
+                                <span style={{ fontWeight: 600 }}>
+                                  ±{target.trackingUncertainty.toFixed(1)}m
+                                </span>
+                              </div>
+                            )}
+                            {target.triangulationMethod && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ opacity: 0.75 }}>Method:</span>
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    fontSize: '0.7rem',
+                                    letterSpacing: '0.02rem',
+                                  }}
+                                >
+                                  {target.triangulationMethod}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
                     )}
                     <div>Last seen: {new Date(target.lastSeen).toLocaleString()}</div>
                     {target.tracking ? (
