@@ -408,6 +408,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
               rssi?: unknown;
               detectionTimestamp?: unknown;
               stage?: unknown;
+              type?: unknown;
             };
 
             const macFromData = triData.mac;
@@ -436,9 +437,41 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
                 detectionTimestamp: triDetectionTimestamp, // GPS-synced RTC timestamp
               });
 
+              // Update inventory for this detection
+              try {
+                await this.inventoryService.recordDetection(
+                  {
+                    kind: 'target-detected',
+                    nodeId: event.nodeId,
+                    mac: macString,
+                    rssi: triRssi ?? 0,
+                    type: triData.type ? String(triData.type) : undefined,
+                    lat: estimate?.lat ?? triLat,
+                    lon: estimate?.lon ?? triLon,
+                    raw: event.raw,
+                  },
+                  siteId,
+                  triLat,
+                  triLon,
+                );
+              } catch (error) {
+                this.logger.warn(
+                  `Failed to update inventory for TARGET_DATA ${macString}: ${
+                    error instanceof Error ? error.message : String(error)
+                  }`,
+                );
+              }
+
               // Persist if tracking service recommends
               if (estimate?.shouldPersist) {
                 await this.trackingService.persistEstimate(estimate.mac, estimate);
+                this.logger.debug(
+                  `Persisted TDOA estimate for ${estimate.mac}: method=${estimate.method}, confidence=${(estimate.confidence * 100).toFixed(1)}%, nodes=${estimate.uniqueNodes}`,
+                );
+              } else if (estimate) {
+                this.logger.debug(
+                  `TDOA estimate not persisted for ${estimate.mac}: confidence=${(estimate.confidence * 100).toFixed(1)}%, method=${estimate.method}, shouldPersist=false`,
+                );
               }
 
               // Emit tracking update to WebSocket clients

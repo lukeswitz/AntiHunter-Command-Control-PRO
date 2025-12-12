@@ -9,7 +9,7 @@ import { useTrackingBannerStore } from '../stores/tracking-banner-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
 import { useTriangulationStore } from '../stores/triangulation-store';
 
-const DEFAULT_TRIANGULATION_DURATION = 300;
+const DEFAULT_TRIANGULATION_DURATION = 30;
 const DEFAULT_SCAN_DURATION = 60;
 const TRIANGULATE_DEBOUNCE_MS = 3000;
 const REFINEMENT_DURATION_MULTIPLIER = 1.5;
@@ -284,7 +284,7 @@ export function TargetsPage() {
       return;
     }
     const input = window.prompt(
-      'Enter triangulation duration in seconds (60-300)',
+      'Enter triangulation duration in seconds (30-300)',
       String(DEFAULT_TRIANGULATION_DURATION),
     );
     if (input == null) {
@@ -295,7 +295,7 @@ export function TargetsPage() {
       window.alert('Invalid duration.');
       return;
     }
-    const duration = Math.max(60, Math.min(300, Math.round(parsed)));
+    const duration = Math.max(30, Math.min(300, Math.round(parsed)));
     beginTriangulateCooldown();
     void triangulateMutation.mutateAsync({ target, duration }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to start triangulation.';

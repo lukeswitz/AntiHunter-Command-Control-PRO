@@ -224,23 +224,12 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     const lon = Number(match.groups.lon);
     const hdop = match.groups.hdop ? Number(match.groups.hdop) : undefined;
     const type = match.groups.type;
-    // Preserve full microsecond precision for TDOA calculations
-    const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) * 1_000_000 : undefined;
-    const timestamp = match.groups.ts ? new Date(Number(match.groups.ts) * 1000) : undefined;
+
+    // TODO see if it is centiseconds from FW 
+    const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) * 10_000 : undefined;
+    const timestamp = match.groups.ts ? new Date() : undefined;
     const resolvedNodeId = nodeId ?? match.groups.id;
     return [
-      {
-        kind: 'target-detected',
-        nodeId: resolvedNodeId,
-        mac,
-        rssi,
-        type,
-        // DO NOT include lat/lon here - they represent the node's position, not the target's
-        // The target position will be calculated via TDOA triangulation
-        timestamp,
-        detectionTimestamp, // For TDOA calculations
-        raw,
-      },
       {
         kind: 'alert',
         level: 'NOTICE',
@@ -257,6 +246,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
           lon,
           hdop,
           detectionTimestamp,
+          timestamp,
         },
       },
     ];

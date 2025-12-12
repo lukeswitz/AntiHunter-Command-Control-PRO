@@ -8,9 +8,9 @@ const SPEED_OF_LIGHT_M_PER_S = 299_792_458; // meters per second
 const DETECTION_WINDOW_MS = 45_000;
 const PERSIST_INTERVAL_MS = 15_000;
 const PERSIST_DISTANCE_M = 8;
-const MIN_BOOTSTRAP_CONFIDENCE = 0.18;
-const MIN_CONFIDENCE_FOR_PERSIST = 0.3;
-const SINGLE_NODE_CONFIDENCE_FLOOR = 0.22;
+const MIN_BOOTSTRAP_CONFIDENCE = 0.05;
+const MIN_CONFIDENCE_FOR_PERSIST = 0.1;
+const SINGLE_NODE_CONFIDENCE_FLOOR = 0.08;
 const MAX_HISTORY_SIZE = 64;
 const MIN_NODES_FOR_TDOA = 3;
 
@@ -128,7 +128,7 @@ export class TargetTrackingService {
       measurementLat !== undefined && measurementLon !== undefined,
     );
 
-    state.detections.push({
+    const detection: DetectionEntry = {
       nodeId: input.nodeId,
       lat: latForEntry,
       lon: lonForEntry,
@@ -137,9 +137,19 @@ export class TargetTrackingService {
       weight,
       rssi: this.toFinite(input.rssi),
       timestamp: now,
-      source: measurementLat !== undefined && measurementLon !== undefined ? 'target' : 'node',
+      source: (measurementLat !== undefined && measurementLon !== undefined
+        ? 'target'
+        : 'node') as DetectionSource,
       detectionTimestamp: this.toFinite(input.detectionTimestamp),
-    });
+    };
+
+    state.detections.push(detection);
+
+    if (input.detectionTimestamp !== undefined) {
+      this.logger.debug(
+        `Ingested detection for ${normalizedMac} from node ${input.nodeId}: RSSI=${input.rssi}, detectionTimestamp=${input.detectionTimestamp}μs, nodeLat=${nodeLat}, nodeLon=${nodeLon}`,
+      );
+    }
 
     if (state.detections.length > MAX_HISTORY_SIZE) {
       state.detections.splice(0, state.detections.length - MAX_HISTORY_SIZE);
@@ -379,6 +389,20 @@ export class TargetTrackingService {
       const baseWeight = detection.weight ?? 1.0;
       const timeWeight = Math.max(0.1, 1.0 - Math.abs(timeDiff) / 0.1); // Prefer closer time differences
 
+      this.logger.debug(
+        `TDOA node ${detection.nodeId}: timeDiff=${(timeDiff * 1000).toFixed(3)}ms, rangeDiff=${rangeDiff.toFixed(1)}m, timestamp=${detection.detectionTimestamp}μs`,
+      );
+
+      // Warn if range difference is unrealistic (suggests timestamp conversion issue)
+      if (Math.abs(rangeDiff) > 100_000) {
+        // 100km threshold
+        this.logger.warn(
+          `TDOA: Suspicious range difference of ${(rangeDiff / 1000).toFixed(1)}km detected. ` +
+            `This may indicate incorrect timestamp conversion (TS field multiplier). ` +
+            `Time diff: ${(timeDiff * 1000).toFixed(3)}ms between nodes ${reference.nodeId} and ${detection.nodeId}`,
+        );
+      }
+
       tdoaNodes.push({
         lat: detection.nodeLat!,
         lon: detection.nodeLon!,
@@ -429,9 +453,6 @@ export class TargetTrackingService {
     };
   }
 
-  /**
-   * Solve TDOA equations using weighted least squares
-   */
   private solveTDOA(
     refLat: number,
     refLon: number,
@@ -441,14 +462,29 @@ export class TargetTrackingService {
       return null;
     }
 
-    // Initial guess: weighted centroid
-    const totalWeight = nodes.reduce((sum, n) => sum + n.weight, 1);
-    let estLat = (refLat + nodes.reduce((sum, n) => sum + n.lat * n.weight, 0)) / totalWeight;
-    let estLon = (refLon + nodes.reduce((sum, n) => sum + n.lon * n.weight, 0)) / totalWeight;
+    const nodePositions = [{ lat: refLat, lon: refLon }, ...nodes];
+    const avgNodeDistance =
+      nodePositions.reduce((sum, n1, i) => {
+        return (
+          sum +
+          nodePositions
+            .slice(i + 1)
+            .reduce((s, n2) => s + this.distanceMeters(n1.lat, n1.lon, n2.lat, n2.lon), 0)
+        );
+      }, 0) /
+      ((nodePositions.length * (nodePositions.length - 1)) / 2);
 
-    // Gauss-Newton iterations
-    const maxIterations = 10;
-    const convergenceThreshold = 0.1; // meters
+    const environment = this.detectEnvironment(avgNodeDistance, nodes.length);
+
+    let workingNodes = [...nodes];
+    const maxIterations = 15;
+    const convergenceThreshold = 0.1;
+
+    const totalWeight = workingNodes.reduce((sum, n) => sum + n.weight, 1);
+    let estLat =
+      (refLat + workingNodes.reduce((sum, n) => sum + n.lat * n.weight, 0)) / totalWeight;
+    let estLon =
+      (refLon + workingNodes.reduce((sum, n) => sum + n.lon * n.weight, 0)) / totalWeight;
 
     for (let iter = 0; iter < maxIterations; iter++) {
       let sumH11 = 0,
@@ -457,19 +493,16 @@ export class TargetTrackingService {
       let sumG1 = 0,
         sumG2 = 0;
 
-      // Distance from current estimate to reference
       const r0 = this.distanceMeters(estLat, estLon, refLat, refLon);
+      const residuals: number[] = [];
 
-      for (const node of nodes) {
-        // Distance from current estimate to this node
+      for (const node of workingNodes) {
         const ri = this.distanceMeters(estLat, estLon, node.lat, node.lon);
-
-        // Expected range difference
         const expectedDiff = ri - r0;
         const residual = node.rangeDiff - expectedDiff;
+        residuals.push(Math.abs(residual));
 
-        // Partial derivatives (approximation using small delta)
-        const deltaLat = 0.00001; // ~1 meter
+        const deltaLat = 0.00001;
         const deltaLon = 0.00001;
 
         const r0_dLat = this.distanceMeters(estLat + deltaLat, estLon, refLat, refLon);
@@ -480,7 +513,6 @@ export class TargetTrackingService {
         const ri_dLon = this.distanceMeters(estLat, estLon + deltaLon, node.lat, node.lon);
         const dLon = (ri_dLon - r0_dLon - expectedDiff) / deltaLon;
 
-        // Weighted normal equations
         const w = node.weight;
         sumH11 += w * dLat * dLat;
         sumH12 += w * dLat * dLon;
@@ -489,10 +521,20 @@ export class TargetTrackingService {
         sumG2 += w * dLon * residual;
       }
 
-      // Solve 2x2 system: H * delta = G
+      if (iter > 3 && workingNodes.length >= 4) {
+        const medianResidual = this.median(residuals);
+        const mad = this.median(residuals.map((r) => Math.abs(r - medianResidual)));
+        const threshold = medianResidual + 3 * mad * 1.4826;
+
+        const filtered = workingNodes.filter((node, idx) => residuals[idx] <= threshold);
+        if (filtered.length >= MIN_NODES_FOR_TDOA) {
+          workingNodes = filtered;
+        }
+      }
+
       const det = sumH11 * sumH22 - sumH12 * sumH12;
       if (Math.abs(det) < 1e-10) {
-        break; // Singular matrix
+        break;
       }
 
       const deltaLat = (sumH22 * sumG1 - sumH12 * sumG2) / det;
@@ -501,9 +543,9 @@ export class TargetTrackingService {
       estLat += deltaLat;
       estLon += deltaLon;
 
-      // Check convergence
       const deltaMeters = Math.sqrt(
-        Math.pow(deltaLat * 111320, 2) + Math.pow(deltaLon * 111320 * Math.cos(this.toRadians(estLat)), 2),
+        Math.pow(deltaLat * 111320, 2) +
+          Math.pow(deltaLon * 111320 * Math.cos(this.toRadians(estLat)), 2),
       );
 
       if (deltaMeters < convergenceThreshold) {
@@ -511,26 +553,30 @@ export class TargetTrackingService {
       }
     }
 
-    // Calculate spread and confidence
     const r0Final = this.distanceMeters(estLat, estLon, refLat, refLon);
     let sumWeightedError = 0;
     let sumWeights = 0;
+    const errors: number[] = [];
 
-    for (const node of nodes) {
+    for (const node of workingNodes) {
       const ri = this.distanceMeters(estLat, estLon, node.lat, node.lon);
       const expectedDiff = ri - r0Final;
       const error = Math.abs(node.rangeDiff - expectedDiff);
+      errors.push(error);
       sumWeightedError += node.weight * error;
       sumWeights += node.weight;
     }
 
     const avgError = sumWeights > 0 ? sumWeightedError / sumWeights : 1000;
-    const spreadMeters = avgError;
+    const medianError = this.median(errors);
+    const spreadMeters = Math.min(avgError, medianError * 1.5);
 
-    // Confidence based on error, number of nodes, and geometry
-    const errorFactor = 1 / (1 + avgError / 50); // Lower error = higher confidence
-    const nodeFactor = Math.min(1, nodes.length / 4); // More nodes = higher confidence
-    const confidence = this.clamp01(errorFactor * nodeFactor * 0.9);
+    const envFactor = environment === 'urban' ? 0.7 : environment === 'suburban' ? 0.85 : 1.0;
+    const errorThreshold = environment === 'urban' ? 100 : environment === 'suburban' ? 75 : 50;
+    const errorFactor = envFactor / (1 + spreadMeters / errorThreshold);
+    const nodeFactor = Math.min(1, workingNodes.length / 4);
+    const gdopFactor = this.calculateGDOP(refLat, refLon, workingNodes);
+    const confidence = this.clamp01(errorFactor * nodeFactor * gdopFactor * 0.95);
 
     return {
       lat: this.clampLatitude(estLat),
@@ -538,6 +584,49 @@ export class TargetTrackingService {
       confidence,
       spreadMeters,
     };
+  }
+
+  private detectEnvironment(avgNodeDistance: number, nodeCount: number): string {
+    const density = nodeCount / Math.max(1, avgNodeDistance / 1000);
+    if (density > 5 || avgNodeDistance < 500) {
+      return 'urban';
+    } else if (density > 2 || avgNodeDistance < 1500) {
+      return 'suburban';
+    }
+    return 'rural';
+  }
+
+  private calculateGDOP(
+    refLat: number,
+    refLon: number,
+    nodes: Array<{ lat: number; lon: number }>,
+  ): number {
+    if (nodes.length < 2) {
+      return 0.5;
+    }
+    const angles: number[] = [];
+    for (const node of nodes) {
+      const dLat = node.lat - refLat;
+      const dLon = node.lon - refLon;
+      angles.push(Math.atan2(dLon, dLat));
+    }
+    angles.sort((a, b) => a - b);
+    let minAngleDiff = Math.PI * 2;
+    for (let i = 0; i < angles.length; i++) {
+      const diff = (angles[(i + 1) % angles.length] - angles[i] + Math.PI * 2) % (Math.PI * 2);
+      minAngleDiff = Math.min(minAngleDiff, diff);
+    }
+    const idealAngle = (Math.PI * 2) / (nodes.length + 1);
+    return Math.max(0.3, 1 - Math.abs(minAngleDiff - idealAngle) / Math.PI);
+  }
+
+  private median(values: number[]): number {
+    if (values.length === 0) {
+      return 0;
+    }
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
   }
 
   /**
