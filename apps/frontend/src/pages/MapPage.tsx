@@ -167,7 +167,7 @@ export function MapPage() {
     );
     const triMac =
       triangulationState.status === 'success' &&
-      triangulationState.link &&
+      (triangulationState.link || (triangulationState.lat != null && triangulationState.lon != null)) &&
       triangulationState.targetMac &&
       triangulationState.lastUpdated &&
       Date.now() - triangulationState.lastUpdated < 10_000
@@ -178,6 +178,10 @@ export function MapPage() {
       const comment = commentMap[target.id];
       const lastSeen = target.updatedAt ?? target.createdAt;
       const targetMacUpper = target.mac ? target.mac.toUpperCase() : null;
+      // Check if target has been triangulated (persisted data or recent triangulation)
+      const hasPersistedTriangulation =
+        target.trackingConfidence != null && target.trackingConfidence > 0;
+      const isRecentTriangulation = triMac != null && targetMacUpper === triMac;
       return {
         id: target.id,
         mac: target.mac ?? undefined,
@@ -193,7 +197,10 @@ export function MapPage() {
         trackingSince: trackingEntry?.since ?? null,
         trackingConfidence:
           typeof target.trackingConfidence === 'number' ? target.trackingConfidence : undefined,
-        triangulatedRecent: triMac != null && targetMacUpper === triMac,
+        trackingUncertainty:
+          typeof target.trackingUncertainty === 'number' ? target.trackingUncertainty : undefined,
+        triangulationMethod: target.triangulationMethod ?? undefined,
+        triangulatedRecent: hasPersistedTriangulation || isRecentTriangulation,
         history: [
           {
             lat: target.lat,
@@ -554,6 +561,15 @@ export function MapPage() {
       }
     });
 
+    // Add targets
+    if (targetsQuery.data) {
+      targetsQuery.data.forEach((target) => {
+        if (typeof target.lat === 'number' && typeof target.lon === 'number') {
+          positions.push([target.lat, target.lon]);
+        }
+      });
+    }
+
     // Add drones
     freshDrones.forEach((drone) => {
       if (typeof drone.lat === 'number' && typeof drone.lon === 'number') {
@@ -584,7 +600,7 @@ export function MapPage() {
     const bounds = latLngBounds(positions);
     mapRef.current.fitBounds(bounds.pad(0.25));
     return true;
-  }, [mapReady, nodeListWithFix, freshDrones, adsbTracks, geofences]);
+  }, [mapReady, nodeListWithFix, targetsQuery.data, freshDrones, adsbTracks, geofences]);
 
   const handleFitClick = () => {
     if (fitEnabled) {
