@@ -733,6 +733,7 @@ interface CommandCenterMapProps {
   showRadius: boolean;
   showTrails: boolean;
   showTargets: boolean;
+  showGeofences: boolean;
   followEnabled: boolean;
   showCoverage: boolean;
   adsbTracks?: AdsbTrack[];
@@ -770,6 +771,7 @@ export function CommandCenterMap({
   showRadius,
   showTrails,
   showTargets,
+  showGeofences,
   followEnabled,
   showCoverage,
   geofences,
@@ -941,7 +943,7 @@ export function CommandCenterMap({
         baseRadius={effectiveRadius}
       />
 
-      {uniqueGeofences.map((geofence) => {
+      {showGeofences && uniqueGeofences.map((geofence) => {
         if (geofence.polygon.length < 3) {
           return null;
         }

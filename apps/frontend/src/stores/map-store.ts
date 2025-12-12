@@ -8,6 +8,7 @@ interface MapPreferencesState {
   followEnabled: boolean;
   targetsEnabled: boolean;
   coverageEnabled: boolean;
+  geofencesEnabled: boolean;
   adsbEnabled: boolean;
   adsbMuted: boolean;
   acarsEnabled: boolean;
@@ -21,6 +22,7 @@ interface MapPreferencesState {
   toggleFollow: () => void;
   toggleTargets: () => void;
   toggleCoverage: () => void;
+  toggleGeofences: () => void;
   toggleAdsb: () => void;
   toggleAdsbMuted: () => void;
   toggleAcars: () => void;
@@ -37,6 +39,7 @@ const DEFAULT_STATE: Pick<
   | 'followEnabled'
   | 'targetsEnabled'
   | 'coverageEnabled'
+  | 'geofencesEnabled'
   | 'adsbEnabled'
   | 'adsbMuted'
   | 'acarsEnabled'
@@ -52,6 +55,7 @@ const DEFAULT_STATE: Pick<
   followEnabled: false,
   targetsEnabled: true,
   coverageEnabled: false,
+  geofencesEnabled: true,
   adsbEnabled: false,
   adsbMuted: false,
   acarsEnabled: false,
@@ -71,6 +75,7 @@ export const useMapPreferences = create<MapPreferencesState>()(
       toggleFollow: () => set((state) => ({ followEnabled: !state.followEnabled })),
       toggleTargets: () => set((state) => ({ targetsEnabled: !state.targetsEnabled })),
       toggleCoverage: () => set((state) => ({ coverageEnabled: !state.coverageEnabled })),
+      toggleGeofences: () => set((state) => ({ geofencesEnabled: !state.geofencesEnabled })),
       toggleAdsb: () => set((state) => ({ adsbEnabled: !state.adsbEnabled })),
       toggleAdsbMuted: () => set((state) => ({ adsbMuted: !state.adsbMuted })),
       toggleAcars: () => set((state) => ({ acarsEnabled: !state.acarsEnabled })),
@@ -83,7 +88,7 @@ export const useMapPreferences = create<MapPreferencesState>()(
     }),
     {
       name: 'map-preferences',
-      version: 3,
+      version: 4,
       partialize: (state) => ({
         fitEnabled: state.fitEnabled,
         trailsEnabled: state.trailsEnabled,
@@ -91,6 +96,7 @@ export const useMapPreferences = create<MapPreferencesState>()(
         followEnabled: state.followEnabled,
         targetsEnabled: state.targetsEnabled,
         coverageEnabled: state.coverageEnabled,
+        geofencesEnabled: state.geofencesEnabled,
         adsbEnabled: state.adsbEnabled,
         adsbMuted: state.adsbMuted,
         acarsEnabled: state.acarsEnabled,

@@ -56,4 +56,8 @@ export class CreateGeofenceDto {
   @IsOptional()
   @IsBoolean()
   appliesToTargets?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  appliesToDevices?: boolean;
 }

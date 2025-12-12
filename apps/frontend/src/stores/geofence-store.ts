@@ -201,6 +201,9 @@ export const useGeofenceStore = create<GeofenceStoreState>()((set, get) => {
             ...('appliesToTargets' in update
               ? { appliesToTargets: update.appliesToTargets ?? geofence.appliesToTargets }
               : null),
+            ...('appliesToDevices' in update
+              ? { appliesToDevices: update.appliesToDevices ?? geofence.appliesToDevices }
+              : null),
             polygon: update.polygon ? update.polygon.map(normalizeVertex) : geofence.polygon,
             alarm: update.alarm ? { ...geofence.alarm, ...update.alarm } : geofence.alarm,
             updatedAt: new Date().toISOString(),
@@ -302,6 +305,19 @@ export const useGeofenceStore = create<GeofenceStoreState>()((set, get) => {
 
       geofences.forEach((geofence) => {
         if (geofence.polygon.length < 3 || !geofence.alarm.enabled) {
+          return;
+        }
+
+        // Check if this geofence applies to this entity type
+        const type = entityType?.toLowerCase();
+        if (type === 'drone' && !geofence.appliesToDrones) {
+          return;
+        }
+        if (type === 'target' && !geofence.appliesToTargets) {
+          return;
+        }
+        // For devices and any other entity types
+        if (type !== 'drone' && type !== 'target' && !geofence.appliesToDevices) {
           return;
         }
 
@@ -433,6 +449,9 @@ function mergePatch(
   }
   if (update.appliesToTargets !== undefined) {
     patch.appliesToTargets = update.appliesToTargets;
+  }
+  if (update.appliesToDevices !== undefined) {
+    patch.appliesToDevices = update.appliesToDevices;
   }
 
   return patch;
