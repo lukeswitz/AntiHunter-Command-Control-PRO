@@ -182,9 +182,21 @@ const ADSB_FIGHTER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2
     d="M11.5 17v3.5h1V17z"
   />
 </svg>`;
+const ADSB_LIGHT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <path
+    fill="#ffffff"
+    d="M11.75 4c0-.28.22-.5.5-.5s.5.22.5.5v4.5l4 1v.8l-4-.5v2.5l1.5 1v.8l-1.75-.3-.25-.05-.25.05-1.75.3v-.8l1.5-1v-2.5l-4 .5v-.8l4-1V4Z"
+  />
+  <circle cx="12" cy="16" r="0.8" fill="#ffffff"/>
+  <path
+    fill="#ffffff"
+    d="M11.5 16.5v2h1v-2z"
+  />
+</svg>`;
 
 type AdsbAircraftType =
   | 'plane'
+  | 'light'
   | 'helicopter'
   | 'uav'
   | 'glider'
@@ -206,6 +218,12 @@ const ADSB_TYPE_CONFIG: Record<AdsbAircraftType, Omit<AdsbTypeInfo, 'type'>> = {
     svg: ADSB_PLANE_SVG,
     color: '#06b6d4', // cyan
     label: 'Fixed wing',
+    isMilitary: false,
+  },
+  light: {
+    svg: ADSB_LIGHT_SVG,
+    color: '#22c55e', // light green
+    label: 'Light aircraft',
     isMilitary: false,
   },
   helicopter: {
@@ -348,17 +366,34 @@ function createAdsbIcon(track: AdsbTrack, hasAcarsMessages = false): DivIcon {
     track.aircraftType,
     track.typeCode,
     track.categoryDescription,
+    track.callsign,
+    track.reg,
+    track.icao,
   );
   const config = ADSB_TYPE_CONFIG[typeInfo.type];
   const markerClass = `adsb-marker--${typeInfo.type}`;
   const rotation = typeof track.heading === 'number' ? track.heading : null;
   const acarsBadge = hasAcarsMessages
-    ? '<span class="adsb-marker__acars-badge" title="Has ACARS messages">ÔÜí</span>'
+    ? '<span class="adsb-marker__acars-badge" title="Has ACARS messages">⚡</span>'
     : '';
+  const militaryBadge = typeInfo.isMilitary
+    ? '<span class="adsb-marker__military-badge" title="Military aircraft">★</span>'
+    : '';
+
+  // Build tooltip with aircraft info
+  const tooltipParts = [track.callsign ?? track.icao, config.label];
+  if (typeInfo.isMilitary) {
+    tooltipParts.push('MILITARY');
+  }
+  if (track.alt) {
+    tooltipParts.push(`${track.alt.toFixed(0)}ft`);
+  }
+  const tooltip = escapeHtml(tooltipParts.join(' | '));
+
   return divIcon({
     html: `<div class="adsb-marker ${markerClass}" style="--adsb-color:${config.color};${
       rotation != null ? `--adsb-rotation:${rotation}deg;` : ''
-    }"><span class="adsb-marker__icon" aria-hidden="true">${config.svg}</span><span class="adsb-marker__label">${label}${acarsBadge}</span></div>`,
+    }" title="${tooltip}"><span class="adsb-marker__icon" aria-hidden="true">${config.svg}</span><span class="adsb-marker__label">${label}${militaryBadge}${acarsBadge}</span></div>`,
     className: 'adsb-marker-wrapper',
     iconSize: [40, 48],
     iconAnchor: [20, 16],
@@ -376,57 +411,130 @@ function createAcarsIcon(message: AcarsMessage): DivIcon {
   });
 }
 
-function detectAdsbAircraftType(
+export function detectAdsbAircraftType(
   category?: string | null,
   aircraftType?: string | null,
   typeCode?: string | null,
   categoryDescription?: string | null,
+  callsign?: string | null,
+  registration?: string | null,
+  icaoHex?: string | null,
 ): AdsbTypeInfo {
-  const tokens = [category, aircraftType, typeCode, categoryDescription]
+  const tokens = [category, aircraftType, typeCode, categoryDescription, callsign, registration]
     .map((token) => token?.trim().toUpperCase())
     .filter((token): token is string => Boolean(token));
+
+  // ICAO hex code (Mode-S address) is the definitive method to detect military aircraft
+  // Each country has allocated ranges, with military using specific sub-ranges
+  let isMilitary = false;
+  const icaoHexUpper = icaoHex?.trim().toUpperCase();
+
+  if (icaoHexUpper && /^[0-9A-F]{6}$/i.test(icaoHexUpper)) {
+    // US Military: AE0000-AEFFFF
+    if (icaoHexUpper >= 'AE0000' && icaoHexUpper <= 'AEFFFF') {
+      isMilitary = true;
+    }
+    // Add other country military ranges as needed:
+    // Canada military: Often in C00000-C3FFFF range
+    // UK military: Often in 400000-43FFFF range
+    // NATO: Various ranges
+  }
+
+  // Fallback: Check callsign patterns if ICAO hex range check didn't catch it
+  if (!isMilitary) {
+    const callsignUpper = callsign?.trim().toUpperCase();
+    if (callsignUpper) {
+      // Common military callsign prefixes
+      const militaryCallsigns = [
+        'RCH',
+        'REACH',
+        'EVAC',
+        'CONVOY',
+        'TITAN',
+        'SPAR',
+        'VENUS',
+        'CLUB',
+        'NAVY',
+        'ARMY',
+        'AIR FORCE',
+        'USAF',
+        'USN',
+        'USMC',
+        'USCG',
+        'OTIS',
+        'CHIEF',
+        'SPUR',
+        'PITT',
+        'BOXER',
+        'VALOR',
+        'TORCH',
+        'DUMP',
+        'TANK',
+        'HAWK',
+        'VIPER',
+        'FURY',
+        'CHAOS',
+        'MAGIC',
+        'PAT',
+        'PATROL',
+        'GUARD',
+        'EASY',
+        'RACER',
+        'HUNTER',
+        'AIR FORCE ONE',
+      ];
+      isMilitary = militaryCallsigns.some((prefix) => callsignUpper.startsWith(prefix));
+    }
+  }
 
   // Check category codes first (most reliable)
   const cat = category?.trim().toUpperCase();
   if (cat) {
     // Category A: Aircraft
     if (cat === 'A7') {
-      return { type: 'helicopter', ...ADSB_TYPE_CONFIG.helicopter };
+      return { type: 'helicopter', ...ADSB_TYPE_CONFIG.helicopter, isMilitary };
     }
     if (cat === 'A6') {
       // High performance - likely military fighter
-      return { type: 'fighter', ...ADSB_TYPE_CONFIG.fighter };
+      return { type: 'fighter', ...ADSB_TYPE_CONFIG.fighter, isMilitary: true };
     }
     if (cat === 'A5') {
       // Heavy aircraft (>300,000 lbs)
-      return { type: 'heavy', ...ADSB_TYPE_CONFIG.heavy };
+      return { type: 'heavy', ...ADSB_TYPE_CONFIG.heavy, isMilitary };
     }
-    // A4, A3, A2, A1, A0 are regular planes
+    if (cat === 'A4' || cat === 'A3') {
+      // Large aircraft (75,000 to 300,000 lbs) - Boeing 737, A320, etc.
+      return { type: 'plane', ...ADSB_TYPE_CONFIG.plane, isMilitary };
+    }
+    if (cat === 'A2' || cat === 'A1' || cat === 'A0') {
+      // Light/Small aircraft (< 75,000 lbs) - Cessnas, business jets, etc.
+      return { type: 'light', ...ADSB_TYPE_CONFIG.light, isMilitary };
+    }
 
     // Category B: Non-aircraft
     if (cat === 'B6') {
       // UAV/UAS
-      return { type: 'uav', ...ADSB_TYPE_CONFIG.uav };
+      return { type: 'uav', ...ADSB_TYPE_CONFIG.uav, isMilitary };
     }
     if (cat === 'B1') {
-      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider };
+      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider, isMilitary };
     }
     if (cat === 'B2') {
       // Lighter-than-air
-      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon };
+      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon, isMilitary };
     }
     if (cat === 'B3' || cat === 'B4') {
       // Parachutist/Ultralight - treat as glider
-      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider };
+      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider, isMilitary };
     }
 
     // Category C: Ground vehicles and obstacles
     if (cat === 'C1' || cat === 'C2') {
-      return { type: 'ground', ...ADSB_TYPE_CONFIG.ground };
+      return { type: 'ground', ...ADSB_TYPE_CONFIG.ground, isMilitary };
     }
     if (cat === 'C3' || cat === 'C4' || cat === 'C5') {
       // Obstacles (including tethered balloons)
-      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon };
+      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon, isMilitary };
     }
   }
 
@@ -440,7 +548,7 @@ function detectAdsbAircraftType(
       token.includes('ROTOR') ||
       token.includes('ROTARY')
     ) {
-      return { type: 'helicopter', ...ADSB_TYPE_CONFIG.helicopter };
+      return { type: 'helicopter', ...ADSB_TYPE_CONFIG.helicopter, isMilitary };
     }
 
     // UAV/Drone detection
@@ -451,7 +559,7 @@ function detectAdsbAircraftType(
       token.includes('DRONE') ||
       token.includes('UNMANNED')
     ) {
-      return { type: 'uav', ...ADSB_TYPE_CONFIG.uav };
+      return { type: 'uav', ...ADSB_TYPE_CONFIG.uav, isMilitary };
     }
 
     // Fighter/Military detection
@@ -462,7 +570,7 @@ function detectAdsbAircraftType(
       token.includes('F-') || // F-16, F-22, etc.
       token.includes('MIL')
     ) {
-      return { type: 'fighter', ...ADSB_TYPE_CONFIG.fighter };
+      return { type: 'fighter', ...ADSB_TYPE_CONFIG.fighter, isMilitary: true };
     }
 
     // Glider detection
@@ -472,7 +580,7 @@ function detectAdsbAircraftType(
       token.includes('SAILPLANE') ||
       token.includes('ULTRA')
     ) {
-      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider };
+      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider, isMilitary };
     }
 
     // Balloon detection
@@ -483,12 +591,12 @@ function detectAdsbAircraftType(
       token.includes('AIRSHIP') ||
       token.includes('BLIMP')
     ) {
-      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon };
+      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon, isMilitary };
     }
 
     // Ground vehicle detection
     if (token === 'C1' || token === 'C2' || token.includes('GROUND') || token.includes('VEHICLE')) {
-      return { type: 'ground', ...ADSB_TYPE_CONFIG.ground };
+      return { type: 'ground', ...ADSB_TYPE_CONFIG.ground, isMilitary };
     }
 
     // Heavy aircraft detection
@@ -499,12 +607,12 @@ function detectAdsbAircraftType(
       token.includes('747') ||
       token.includes('777')
     ) {
-      return { type: 'heavy', ...ADSB_TYPE_CONFIG.heavy };
+      return { type: 'heavy', ...ADSB_TYPE_CONFIG.heavy, isMilitary };
     }
   }
 
   // Default to regular plane
-  return { type: 'plane', ...ADSB_TYPE_CONFIG.plane };
+  return { type: 'plane', ...ADSB_TYPE_CONFIG.plane, isMilitary };
 }
 
 function createDroneIcon(drone: DroneMarker): DivIcon {
@@ -1073,6 +1181,9 @@ export function CommandCenterMap({
           track.aircraftType,
           track.typeCode,
           track.categoryDescription,
+          track.callsign,
+          track.reg,
+          track.icao,
         );
         const config = ADSB_TYPE_CONFIG[typeInfo.type];
         const trailColor = config.color;
@@ -1100,7 +1211,9 @@ export function CommandCenterMap({
               <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
                 <div className="drone-tooltip">
                   <div className="adsb-tooltip-header">
-                    <div className="badge badge--inline">Source: ADS-B</div>
+                    <div className="badge badge--inline">
+                      Source: ADS-B{typeInfo.isMilitary ? ' | ★ MIL' : ''}
+                    </div>
                     <strong className="adsb-tooltip-callsign">
                       {track.callsign ?? track.icao}
                     </strong>
@@ -1110,9 +1223,6 @@ export function CommandCenterMap({
                     Location: {track.lat.toFixed(5)}, {track.lon.toFixed(5)}
                   </div>
                   <div>Type: {typeInfo.label}</div>
-                  {typeInfo.isMilitary ? (
-                    <div className="badge badge--warning">Classification: Military</div>
-                  ) : null}
                   {(() => {
                     const depLabel = buildAirportLabel(track.depIata, track.depIcao ?? track.dep);
                     const destLabel = buildAirportLabel(

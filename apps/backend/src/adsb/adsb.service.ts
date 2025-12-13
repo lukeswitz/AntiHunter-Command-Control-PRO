@@ -288,7 +288,8 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
 
   clearSessionLog(): void {
     this.sessionLog.clear();
-    this.logger.log('Cleared ADS-B session log');
+    this.tracks.clear();
+    this.logger.log('Cleared ADS-B session log and live tracks');
   }
 
   // Alert rules CRUD

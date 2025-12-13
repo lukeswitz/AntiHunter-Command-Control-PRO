@@ -1364,15 +1364,16 @@ body.theme-dark .control-chip[disabled] {
   }
 }
 
-/* On small screens, dock floating cards under the map instead of overlaying */
-@media (max-width: 1180px) {
+/* On small and medium screens, dock floating cards under the map instead of overlaying */
+@media (max-width: 1400px) {
   .drone-floating-card {
     position: static;
     display: none;
     width: 100%;
     max-height: none;
-    border-radius: 0;
+    border-radius: 0.85rem;
     padding: 0.9rem 1rem 1rem;
+    margin-top: 1rem;
     transform: none;
     opacity: 1;
     pointer-events: auto;
@@ -2801,14 +2802,15 @@ body.theme-dark .control-chip[disabled] {
   }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1400px) {
   .drone-floating-card {
     position: static;
     display: none;
     width: 100%;
     max-height: none;
-    border-radius: 0;
+    border-radius: 0.85rem;
     padding: 0.9rem 1rem 1rem;
+    margin-top: 1rem;
     transform: none;
     opacity: 1;
     pointer-events: auto;

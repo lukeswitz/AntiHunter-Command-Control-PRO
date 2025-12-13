@@ -15,6 +15,7 @@ import {
   MdClose,
   MdRadar,
   MdSettingsInputAntenna,
+  MdViewList,
 } from 'react-icons/md';
 
 import { getAcarsMessages } from '../api/acars';
@@ -604,6 +605,7 @@ export function MapPage() {
   const [droneCardVisible, setDroneCardVisible] = useState(false);
   const [activeAdsbId, setActiveAdsbId] = useState<string | null>(null);
   const [adsbCardVisible, setAdsbCardVisible] = useState(false);
+  const [tracksUiVisible, setTracksUiVisible] = useState(true);
 
   useEffect(() => {
     if (freshDrones.length === 0) {
@@ -729,9 +731,19 @@ export function MapPage() {
 
   const handleAdsbCardClose = useCallback(() => {
     setAdsbCardVisible(false);
-  }, []);
+    // If both cards are now closed, also hide the tracks UI
+    if (!droneCardVisible) {
+      setTracksUiVisible(false);
+    }
+  }, [droneCardVisible]);
 
-  const handleDroneCardClose = useCallback(() => setDroneCardVisible(false), []);
+  const handleDroneCardClose = useCallback(() => {
+    setDroneCardVisible(false);
+    // If both cards are now closed, also hide the tracks UI
+    if (!adsbCardVisible) {
+      setTracksUiVisible(false);
+    }
+  }, [adsbCardVisible]);
 
   useEffect(() => {
     if (geofenceHighlightCount === 0) {
@@ -923,6 +935,27 @@ export function MapPage() {
             >
               <MdVisibility /> Targets
             </button>
+            {freshDrones.length > 0 || adsbTracksForCard.length > 0 ? (
+              <button
+                type="button"
+                className={`control-chip ${tracksUiVisible ? 'is-active' : ''}`}
+                onClick={() => {
+                  const nextVisible = !tracksUiVisible;
+                  setTracksUiVisible(nextVisible);
+                  // When showing tracks, also restore individual card visibility
+                  if (nextVisible) {
+                    if (freshDrones.length > 0) {
+                      setDroneCardVisible(true);
+                    }
+                    if (adsbTracksForCard.length > 0) {
+                      setAdsbCardVisible(true);
+                    }
+                  }
+                }}
+              >
+                <MdViewList /> Tracks
+              </button>
+            ) : null}
             {adsbAddonEnabled ? (
               <button
                 type="button"
@@ -991,6 +1024,24 @@ export function MapPage() {
             onAdsbSelect={handleAdsbSelect}
           />
         </div>
+        <AdsbFloatingCard
+          tracks={adsbTracksForCard}
+          activeId={activeAdsbId}
+          visible={tracksUiVisible && adsbCardVisible && adsbTracksForCard.length > 0}
+          onClose={handleAdsbCardClose}
+          onSelect={handleAdsbSelect}
+        />
+        <DroneFloatingCard
+          drones={freshDrones}
+          activeDroneId={activeDroneId}
+          visible={tracksUiVisible && droneCardVisible && freshDrones.length > 0}
+          onClose={handleDroneCardClose}
+          onSelect={handleDroneSelect}
+          onStatusChange={canManageDrones ? handleDroneStatusChange : undefined}
+          statusOptions={DRONE_STATUS_OPTIONS}
+          isStatusUpdating={isUpdatingDrone}
+          canManage={canManageDrones}
+        />
         <footer className="map-footer">
           <section className="map-footer__views">
             <div className="map-footer__views-controls">
@@ -1089,24 +1140,6 @@ export function MapPage() {
           </div>
         </footer>
       </section>
-      <AdsbFloatingCard
-        tracks={adsbTracksForCard}
-        activeId={activeAdsbId}
-        visible={adsbCardVisible && adsbTracksForCard.length > 0}
-        onClose={handleAdsbCardClose}
-        onSelect={handleAdsbSelect}
-      />
-      <DroneFloatingCard
-        drones={freshDrones}
-        activeDroneId={activeDroneId}
-        visible={droneCardVisible && freshDrones.length > 0}
-        onClose={handleDroneCardClose}
-        onSelect={handleDroneSelect}
-        onStatusChange={canManageDrones ? handleDroneStatusChange : undefined}
-        statusOptions={DRONE_STATUS_OPTIONS}
-        isStatusUpdating={isUpdatingDrone}
-        canManage={canManageDrones}
-      />
     </>
   );
 }
