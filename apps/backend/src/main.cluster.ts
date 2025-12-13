@@ -6,9 +6,7 @@ import { SerialClusterMessage } from './serial/serial-cluster.types';
 
 // Check for silent flag (from command line or environment variable)
 const isSilent =
-  process.argv.includes('--silent') ||
-  process.argv.includes('-s') ||
-  process.env.SILENT === 'true';
+  process.argv.includes('--silent') || process.argv.includes('-s') || process.env.SILENT === 'true';
 
 if (isSilent) {
   // Set log level to error to suppress all output except critical errors
