@@ -697,8 +697,7 @@ body.theme-dark .control-chip[disabled] {
 .geofence-table td textarea,
 .geofence-table td select,
 .geofence-table td input[type='text'],
-.geofence-table td input[type='number'],
-.geofence-table td input[type='color'] {
+.geofence-table td input[type='number'] {
   width: 100%;
   background: var(--color-input-bg);
   border: 1px solid var(--color-input-border);
@@ -706,6 +705,15 @@ body.theme-dark .control-chip[disabled] {
   padding: 0.4rem 0.65rem;
   color: var(--color-text);
   font-size: 0.88rem;
+}
+.geofence-table td input[type='color'] {
+  width: 48px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-input-border);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  background: transparent;
 }
 .geofence-table td textarea:focus,
 .geofence-table td select:focus {

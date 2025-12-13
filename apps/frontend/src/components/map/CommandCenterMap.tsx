@@ -790,6 +790,7 @@ interface CommandCenterMapProps {
   showRadius: boolean;
   showTrails: boolean;
   showTargets: boolean;
+  showGeofences: boolean;
   followEnabled: boolean;
   showCoverage: boolean;
   adsbTracks?: AdsbTrack[];
@@ -827,6 +828,7 @@ export function CommandCenterMap({
   showRadius,
   showTrails,
   showTargets,
+  showGeofences,
   followEnabled,
   showCoverage,
   geofences,
@@ -998,44 +1000,45 @@ export function CommandCenterMap({
         baseRadius={effectiveRadius}
       />
 
-      {uniqueGeofences.map((geofence) => {
-        if (geofence.polygon.length < 3) {
-          return null;
-        }
-        const positions = geofence.polygon.map((vertex: GeofenceVertex) => [
-          vertex.lat,
-          vertex.lon,
-        ]) as LatLngTuple[];
-        const highlighted = geofenceHighlights.has(geofence.id);
-        const polygonClass = classNames(
-          'geofence-polygon',
-          highlighted && 'geofence-polygon--breached',
-        );
-        return (
-          <Polygon
-            key={geofence.id}
-            positions={positions}
-            pathOptions={{
-              className: polygonClass,
-              color: geofence.color,
-              fillColor: geofence.color,
-              weight: highlighted ? 3 : 2,
-              fillOpacity: highlighted ? 0.25 : 0.15,
-            }}
-          >
-            <Tooltip direction="center" opacity={0.85}>
-              <div className="geofence-tooltip">
-                <strong>{geofence.name}</strong>
-                {geofence.alarm.enabled ? (
-                  <span className="badge badge--active">Alarm: {geofence.alarm.level}</span>
-                ) : (
-                  <span className="badge">Alarm disabled</span>
-                )}
-              </div>
-            </Tooltip>
-          </Polygon>
-        );
-      })}
+      {showGeofences &&
+        uniqueGeofences.map((geofence) => {
+          if (geofence.polygon.length < 3) {
+            return null;
+          }
+          const positions = geofence.polygon.map((vertex: GeofenceVertex) => [
+            vertex.lat,
+            vertex.lon,
+          ]) as LatLngTuple[];
+          const highlighted = geofenceHighlights.has(geofence.id);
+          const polygonClass = classNames(
+            'geofence-polygon',
+            highlighted && 'geofence-polygon--breached',
+          );
+          return (
+            <Polygon
+              key={geofence.id}
+              positions={positions}
+              pathOptions={{
+                className: polygonClass,
+                color: geofence.color,
+                fillColor: geofence.color,
+                weight: highlighted ? 3 : 2,
+                fillOpacity: highlighted ? 0.25 : 0.15,
+              }}
+            >
+              <Tooltip direction="center" opacity={0.85}>
+                <div className="geofence-tooltip">
+                  <strong>{geofence.name}</strong>
+                  {geofence.alarm.enabled ? (
+                    <span className="badge badge--active">Alarm: {geofence.alarm.level}</span>
+                  ) : (
+                    <span className="badge">Alarm disabled</span>
+                  )}
+                </div>
+              </Tooltip>
+            </Polygon>
+          );
+        })}
 
       {drawing?.enabled && draftPositions.length > 0 ? (
         <>
