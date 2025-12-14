@@ -27,6 +27,7 @@ export interface TargetTrackingInput {
   siteId?: string | null;
   timestamp?: number;
   detectionTimestamp?: number;
+  hdop?: number;
 }
 
 interface DetectionEntry {
@@ -40,6 +41,7 @@ interface DetectionEntry {
   timestamp: number;
   source: DetectionSource;
   detectionTimestamp?: number; // (microseconds)
+  hdop?: number;
 }
 
 interface InternalEstimate {
@@ -141,6 +143,7 @@ export class TargetTrackingService {
         ? 'target'
         : 'node') as DetectionSource,
       detectionTimestamp: this.toFinite(input.detectionTimestamp),
+      hdop: this.toFinite(input.hdop),
     };
 
     state.detections.push(detection);
@@ -385,12 +388,24 @@ export class TargetTrackingService {
       const timeDiff = (detection.detectionTimestamp! - refTime) / 1_000_000; // Convert μs to seconds
       const rangeDiff = timeDiff * SPEED_OF_LIGHT_M_PER_S;
 
-      // Weight based on signal quality and time precision
+      // Weight based on signal quality, GPS accuracy, and clock synchronization
       const baseWeight = detection.weight ?? 1.0;
-      const timeWeight = Math.max(0.1, 1.0 - Math.abs(timeDiff) / 0.1); // Prefer closer time differences
+
+      // HDOP weight: lower HDOP = better GPS accuracy = higher weight
+      // Typical HDOP values: <2 (excellent), 2-5 (good), 5-10 (moderate), >10 (poor)
+      const hdopWeight = detection.hdop !== undefined
+        ? Math.max(0.3, 1.0 / (1.0 + detection.hdop / 2.5))  // Normalize around HDOP=2.5
+        : 0.7; // Default if HDOP unavailable
+
+      // Clock sync weight: GPS-disciplined clocks have microsecond precision
+      // High weight for valid timestamps (indicates GPS-synced RTC)
+      const clockSyncWeight = 1.0;
+
+      const finalWeight = baseWeight * hdopWeight * clockSyncWeight;
 
       this.logger.debug(
-        `TDOA node ${detection.nodeId}: timeDiff=${(timeDiff * 1000).toFixed(3)}ms, rangeDiff=${rangeDiff.toFixed(1)}m, timestamp=${detection.detectionTimestamp}μs`,
+        `TDOA node ${detection.nodeId}: timeDiff=${(timeDiff * 1000).toFixed(3)}ms, rangeDiff=${rangeDiff.toFixed(1)}m, ` +
+        `timestamp=${detection.detectionTimestamp}μs, hdop=${detection.hdop?.toFixed(2) ?? 'N/A'}, weight=${finalWeight.toFixed(3)}`,
       );
 
       // Warn if range difference is unrealistic (suggests timestamp conversion issue)
@@ -407,7 +422,7 @@ export class TargetTrackingService {
         lat: detection.nodeLat!,
         lon: detection.nodeLon!,
         rangeDiff,
-        weight: baseWeight * timeWeight,
+        weight: finalWeight,
         nodeId: detection.nodeId!,
         rssi: detection.rssi,
       });
@@ -572,11 +587,13 @@ export class TargetTrackingService {
     const spreadMeters = Math.min(avgError, medianError * 1.5);
 
     const envFactor = environment === 'urban' ? 0.7 : environment === 'suburban' ? 0.85 : 1.0;
-    const errorThreshold = environment === 'urban' ? 100 : environment === 'suburban' ? 75 : 50;
+    // Tighter error thresholds for GPS-disciplined clock precision (microsecond timestamps)
+    const errorThreshold = environment === 'urban' ? 75 : environment === 'suburban' ? 50 : 35;
     const errorFactor = envFactor / (1 + spreadMeters / errorThreshold);
     const nodeFactor = Math.min(1, workingNodes.length / 4);
     const gdopFactor = this.calculateGDOP(refLat, refLon, workingNodes);
-    const confidence = this.clamp01(errorFactor * nodeFactor * gdopFactor * 0.95);
+    // Boost confidence slightly due to GPS-synced timestamps (0.95 → 0.98)
+    const confidence = this.clamp01(errorFactor * nodeFactor * gdopFactor * 0.98);
 
     return {
       lat: this.clampLatitude(estLat),

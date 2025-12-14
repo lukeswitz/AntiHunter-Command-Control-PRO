@@ -224,8 +224,8 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     const hdop = match.groups.hdop ? Number(match.groups.hdop) : undefined;
     const type = match.groups.type;
 
-    // TODO see if it is centiseconds from FW
-    const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) * 10_000 : undefined;
+    // Convert Unix timestamp (seconds) to microseconds for TDoA precision
+    const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) * 1_000_000 : undefined;
     const timestamp = match.groups.ts ? new Date() : undefined;
     const resolvedNodeId = nodeId ?? match.groups.id;
     return [

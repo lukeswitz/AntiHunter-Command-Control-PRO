@@ -407,6 +407,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
               lon?: unknown;
               rssi?: unknown;
               detectionTimestamp?: unknown;
+              hdop?: unknown;
               stage?: unknown;
               type?: unknown;
             };
@@ -417,6 +418,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             const triRssi = typeof triData.rssi === 'number' ? triData.rssi : undefined;
             const triDetectionTimestamp =
               typeof triData.detectionTimestamp === 'number' ? triData.detectionTimestamp : undefined;
+            const triHdop = typeof triData.hdop === 'number' ? triData.hdop : undefined;
 
             // Handle TARGET_DATA messages (not just complete stage)
             if (macFromData && triLat != null && triLon != null && event.nodeId) {
@@ -435,6 +437,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
                 siteId,
                 timestamp: timestamp.getTime(),
                 detectionTimestamp: triDetectionTimestamp, // GPS-synced RTC timestamp
+                hdop: triHdop, // GPS Horizontal Dilution of Precision
               });
 
               // Update inventory for this detection
