@@ -229,6 +229,8 @@ export function TargetsPage() {
       window.alert('Triangulation commands are cooling down. Please wait a moment.');
       return;
     }
+    // Set cooldown immediately to prevent multiple rapid clicks
+    beginTriangulateCooldown();
     const input = window.prompt(
       'Enter triangulation duration in seconds (60-300)',
       String(DEFAULT_TRIANGULATION_DURATION),
@@ -242,7 +244,6 @@ export function TargetsPage() {
       return;
     }
     const duration = Math.max(60, Math.min(300, Math.round(parsed)));
-    beginTriangulateCooldown();
     void triangulateMutation.mutateAsync({ target, duration }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
       window.alert(message);
