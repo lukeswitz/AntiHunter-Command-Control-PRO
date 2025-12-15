@@ -4,8 +4,9 @@
  * TDOA Simulator - Tests Time Difference of Arrival triangulation
  *
  * Simulates 4 static nodes detecting a single STATIC target (MAC: AA:BB:CC:DD:EE:FF)
- * positioned inside the node constellation. Each detection includes RTC timestamps
- * as 2-digit centiseconds (TS=00-99) calculated from signal propagation time.
+ * positioned inside the node constellation. Each detection includes GPS-disciplined
+ * RTC timestamps as Unix seconds with microsecond precision, calculated from signal
+ * propagation time to simulate realistic TDoA measurements.
  *
  * Usage: node scripts/tdoa-sim.cjs --token "<YOUR_ADMIN_JWT>"
  *
@@ -159,7 +160,7 @@ async function main() {
   console.log('Starting TDOA triangulation scan...\n');
 
   for (let i = 0; i < count; i++) {
-    const baseTime = Date.now() / 1000;
+    const baseTime = Date.now() / 1000; // Unix timestamp in seconds
     const lines = [];
 
     console.log(`[${i + 1}/${count}] TDOA Detection ${i + 1}`);
@@ -167,14 +168,14 @@ async function main() {
     for (const node of NODES) {
       const dist = distance(targetLat, targetLon, node.lat, node.lon);
       const propTime = dist / SPEED_OF_LIGHT;
-      const fullTime = baseTime + propTime;
-      const fractionalSecond = fullTime - Math.floor(fullTime);
-      const centiseconds = Math.round(fractionalSecond * 100) % 100;
-      const ts = centiseconds.toString().padStart(2, '0');
+      // Add propagation time to base time for GPS-disciplined RTC timestamp
+      const detectionTime = baseTime + propTime;
+      // Format with 6 decimal places for microsecond precision
+      const ts = detectionTime.toFixed(6);
       const rssi = Math.round(-65 - 20 * Math.log10(dist / 100));
 
       lines.push(
-        `${node.id}: TARGET_DATA: ${TARGET_MAC} Hits=5 RSSI:${rssi} Type:WiFi GPS=${node.lat.toFixed(6)},${node.lon.toFixed(6)} HDOP=0.9 TS=${ts}`,
+        `${node.id}: TARGET_DATA: ${TARGET_MAC} RSSI:${rssi} Type:WiFi GPS=${node.lat.toFixed(6)},${node.lon.toFixed(6)} HDOP=0.9 TS=${ts}`,
       );
 
       console.log(
