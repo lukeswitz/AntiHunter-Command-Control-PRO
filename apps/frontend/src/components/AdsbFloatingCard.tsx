@@ -103,7 +103,7 @@ export function AdsbFloatingCard({
                     key={track.id}
                     className={classNames({
                       'is-active': isActive,
-                      'is-most-recent': isMostRecent
+                      'is-most-recent': isMostRecent,
                     })}
                     onClick={() => onSelect(track)}
                   >

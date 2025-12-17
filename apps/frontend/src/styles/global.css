@@ -1108,7 +1108,7 @@ body.theme-dark .control-chip[disabled] {
   background: rgba(5, 7, 8, 0.9) !important;
   color: #ffffff !important;
   white-space: normal !important;
-  max-width: min(360px, calc(100vw - 40px)) !important;
+  max-width: 360px;
   word-break: normal;
   overflow-wrap: break-word;
   border: 1px solid rgba(255, 255, 255, 0.18) !important;
@@ -1116,8 +1116,6 @@ body.theme-dark .control-chip[disabled] {
   backdrop-filter: blur(6px) !important;
   text-shadow: none !important;
   border-radius: 0.75rem !important;
-  max-height: calc(100vh - 80px) !important;
-  overflow-y: auto !important;
 }
 
 .leaflet-tooltip a {

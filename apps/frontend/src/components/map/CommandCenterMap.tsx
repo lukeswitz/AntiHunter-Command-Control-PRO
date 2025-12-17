@@ -1884,7 +1884,9 @@ function MapTooltipPositionManager() {
         const parent = tooltipElement.parentElement;
 
         // Find the associated marker to calculate clearance
-        const marker = parent?.querySelector('.leaflet-marker-icon, .adsb-marker-wrapper, .drone-marker-wrapper, .target-marker-wrapper');
+        const marker = parent?.querySelector(
+          '.leaflet-marker-icon, .adsb-marker-wrapper, .drone-marker-wrapper, .target-marker-wrapper',
+        );
         const markerRect = marker?.getBoundingClientRect();
 
         let adjusted = false;
@@ -1892,8 +1894,8 @@ function MapTooltipPositionManager() {
         const translateMatch = currentTransform.match(/translate3d\(([-\d.]+)px,\s*([-\d.]+)px/);
 
         if (translateMatch) {
-          let currentX = Number.parseFloat(translateMatch[1] || '0');
-          let currentY = Number.parseFloat(translateMatch[2] || '0');
+          const currentX = Number.parseFloat(translateMatch[1] || '0');
+          const currentY = Number.parseFloat(translateMatch[2] || '0');
           let newX = currentX;
           let newY = currentY;
 
@@ -1906,7 +1908,7 @@ function MapTooltipPositionManager() {
 
             const distanceFromMarker = Math.sqrt(
               Math.pow(tooltipCenterX - markerCenterX, 2) +
-              Math.pow(tooltipCenterY - markerCenterY, 2)
+                Math.pow(tooltipCenterY - markerCenterY, 2),
             );
 
             // If tooltip is too close to marker, push it away
@@ -1924,14 +1926,14 @@ function MapTooltipPositionManager() {
             newX = currentX - overflow;
             adjusted = true;
           } else if (tooltipRect.left < mapRect.left + padding) {
-            const overflow = (mapRect.left + padding) - tooltipRect.left;
+            const overflow = mapRect.left + padding - tooltipRect.left;
             newX = currentX + overflow;
             adjusted = true;
           }
 
           // Adjust vertically if tooltip extends beyond edges
           if (tooltipRect.top < mapRect.top + padding) {
-            const overflow = (mapRect.top + padding) - tooltipRect.top;
+            const overflow = mapRect.top + padding - tooltipRect.top;
             newY = currentY + overflow;
             adjusted = true;
           } else if (tooltipRect.bottom > mapRect.bottom - padding) {
