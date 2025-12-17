@@ -417,7 +417,9 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             const triLon = typeof triData.lon === 'number' ? triData.lon : undefined;
             const triRssi = typeof triData.rssi === 'number' ? triData.rssi : undefined;
             const triDetectionTimestamp =
-              typeof triData.detectionTimestamp === 'number' ? triData.detectionTimestamp : undefined;
+              typeof triData.detectionTimestamp === 'number'
+                ? triData.detectionTimestamp
+                : undefined;
             const triHdop = typeof triData.hdop === 'number' ? triData.hdop : undefined;
 
             // Handle TARGET_DATA messages (not just complete stage)

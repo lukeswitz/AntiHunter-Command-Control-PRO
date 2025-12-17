@@ -393,9 +393,10 @@ export class TargetTrackingService {
 
       // HDOP weight: lower HDOP = better GPS accuracy = higher weight
       // Typical HDOP values: <2 (excellent), 2-5 (good), 5-10 (moderate), >10 (poor)
-      const hdopWeight = detection.hdop !== undefined
-        ? Math.max(0.3, 1.0 / (1.0 + detection.hdop / 2.5))  // Normalize around HDOP=2.5
-        : 0.7; // Default if HDOP unavailable
+      const hdopWeight =
+        detection.hdop !== undefined
+          ? Math.max(0.3, 1.0 / (1.0 + detection.hdop / 2.5)) // Normalize around HDOP=2.5
+          : 0.7; // Default if HDOP unavailable
 
       // Clock sync weight: GPS-disciplined clocks have microsecond precision
       // High weight for valid timestamps (indicates GPS-synced RTC)
@@ -405,7 +406,7 @@ export class TargetTrackingService {
 
       this.logger.debug(
         `TDOA node ${detection.nodeId}: timeDiff=${(timeDiff * 1000).toFixed(3)}ms, rangeDiff=${rangeDiff.toFixed(1)}m, ` +
-        `timestamp=${detection.detectionTimestamp}μs, hdop=${detection.hdop?.toFixed(2) ?? 'N/A'}, weight=${finalWeight.toFixed(3)}`,
+          `timestamp=${detection.detectionTimestamp}μs, hdop=${detection.hdop?.toFixed(2) ?? 'N/A'}, weight=${finalWeight.toFixed(3)}`,
       );
 
       // Warn if range difference is unrealistic (suggests timestamp conversion issue)

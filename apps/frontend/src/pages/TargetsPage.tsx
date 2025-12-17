@@ -709,8 +709,9 @@ export function TargetsPage() {
                           type="button"
                           className="control-chip"
                           style={{
-                            backgroundColor:
-                              tdoaQuality.needsRefinement ? '#ef444420' : '#f59e0b20',
+                            backgroundColor: tdoaQuality.needsRefinement
+                              ? '#ef444420'
+                              : '#f59e0b20',
                             borderColor: tdoaQuality.needsRefinement ? '#ef4444' : '#f59e0b',
                           }}
                           onClick={() => {

@@ -167,7 +167,8 @@ export function MapPage() {
     );
     const triMac =
       triangulationState.status === 'success' &&
-      (triangulationState.link || (triangulationState.lat != null && triangulationState.lon != null)) &&
+      (triangulationState.link ||
+        (triangulationState.lat != null && triangulationState.lon != null)) &&
       triangulationState.targetMac &&
       triangulationState.lastUpdated &&
       Date.now() - triangulationState.lastUpdated < 10_000
