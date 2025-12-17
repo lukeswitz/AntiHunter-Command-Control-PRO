@@ -84,8 +84,9 @@ export function AdsbFloatingCard({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((track) => {
+              {sorted.map((track, index) => {
                 const isActive = activeId === track.id;
+                const isMostRecent = index === 0;
                 const typeInfo = detectAdsbAircraftType(
                   track.category,
                   track.aircraftType,
@@ -94,11 +95,16 @@ export function AdsbFloatingCard({
                   track.callsign,
                   track.reg,
                   track.icao,
+                  track.manufacturer,
+                  track.model,
                 );
                 return (
                   <tr
                     key={track.id}
-                    className={classNames({ 'is-active': isActive })}
+                    className={classNames({
+                      'is-active': isActive,
+                      'is-most-recent': isMostRecent
+                    })}
                     onClick={() => onSelect(track)}
                   >
                     <td>
