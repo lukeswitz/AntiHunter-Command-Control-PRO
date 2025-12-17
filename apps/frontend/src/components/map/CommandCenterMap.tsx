@@ -2,7 +2,7 @@ import classNames from 'clsx';
 import type { LatLngExpression, LatLngTuple, Map as LeafletMap, TileLayerOptions } from 'leaflet';
 import { DivIcon, divIcon } from 'leaflet';
 import * as L from 'leaflet';
-import { Fragment, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Circle,
   LayersControl,
@@ -369,6 +369,8 @@ function createAdsbIcon(track: AdsbTrack, hasAcarsMessages = false): DivIcon {
     track.callsign,
     track.reg,
     track.icao,
+    track.manufacturer,
+    track.model,
   );
   const config = ADSB_TYPE_CONFIG[typeInfo.type];
   const markerClass = `adsb-marker--${typeInfo.type}`;
@@ -419,6 +421,8 @@ export function detectAdsbAircraftType(
   callsign?: string | null,
   registration?: string | null,
   icaoHex?: string | null,
+  manufacturer?: string | null,
+  model?: string | null,
 ): AdsbTypeInfo {
   const tokens = [category, aircraftType, typeCode, categoryDescription, callsign, registration]
     .map((token) => token?.trim().toUpperCase())
@@ -972,6 +976,7 @@ export function CommandCenterMap({
       preferCanvas
     >
       <MapReadyBridge onReady={handleReady} />
+      <MapTooltipPositionManager />
       <GeofenceDrawingHandler
         enabled={Boolean(drawing?.enabled)}
         onPoint={drawing?.onPoint}
@@ -1187,6 +1192,8 @@ export function CommandCenterMap({
           track.callsign,
           track.reg,
           track.icao,
+          track.manufacturer,
+          track.model,
         );
         const config = ADSB_TYPE_CONFIG[typeInfo.type];
         const trailColor = config.color;
@@ -1850,6 +1857,139 @@ function buildAirportLabel(iata?: string | null, icao?: string | null): string |
     return `${iataCode} (${icaoCode})`;
   }
   return iataCode || icaoCode || null;
+}
+
+/**
+ * Component that monitors and adjusts tooltip positions to prevent them from going off-screen
+ * while ensuring they don't cover markers
+ */
+function MapTooltipPositionManager() {
+  const map = useMap();
+
+  useEffect(() => {
+    const adjustTooltips = () => {
+      const mapContainer = map.getContainer();
+      const tooltips = mapContainer.querySelectorAll('.leaflet-tooltip');
+      const mapRect = mapContainer.getBoundingClientRect();
+      const padding = 15; // Padding from map edges
+      const minMarkerClearance = 60; // Minimum distance from marker to avoid covering it
+
+      tooltips.forEach((tooltip) => {
+        const tooltipElement = tooltip as HTMLElement;
+
+        // Skip if tooltip already has custom adjustment applied
+        if (tooltipElement.dataset.adjusted === 'true') return;
+
+        const tooltipRect = tooltipElement.getBoundingClientRect();
+        const parent = tooltipElement.parentElement;
+
+        // Find the associated marker to calculate clearance
+        const marker = parent?.querySelector('.leaflet-marker-icon, .adsb-marker-wrapper, .drone-marker-wrapper, .target-marker-wrapper');
+        const markerRect = marker?.getBoundingClientRect();
+
+        let adjusted = false;
+        const currentTransform = tooltipElement.style.transform || '';
+        const translateMatch = currentTransform.match(/translate3d\(([-\d.]+)px,\s*([-\d.]+)px/);
+
+        if (translateMatch) {
+          let currentX = Number.parseFloat(translateMatch[1] || '0');
+          let currentY = Number.parseFloat(translateMatch[2] || '0');
+          let newX = currentX;
+          let newY = currentY;
+
+          // Check if tooltip is covering the marker
+          if (markerRect) {
+            const tooltipCenterX = tooltipRect.left + tooltipRect.width / 2;
+            const tooltipCenterY = tooltipRect.top + tooltipRect.height / 2;
+            const markerCenterX = markerRect.left + markerRect.width / 2;
+            const markerCenterY = markerRect.top + markerRect.height / 2;
+
+            const distanceFromMarker = Math.sqrt(
+              Math.pow(tooltipCenterX - markerCenterX, 2) +
+              Math.pow(tooltipCenterY - markerCenterY, 2)
+            );
+
+            // If tooltip is too close to marker, push it away
+            if (distanceFromMarker < minMarkerClearance) {
+              // Move tooltip to the right of the marker
+              const shiftAmount = minMarkerClearance - distanceFromMarker + 10;
+              newX = currentX + shiftAmount;
+              adjusted = true;
+            }
+          }
+
+          // Adjust horizontally if tooltip extends beyond edges
+          if (tooltipRect.right > mapRect.right - padding) {
+            const overflow = tooltipRect.right - (mapRect.right - padding);
+            newX = currentX - overflow;
+            adjusted = true;
+          } else if (tooltipRect.left < mapRect.left + padding) {
+            const overflow = (mapRect.left + padding) - tooltipRect.left;
+            newX = currentX + overflow;
+            adjusted = true;
+          }
+
+          // Adjust vertically if tooltip extends beyond edges
+          if (tooltipRect.top < mapRect.top + padding) {
+            const overflow = (mapRect.top + padding) - tooltipRect.top;
+            newY = currentY + overflow;
+            adjusted = true;
+          } else if (tooltipRect.bottom > mapRect.bottom - padding) {
+            const overflow = tooltipRect.bottom - (mapRect.bottom - padding);
+            newY = currentY - overflow;
+            adjusted = true;
+          }
+
+          if (adjusted) {
+            tooltipElement.style.transform = `translate3d(${newX}px, ${newY}px, 0px)`;
+            tooltipElement.dataset.adjusted = 'true';
+          }
+        }
+      });
+    };
+
+    // Reset adjusted flags on map move/zoom
+    const resetAdjustments = () => {
+      const mapContainer = map.getContainer();
+      const tooltips = mapContainer.querySelectorAll('.leaflet-tooltip');
+      tooltips.forEach((tooltip) => {
+        const tooltipElement = tooltip as HTMLElement;
+        delete tooltipElement.dataset.adjusted;
+      });
+      setTimeout(adjustTooltips, 10);
+    };
+
+    // Run adjustment on map events
+    map.on('movestart', resetAdjustments);
+    map.on('zoomstart', resetAdjustments);
+    map.on('moveend', adjustTooltips);
+    map.on('zoomend', adjustTooltips);
+    map.on('resize', adjustTooltips);
+
+    // Also use MutationObserver to catch tooltip additions
+    const observer = new MutationObserver(() => {
+      setTimeout(adjustTooltips, 10);
+    });
+
+    observer.observe(map.getContainer(), {
+      childList: true,
+      subtree: true,
+    });
+
+    // Initial adjustment
+    setTimeout(adjustTooltips, 100);
+
+    return () => {
+      map.off('movestart', resetAdjustments);
+      map.off('zoomstart', resetAdjustments);
+      map.off('moveend', adjustTooltips);
+      map.off('zoomend', adjustTooltips);
+      map.off('resize', adjustTooltips);
+      observer.disconnect();
+    };
+  }, [map]);
+
+  return null;
 }
 
 function normalizePhotoUrl(url?: unknown): string {

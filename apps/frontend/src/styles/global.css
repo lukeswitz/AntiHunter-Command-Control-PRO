@@ -1108,7 +1108,7 @@ body.theme-dark .control-chip[disabled] {
   background: rgba(5, 7, 8, 0.9) !important;
   color: #ffffff !important;
   white-space: normal !important;
-  max-width: 360px;
+  max-width: min(360px, calc(100vw - 40px)) !important;
   word-break: normal;
   overflow-wrap: break-word;
   border: 1px solid rgba(255, 255, 255, 0.18) !important;
@@ -1116,6 +1116,8 @@ body.theme-dark .control-chip[disabled] {
   backdrop-filter: blur(6px) !important;
   text-shadow: none !important;
   border-radius: 0.75rem !important;
+  max-height: calc(100vh - 80px) !important;
+  overflow-y: auto !important;
 }
 
 .leaflet-tooltip a {
@@ -1171,31 +1173,25 @@ body.theme-dark .control-chip[disabled] {
 }
 
 .drone-floating-card {
-  position: fixed;
-  inset: auto 0 0 0;
+  position: static;
+  display: none;
   width: 100%;
-  max-height: min(85vh, 820px);
-  display: flex;
+  max-height: none;
   flex-direction: column;
   gap: 0;
   background: var(--color-panel);
-  border-top: 1px solid var(--color-panel-border);
-  border-radius: 1.25rem 1.25rem 0 0;
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.6);
-  padding: 1.25rem 2rem 1.25rem;
-  transform: translateY(calc(100% + 2rem));
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    transform 0.3s ease,
-    opacity 0.3s ease;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 0.85rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 0.9rem 1rem 1rem;
+  margin-top: 1rem;
+  opacity: 1;
+  pointer-events: auto;
   z-index: 600;
 }
 
 .drone-floating-card--visible {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
+  display: flex;
 }
 
 .drone-floating-card__header {
@@ -1296,6 +1292,15 @@ body.theme-dark .control-chip[disabled] {
   border-left: 3px solid #ef4444;
 }
 
+.drone-floating-card__table tbody tr.is-most-recent {
+  background: rgba(34, 197, 94, 0.12);
+  border-left: 3px solid #22c55e;
+}
+
+.drone-floating-card__table tbody tr.is-most-recent:hover {
+  background: rgba(34, 197, 94, 0.18);
+}
+
 .drone-floating-card__status-select {
   min-width: 130px;
 }
@@ -1304,64 +1309,20 @@ body.theme-dark .control-chip[disabled] {
   font-size: 0.75rem;
 }
 
-@media (max-width: 1366px) and (min-width: 901px) {
-  .drone-floating-card {
-    inset: 88px 12px 16px auto;
-    width: min(440px, 92vw);
-    max-height: calc(100vh - 112px);
-    border-radius: 1rem;
-    padding: 1rem 1.1rem;
-    transform: translateX(calc(100% + 1.5rem));
-  }
-  .drone-floating-card--visible {
-    transform: translateX(0);
-  }
-  .drone-floating-card__header {
-    gap: 0.75rem;
-  }
-  .drone-floating-card__table-wrapper {
-    max-height: 260px;
-  }
-}
-
+/* Responsive table sizing */
 @media (max-width: 1200px) {
-  .drone-floating-card {
-    max-height: 70vh;
-    padding: 1rem 1.25rem 1rem;
-  }
-
   .adsb-floating-card__table-wrapper {
     max-height: 280px;
   }
 }
 
 @media (max-width: 900px) {
-  .drone-floating-card {
-    right: 50%;
-    transform: translate(50%, calc(100% + 2rem));
-    width: min(640px, calc(100vw - 2rem));
-    max-height: 65vh;
-  }
-
   .adsb-floating-card__table-wrapper {
     max-height: 220px;
-  }
-
-  .drone-floating-card--visible {
-    transform: translate(50%, 0);
   }
 }
 
 @media (max-width: 640px) {
-  .drone-floating-card {
-    position: fixed;
-    inset: auto 0 0 0;
-    width: 100%;
-    right: 0;
-    border-radius: 1rem 1rem 0 0;
-    padding: 0.75rem 1rem 1rem;
-  }
-
   .drone-floating-card__table {
     font-size: 0.75rem;
   }
@@ -1372,24 +1333,11 @@ body.theme-dark .control-chip[disabled] {
   }
 }
 
-/* On small and medium screens, dock floating cards under the map instead of overlaying */
+.drone-floating-card__table-wrapper {
+  max-height: 400px;
+}
+
 @media (max-width: 1400px) {
-  .drone-floating-card {
-    position: static;
-    display: none;
-    width: 100%;
-    max-height: none;
-    border-radius: 0.85rem;
-    padding: 0.9rem 1rem 1rem;
-    margin-top: 1rem;
-    transform: none;
-    opacity: 1;
-    pointer-events: auto;
-    box-shadow: none;
-  }
-  .drone-floating-card--visible {
-    display: flex;
-  }
   .drone-floating-card__table-wrapper {
     max-height: 320px;
   }
