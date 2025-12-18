@@ -241,6 +241,8 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
           lat,
           lon,
           hdop,
+          detectionTimestamp,
+          timestamp: timestamp?.toISOString(),
         },
       },
     ];

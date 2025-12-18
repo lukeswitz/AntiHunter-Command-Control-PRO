@@ -2,7 +2,7 @@ import classNames from 'clsx';
 import type { LatLngExpression, LatLngTuple, Map as LeafletMap, TileLayerOptions } from 'leaflet';
 import { DivIcon, divIcon } from 'leaflet';
 import * as L from 'leaflet';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import {
   Circle,
   LayersControl,
@@ -424,7 +424,16 @@ export function detectAdsbAircraftType(
   manufacturer?: string | null,
   model?: string | null,
 ): AdsbTypeInfo {
-  const tokens = [category, aircraftType, typeCode, categoryDescription, callsign, registration]
+  const tokens = [
+    category,
+    aircraftType,
+    typeCode,
+    categoryDescription,
+    callsign,
+    registration,
+    manufacturer,
+    model,
+  ]
     .map((token) => token?.trim().toUpperCase())
     .filter((token): token is string => Boolean(token));
 
