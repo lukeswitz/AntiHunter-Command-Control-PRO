@@ -232,7 +232,7 @@ export function TargetsPage() {
     // Set cooldown immediately to prevent multiple rapid clicks
     beginTriangulateCooldown();
     const input = window.prompt(
-      'Enter triangulation duration in seconds (60-300)',
+      'Enter triangulation duration in seconds (20-300)',
       String(DEFAULT_TRIANGULATION_DURATION),
     );
     if (input == null) {
@@ -243,7 +243,7 @@ export function TargetsPage() {
       window.alert('Invalid duration.');
       return;
     }
-    const duration = Math.max(60, Math.min(300, Math.round(parsed)));
+    const duration = Math.max(20, Math.min(300, Math.round(parsed)));
     void triangulateMutation.mutateAsync({ target, duration }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
       window.alert(message);
