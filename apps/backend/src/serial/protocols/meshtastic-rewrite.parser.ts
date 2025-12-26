@@ -22,7 +22,7 @@ const TARGET_REGEX_TYPE_FIRST =
 const TARGET_REGEX_MAC_FIRST =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*Target:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)\s+Type:(?<type>\w+)(?:\s+Name:(?<name>[^ ]+))?(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 const TRI_TARGET_DATA_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*TARGET_DATA:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+Hits=(?<hits>\d+)\s+RSSI:(?<rssi>-?\d+)(?:\s+Type:(?<type>\w+))?\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)(?:\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?))?/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*TARGET_DATA:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)(?:\s+Type:(?<type>\w+))?\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?)\s+TS=(?<ts>-?\d+(?:\.\d+)?)/i;
 const DEVICE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+(?<band>[A-Za-z])\s+(?<rssi>-?\d+)(?:\s+C(?<channel>\d+))?(?:\s+N:(?<name>.+))?/i;
 const DRONE_REGEX =
@@ -69,6 +69,8 @@ const TRI_RESULTS_END_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_E
 const TRI_RESULTS_NO_DATA_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS:NO_DATA/i;
 const TRI_COMPLETE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_COMPLETE:\s*(?:MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+)?Nodes=(?<nodes>\d+)\s*(?<rest>.+)?$/i;
+const TRI_FINAL_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATION_FINAL:\s*MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)\s+CONF=(?<conf>-?\d+(?:\.\d+)?)\s+UNC=(?<unc>-?\d+(?:\.\d+)?)/i;
 const RTC_SYNC_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*RTC_SYNC:(?<source>\S+)/i;
 const TIME_SYNC_REQ_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*TIME_SYNC_REQ:(?<time>\d+):(?<window>\d+):(?<seq>\d+):(?<offset>-?\d+)/i;
@@ -214,12 +216,15 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       return null;
     }
     const mac = match.groups.mac.toUpperCase();
-    const hits = Number(match.groups.hits);
     const rssi = Number(match.groups.rssi);
     const lat = Number(match.groups.lat);
     const lon = Number(match.groups.lon);
     const hdop = match.groups.hdop ? Number(match.groups.hdop) : undefined;
     const type = match.groups.type;
+
+    const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) * 10_000 : undefined;
+    const timestamp = match.groups.ts ? new Date() : undefined;
+    // TODO see if it is centiseconds from FW
     const resolvedNodeId = nodeId ?? match.groups.id;
     return [
       {
@@ -231,12 +236,13 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
         raw,
         data: {
           mac,
-          hits,
           rssi,
           type,
           lat,
           lon,
           hdop,
+          detectionTimestamp,
+          timestamp: timestamp?.toISOString(),
         },
       },
     ];
@@ -867,6 +873,31 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             lat,
             lon,
             link: complete.groups.rest?.trim(),
+          },
+        },
+      ];
+    }
+    const final = TRI_FINAL_REGEX.exec(payload);
+    if (final?.groups) {
+      const lat = Number(final.groups.lat);
+      const lon = Number(final.groups.lon);
+      const conf = Number(final.groups.conf);
+      const unc = Number(final.groups.unc);
+      return [
+        {
+          kind: 'alert',
+          level: 'ALERT',
+          category: 'triangulation',
+          nodeId: id,
+          message: payload,
+          raw,
+          data: {
+            stage: 'final',
+            mac: final.groups.mac?.toUpperCase(),
+            lat: Number.isFinite(lat) ? lat : undefined,
+            lon: Number.isFinite(lon) ? lon : undefined,
+            confidence: Number.isFinite(conf) ? conf : undefined,
+            uncertainty: Number.isFinite(unc) ? unc : undefined,
           },
         },
       ];

@@ -479,6 +479,7 @@ model Geofence {
   appliesToAdsb      Boolean    @default(true)
   appliesToDrones    Boolean    @default(true)
   appliesToTargets   Boolean    @default(true)
+  appliesToDevices   Boolean    @default(true)
   createdBy          String?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt

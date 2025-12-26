@@ -112,6 +112,30 @@ export class FaaRegistryService {
     return { started: true };
   }
 
+  async triggerUpload(fileBuffer: Buffer) {
+    if (this.currentSync) {
+      throw new BadRequestException('FAA registry sync already running');
+    }
+
+    this.logger.log('Starting FAA registry upload from uploaded MASTER.txt');
+    this.progress = { processed: 0, startedAt: new Date() };
+    this.lastError = null;
+    this.currentSync = this.performUpload(fileBuffer)
+      .then(() => {
+        this.logger.log('FAA registry upload completed');
+      })
+      .catch((error) => {
+        this.lastError = error instanceof Error ? error.message : String(error);
+        this.logger.error(`FAA registry upload failed: ${this.lastError}`);
+      })
+      .finally(() => {
+        this.currentSync = null;
+        this.progress = null;
+      });
+
+    return { started: true };
+  }
+
   async lookupAircraft(
     droneId?: string | null,
     mac?: string | null,
@@ -439,6 +463,30 @@ export class FaaRegistryService {
     }
   }
 
+  private async performUpload(fileBuffer: Buffer): Promise<void> {
+    this.logger.log(`Received upload buffer of size: ${fileBuffer.length} bytes`);
+    const tempDir = await fs.mkdtemp(join(tmpdir(), 'faa-upload-'));
+    const masterPath = join(tempDir, MASTER_FILE_NAME);
+    try {
+      this.logger.log(`Writing upload to temporary file: ${masterPath}`);
+      await fs.writeFile(masterPath, fileBuffer);
+      const stats = await fs.stat(masterPath);
+      this.logger.log(`Temporary file written: ${stats.size} bytes`);
+      const datasetVersion = new Date().toISOString();
+      this.logger.log(`Starting ingest from uploaded file, version: ${datasetVersion}`);
+      await this.ingestMaster(masterPath, 'uploaded', datasetVersion);
+      this.summaryCache.clear();
+      this.logger.log(`Upload ingestion completed successfully`);
+    } catch (error) {
+      this.logger.error(
+        `Upload processing failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
   private async downloadFile(url: string, destination: string): Promise<void> {
     // No further validation needed; only hardcoded FAA_DATASET_URL is used
     const response = await fetch(url, {
@@ -457,6 +505,7 @@ export class FaaRegistryService {
     datasetUrl: string,
     datasetVersion: string,
   ): Promise<void> {
+    this.logger.log(`Starting ingestMaster from ${filePath}, source: ${datasetUrl}`);
     const fileStream = createReadStream(filePath);
     const parser = parse({
       columns: true,
@@ -473,7 +522,9 @@ export class FaaRegistryService {
 
     await this.prisma.$transaction(
       async (tx) => {
+        this.logger.log('Deleting existing FAA aircraft records');
         await tx.faaAircraft.deleteMany();
+        this.logger.log('Starting to parse and insert records');
         for await (const record of parser) {
           const mapped = this.mapRecord(record);
           if (!mapped) {
@@ -485,6 +536,9 @@ export class FaaRegistryService {
             total += batch.length;
             batch = [];
             this.progress = this.progress ? { ...this.progress, processed: total } : null;
+            if (total % 10000 === 0) {
+              this.logger.log(`Processed ${total.toLocaleString()} records so far`);
+            }
           }
         }
         if (batch.length > 0) {
@@ -492,6 +546,9 @@ export class FaaRegistryService {
           total += batch.length;
           this.progress = this.progress ? { ...this.progress, processed: total } : null;
         }
+
+        this.logger.log(`Completed parsing. Total records: ${total.toLocaleString()}`);
+        this.logger.log('Updating registry sync record');
 
         await tx.faaRegistrySync.upsert({
           where: { id: 1 },
@@ -509,6 +566,8 @@ export class FaaRegistryService {
             totalRecords: total,
           },
         });
+
+        this.logger.log('Registry sync record updated successfully');
       },
       {
         timeout: 120_000, // FAA ingest can take time; allow longer interactive transaction

@@ -942,6 +942,23 @@ pnpm dev     # http://localhost:5173
 
 Prefer a single command? From the repo root run `pnpm AHCC` to start both workspaces in parallel (single backend process).
 
+**Silent mode (suppress non-critical output):** Add `:silent` to any dev command to minimize console output, showing only critical errors:
+
+```bash
+# Single command with silent mode
+pnpm AHCC:silent
+
+# Or run individually
+cd apps/backend && pnpm dev:silent
+cd apps/frontend && pnpm dev:silent
+
+# Environment variable approach
+SILENT=true pnpm AHCC
+
+# Or with command line flags
+node dist/main.js --silent    # or -s
+```
+
 Need multi-core / multi-worker? Use the cluster script and set worker count (leader + replicas):
 
 ```powershell
@@ -1329,6 +1346,7 @@ The sniffer is a zero-dependency TypeScript script that mirrors frames to stdout
 | Command                                                                | Description                                                                                                                                             |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm AHCC`                                                            | Boots the backend + frontend dev servers in parallel (`pnpm -r --parallel dev`).                                                                        |
+| `pnpm AHCC:silent`                                                     | Boots dev servers with minimal console output (suppresses non-critical logs, shows only errors).                                                        |
 | `pnpm lint`                                                            | ESLint across backend + frontend                                                                                                                        |
 | `pnpm format`                                                          | Prettier writes                                                                                                                                         |
 | `pnpm --filter @command-center/backend prisma:studio`                  | Inspect DB via Prisma Studio                                                                                                                            |
