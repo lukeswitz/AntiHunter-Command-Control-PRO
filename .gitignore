@@ -45,4 +45,6 @@ tmp_AlertsPage.tsx
 # Local ADS-B credentials (never commit)
 apps/backend/data/adsb/opensky-credentials.json
 
+apps/backend/data/adsb/config.json
+
 apps/backend/data/adsb/adsb-alert-rules.json

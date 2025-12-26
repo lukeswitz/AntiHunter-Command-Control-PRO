@@ -127,14 +127,16 @@ export function DroneFloatingCard({
                 </tr>
               </thead>
               <tbody>
-                {sortedDrones.map((drone) => {
+                {sortedDrones.map((drone, index) => {
                   const isActive = drone.id === activeDroneId;
+                  const isMostRecent = index === 0;
                   return (
                     <tr
                       key={drone.id}
                       className={classNames({
                         'is-active': isActive,
                         'is-hostile': drone.status === 'HOSTILE',
+                        'is-most-recent': isMostRecent,
                       })}
                       onClick={() => onSelect(drone.id)}
                     >

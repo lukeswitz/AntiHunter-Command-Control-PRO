@@ -288,7 +288,8 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
 
   clearSessionLog(): void {
     this.sessionLog.clear();
-    this.logger.log('Cleared ADS-B session log');
+    this.tracks.clear();
+    this.logger.log('Cleared ADS-B session log and live tracks');
   }
 
   // Alert rules CRUD
@@ -907,12 +908,14 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     if (!entry) {
       return;
     }
-    track.manufacturer = entry.manufacturer ?? track.manufacturer ?? null;
-    track.model = entry.model ?? track.model ?? null;
-    track.typeCode = entry.typeCode ?? track.typeCode ?? null;
-    track.aircraftType = entry.aircraftType ?? track.aircraftType ?? null;
-    track.categoryDescription = entry.categoryDescription ?? track.categoryDescription ?? null;
-    track.reg = entry.registration ?? track.reg ?? null;
+    // Prioritize feed data over CSV database to avoid bad CSV data corrupting good live data
+    track.manufacturer = track.manufacturer ?? entry.manufacturer ?? null;
+    track.model = track.model ?? entry.model ?? null;
+    track.typeCode = track.typeCode ?? entry.typeCode ?? null;
+    track.aircraftType = track.aircraftType ?? entry.aircraftType ?? null;
+    track.categoryDescription = track.categoryDescription ?? entry.categoryDescription ?? null;
+    track.reg = track.reg ?? entry.registration ?? null;
+    // Only use CSV category if feed doesn't have one
     if (!track.category && entry.categoryDescription) {
       track.category = entry.categoryDescription;
     }

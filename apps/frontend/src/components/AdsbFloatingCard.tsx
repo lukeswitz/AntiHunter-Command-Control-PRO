@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 
 import type { AdsbTrack } from '../api/types';
+import { detectAdsbAircraftType } from './map/CommandCenterMap';
 
 interface AdsbFloatingCardProps {
   tracks: AdsbTrack[];
@@ -70,7 +71,8 @@ export function AdsbFloatingCard({
                 <th>Airports</th>
                 <th>Times</th>
                 <th>Reg</th>
-                <th>Country/Type</th>
+                <th>Country</th>
+                <th>Type</th>
                 <th>Airframe</th>
                 <th>Alt</th>
                 <th>Speed</th>
@@ -82,12 +84,27 @@ export function AdsbFloatingCard({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((track) => {
+              {sorted.map((track, index) => {
                 const isActive = activeId === track.id;
+                const isMostRecent = index === 0;
+                const typeInfo = detectAdsbAircraftType(
+                  track.category,
+                  track.aircraftType,
+                  track.typeCode,
+                  track.categoryDescription,
+                  track.callsign,
+                  track.reg,
+                  track.icao,
+                  track.manufacturer,
+                  track.model,
+                );
                 return (
                   <tr
                     key={track.id}
-                    className={classNames({ 'is-active': isActive })}
+                    className={classNames({
+                      'is-active': isActive,
+                      'is-most-recent': isMostRecent,
+                    })}
                     onClick={() => onSelect(track)}
                   >
                     <td>
@@ -111,11 +128,10 @@ export function AdsbFloatingCard({
                     </td>
                     <td>{track.reg ?? '--'}</td>
                     <td>
-                      {track.country ?? '--'}
-                      <div className="muted">
-                        {track.category ?? track.categoryDescription ?? '--'}
-                      </div>
+                      {track.country ?? '--'}{' '}
+                      {typeInfo.isMilitary ? <span title="Military aircraft">★</span> : ''}
                     </td>
+                    <td>{track.category ?? track.categoryDescription ?? '--'}</td>
                     <td>
                       {track.model ?? track.aircraftType ?? track.typeCode ?? '--'}
                       <div className="muted">{track.manufacturer ?? ''}</div>

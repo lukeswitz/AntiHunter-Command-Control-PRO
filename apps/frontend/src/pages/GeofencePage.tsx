@@ -251,6 +251,7 @@ export function GeofencePage() {
                 <th>ADS-B</th>
                 <th>Drones</th>
                 <th>Targets</th>
+                <th>Devices</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -367,13 +368,28 @@ export function GeofencePage() {
                   <td>
                     <label
                       className="switch"
-                      aria-label={`Apply to targets/devices for ${geofence.name ?? 'this geofence'}`}
+                      aria-label={`Apply to targets for ${geofence.name ?? 'this geofence'}`}
                     >
                       <input
                         type="checkbox"
                         checked={Boolean(geofence.appliesToTargets)}
                         onChange={(event) =>
                           updateGeofence(geofence.id, { appliesToTargets: event.target.checked })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </td>
+                  <td>
+                    <label
+                      className="switch"
+                      aria-label={`Apply to devices for ${geofence.name ?? 'this geofence'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(geofence.appliesToDevices)}
+                        onChange={(event) =>
+                          updateGeofence(geofence.id, { appliesToDevices: event.target.checked })
                         }
                       />
                       <span />

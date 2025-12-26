@@ -76,7 +76,6 @@ const DEFAULT_RADIUS_LIMITS = {
 };
 
 const FAA_DATASET_URL = 'https://registry.faa.gov/database/ReleasableAircraft.zip';
-const FAA_OFFLINE_DISABLED = true; // Temporary kill-switch for offline FAA dataset sync
 
 type SerialConnectPayload = {
   path?: string;
@@ -824,6 +823,25 @@ export function ConfigPage() {
     },
   });
 
+  const faaUploadMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return apiClient.upload<StartFaaSyncResponse>('/config/faa/upload', formData);
+    },
+    onSuccess: () => {
+      setConfigNotice({
+        type: 'info',
+        text: 'FAA registry upload started. This may take several minutes.',
+      });
+      void faaStatusQuery.refetch();
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Unable to upload FAA file.';
+      setConfigNotice({ type: 'error', text: message });
+    },
+  });
+
   const updateSerialConfigMutation = useMutation({
     mutationFn: (body: Partial<SerialConfig>) =>
       apiClient.put<SerialConfig>('/serial/config', body),
@@ -1494,14 +1512,12 @@ export function ConfigPage() {
   };
 
   const handleFaaSyncClick = () => {
-    if (FAA_OFFLINE_DISABLED) {
-      setConfigNotice({
-        type: 'info',
-        text: 'Offline FAA dataset sync is temporarily disabled in this build.',
-      });
-      return;
-    }
     faaSyncMutation.mutate();
+  };
+
+  const handleFaaUpload = (file: File) => {
+    if (!file) return;
+    faaUploadMutation.mutate(file);
   };
 
   const formatDateTime = (value?: string | null) =>
@@ -4027,74 +4043,81 @@ export function ConfigPage() {
                 </div>
               </div>
 
-              {!FAA_OFFLINE_DISABLED ? (
-                <div className="config-subcard">
-                  <h3>Offline Dataset</h3>
-                  <p className="config-hint">
-                    Download and parse the FAA aircraft registry ZIP for offline enrichment.
-                  </p>
-                  <div className="config-row">
-                    <span className="config-label">Last sync</span>
-                    <span>{formatDateTime(faaRegistry?.lastSyncedAt ?? null)}</span>
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Records</span>
-                    <span>{(faaRegistry?.totalRecords ?? 0).toLocaleString()}</span>
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Dataset version</span>
-                    <span>{faaRegistry?.datasetVersion ?? 'Unknown'}</span>
-                  </div>
-                  <div className="config-row">
-                    <span className="config-label">Status</span>
-                    <span>
-                      {faaInProgress
-                        ? `Syncing (${faaProgressCount.toLocaleString()} rows processed)`
-                        : 'Idle'}
-                    </span>
-                  </div>
-                  {faaLastError ? (
-                    <div className="form-error">Last error: {faaLastError}</div>
-                  ) : null}
-                  <div className="config-row">
-                    <span className="config-label">Dataset URL</span>
-                    <input
-                      type="url"
-                      value={faaUrl}
-                      onChange={(event) => setFaaUrl(event.target.value)}
-                      placeholder={FAA_DATASET_URL}
-                      disabled={FAA_OFFLINE_DISABLED || faaInProgress || faaSyncMutation.isPending}
-                    />
-                  </div>
-                  <div className="controls-row">
-                    <button
-                      type="button"
-                      className="submit-button"
-                      disabled={FAA_OFFLINE_DISABLED || faaInProgress || faaSyncMutation.isPending}
-                      onClick={handleFaaSyncClick}
-                    >
-                      {FAA_OFFLINE_DISABLED
-                        ? 'Offline sync disabled'
-                        : faaInProgress
-                          ? 'Sync in progress...'
-                          : 'Download & Parse'}
-                    </button>
-                    <button
-                      type="button"
-                      className="control-chip"
-                      onClick={() => faaStatusQuery.refetch()}
-                      disabled={faaStatusQuery.isFetching}
-                    >
-                      Refresh Status
-                    </button>
-                  </div>
-                  <p className="config-hint">
-                    {FAA_OFFLINE_DISABLED
-                      ? 'Offline FAA dataset sync is temporarily disabled.'
-                      : 'The FAA releases updates daily. Parsing the dataset may take several minutes.'}
-                  </p>
+              <div className="config-subcard">
+                <h3>Offline Dataset</h3>
+                <p className="config-hint">
+                  Download and parse the FAA aircraft registry ZIP for offline enrichment, or upload
+                  a MASTER.txt file directly.
+                </p>
+                <div className="config-row">
+                  <span className="config-label">Last sync</span>
+                  <span>{formatDateTime(faaRegistry?.lastSyncedAt ?? null)}</span>
                 </div>
-              ) : null}
+                <div className="config-row">
+                  <span className="config-label">Records</span>
+                  <span>{(faaRegistry?.totalRecords ?? 0).toLocaleString()}</span>
+                </div>
+                <div className="config-row">
+                  <span className="config-label">Dataset version</span>
+                  <span>{faaRegistry?.datasetVersion ?? 'Unknown'}</span>
+                </div>
+                <div className="config-row">
+                  <span className="config-label">Status</span>
+                  <span>
+                    {faaInProgress
+                      ? `Syncing (${faaProgressCount.toLocaleString()} rows processed)`
+                      : 'Idle'}
+                  </span>
+                </div>
+                {faaLastError ? <div className="form-error">Last error: {faaLastError}</div> : null}
+                <div className="config-row">
+                  <span className="config-label">Dataset URL</span>
+                  <input
+                    type="url"
+                    value={faaUrl}
+                    onChange={(event) => setFaaUrl(event.target.value)}
+                    placeholder={FAA_DATASET_URL}
+                    disabled={faaInProgress || faaSyncMutation.isPending}
+                  />
+                </div>
+                <div className="controls-row">
+                  <button
+                    type="button"
+                    className="submit-button"
+                    disabled={faaInProgress || faaSyncMutation.isPending}
+                    onClick={handleFaaSyncClick}
+                  >
+                    {faaInProgress ? 'Sync in progress...' : 'Download & Parse'}
+                  </button>
+                  <label className="control-chip">
+                    {faaUploadMutation.isPending ? 'Uploading...' : 'Upload MASTER.txt'}
+                    <input
+                      type="file"
+                      accept=".txt,text/plain"
+                      hidden
+                      disabled={faaInProgress || faaUploadMutation.isPending}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          handleFaaUpload(file);
+                          event.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="control-chip"
+                    onClick={() => faaStatusQuery.refetch()}
+                    disabled={faaStatusQuery.isFetching}
+                  >
+                    Refresh Status
+                  </button>
+                </div>
+                <p className="config-hint">
+                  The FAA releases updates daily. Parsing the dataset may take several minutes.
+                </p>
+              </div>
             </div>
           </section>
 
