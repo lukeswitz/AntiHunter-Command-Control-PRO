@@ -521,6 +521,185 @@ pnpm install
 
 ```
 
+<details>
+<summary>PostgreSQL Database Setup Guide</summary>
+
+If you don't have PostgreSQL set up yet, follow these instructions for your operating system:
+
+### Linux (Debian/Ubuntu)
+
+1. **Install PostgreSQL**
+   ```bash
+   sudo apt update
+   sudo apt install -y postgresql postgresql-contrib
+   ```
+
+2. **Start PostgreSQL service**
+   ```bash
+   sudo systemctl start postgresql
+   sudo systemctl enable postgresql
+   ```
+
+3. **Create database and user**
+   ```bash
+   # Switch to postgres user
+   sudo -u postgres psql
+   ```
+
+   Then in the PostgreSQL prompt:
+   ```sql
+   -- Create the database
+   CREATE DATABASE command_center;
+
+   -- Create user with password
+   CREATE USER command_center WITH PASSWORD 'command_center';
+
+   -- Grant privileges
+   GRANT ALL PRIVILEGES ON DATABASE command_center TO command_center;
+
+   -- Exit
+   \q
+   ```
+
+4. **Test the connection**
+   ```bash
+   psql -U command_center -d command_center -h localhost
+   # Enter password when prompted: command_center
+   ```
+
+### macOS
+
+1. **Install PostgreSQL via Homebrew**
+   ```bash
+   brew install postgresql@15
+   brew services start postgresql@15
+   ```
+
+2. **Create database and user**
+   ```bash
+   # Access PostgreSQL
+   psql postgres
+   ```
+
+   Then in the PostgreSQL prompt:
+   ```sql
+   -- Create the database
+   CREATE DATABASE command_center;
+
+   -- Create user with password
+   CREATE USER command_center WITH PASSWORD 'command_center';
+
+   -- Grant privileges
+   GRANT ALL PRIVILEGES ON DATABASE command_center TO command_center;
+
+   -- Exit
+   \q
+   ```
+
+3. **Test the connection**
+   ```bash
+   psql -U command_center -d command_center -h localhost
+   # Enter password when prompted: command_center
+   ```
+
+### Windows
+
+1. **Download and Install PostgreSQL**
+   - Download from [postgresql.org/download/windows](https://www.postgresql.org/download/windows/)
+   - Run the installer (EDB installer recommended)
+   - During installation, remember the superuser (postgres) password you set
+   - Default port is 5432 (keep this unless you have conflicts)
+
+2. **Create database and user via pgAdmin**
+   - Open pgAdmin (installed with PostgreSQL)
+   - Connect to local server using the postgres password
+   - Right-click **Databases** → **Create** → **Database**
+   - Name: `command_center`
+   - Right-click **Login/Group Roles** → **Create** → **Login/Group Role**
+   - General tab: Name: `command_center`
+   - Definition tab: Password: `command_center`
+   - Privileges tab: Check "Can login?"
+   - Click **Save**
+   - Right-click the `command_center` database → **Properties** → **Security**
+   - Add privilege for `command_center` user with all permissions
+
+3. **Alternative: Create via SQL Shell (psql)**
+   - Open SQL Shell (psql) from Start menu
+   - Press Enter for all defaults, then enter your postgres password
+   ```sql
+   CREATE DATABASE command_center;
+   CREATE USER command_center WITH PASSWORD 'command_center';
+   GRANT ALL PRIVILEGES ON DATABASE command_center TO command_center;
+   \q
+   ```
+
+4. **Test the connection**
+   - Open SQL Shell (psql)
+   - Server: localhost
+   - Database: command_center
+   - Port: 5432
+   - Username: command_center
+   - Password: command_center
+
+### Docker (Cross-platform)
+
+If you prefer using Docker for PostgreSQL:
+
+```bash
+# Create a postgres container
+docker run -d \
+  --name ahcc-postgres \
+  -e POSTGRES_DB=command_center \
+  -e POSTGRES_USER=command_center \
+  -e POSTGRES_PASSWORD=command_center \
+  -p 5432:5432 \
+  -v pgdata:/var/lib/postgresql/data \
+  postgres:15-alpine
+
+# Check it's running
+docker ps | grep ahcc-postgres
+
+# Test connection
+docker exec -it ahcc-postgres psql -U command_center -d command_center
+```
+
+### Updating the DATABASE_URL
+
+After setting up PostgreSQL, update your `DATABASE_URL` in `apps/backend/.env`:
+
+```env
+# Standard local connection
+DATABASE_URL="postgresql://command_center:command_center@localhost:5432/command_center"
+
+# If using custom credentials, update accordingly:
+# DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/YOUR_DATABASE"
+```
+
+### Troubleshooting Database Connection
+
+**Connection refused errors:**
+- Ensure PostgreSQL is running: `sudo systemctl status postgresql` (Linux) or `brew services list` (macOS)
+- Check port 5432 is listening: `sudo lsof -i :5432` (Linux/macOS) or `netstat -an | findstr 5432` (Windows)
+
+**Authentication failed:**
+- Verify your username and password in the connection string
+- Check `pg_hba.conf` allows password authentication for localhost connections
+- On Linux: `/etc/postgresql/*/main/pg_hba.conf`
+- Look for line: `host all all 127.0.0.1/32 md5` or `scram-sha-256`
+
+**Database does not exist:**
+- Recreate the database using the SQL commands above
+- Ensure you're connecting to the correct database name
+
+**Permission denied:**
+- Re-grant privileges using the `GRANT ALL PRIVILEGES` command above
+- For newer PostgreSQL versions, you may also need:
+  ```sql
+  GRANT ALL ON SCHEMA public TO command_center;
+  ```
+
+</details>
+
 ## Configuration
 
 Create `apps/backend/.env`:
