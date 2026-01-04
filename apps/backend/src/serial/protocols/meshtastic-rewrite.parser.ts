@@ -22,7 +22,7 @@ const TARGET_REGEX_TYPE_FIRST =
 const TARGET_REGEX_MAC_FIRST =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*Target:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)\s+Type:(?<type>\w+)(?:\s+Name:(?<name>[^ ]+))?(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 const TRI_TARGET_DATA_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*TARGET_DATA:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)(?:\s+Type:(?<type>\w+))?\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?)\s+TS=(?<ts>-?\d+(?:\.\d+)?)/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*TARGET_DATA:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+Hits=(?<hits>\d+)\s+RSSI:(?<rssi>-?\d+)\s+Type:(?<type>WiFi|BLE)(?:\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?))?(?:\s+TS=(?<ts>-?\d+(?:\.\d+)?))?/i;
 const DEVICE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+(?<band>[A-Za-z])\s+(?<rssi>-?\d+)(?:\s+C(?<channel>\d+))?(?:\s+N:(?<name>.+))?/i;
 const DRONE_REGEX =
@@ -216,13 +216,14 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       return null;
     }
     const mac = match.groups.mac.toUpperCase();
+    const hits = Number(match.groups.hits);
     const rssi = Number(match.groups.rssi);
-    const lat = Number(match.groups.lat);
-    const lon = Number(match.groups.lon);
-    const hdop = match.groups.hdop ? Number(match.groups.hdop) : undefined;
     const type = match.groups.type;
+    const lat = match.groups.lat ? Number(match.groups.lat) : undefined;
+    const lon = match.groups.lon ? Number(match.groups.lon) : undefined;
+    const hdop = match.groups.hdop ? Number(match.groups.hdop) : undefined;
 
-    const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) * 10_000 : undefined;
+    const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) : undefined;
     const timestamp = match.groups.ts ? new Date() : undefined;
     // TODO see if it is centiseconds from FW
     const resolvedNodeId = nodeId ?? match.groups.id;
@@ -236,6 +237,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
         raw,
         data: {
           mac,
+          hits,
           rssi,
           type,
           lat,
