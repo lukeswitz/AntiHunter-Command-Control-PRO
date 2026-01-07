@@ -22,7 +22,7 @@ const TARGET_REGEX_TYPE_FIRST =
 const TARGET_REGEX_MAC_FIRST =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*Target:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)\s+Type:(?<type>\w+)(?:\s+Name:(?<name>[^ ]+))?(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 const TRI_TARGET_DATA_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*TARGET_DATA:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)\s+Hits=(?<hits>\d+)\s+Type:(?<type>WiFi|BLE)(?:\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?))?(?:\s+TS=(?<ts>-?\d+(?:\.\d+)?))?/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?:TARGET_DATA|T_D):\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)\s+Hits=(?<hits>\d+)\s+Type:(?<type>WiFi|BLE)(?:\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?))?(?:\s+TS=(?<ts>-?\d+(?:\.\d+)?))?/i;
 const DEVICE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+(?<band>[A-Za-z])\s+(?<rssi>-?\d+)(?:\s+C(?<channel>\d+))?(?:\s+N:(?<name>.+))?/i;
 const DRONE_REGEX =
@@ -155,7 +155,6 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     const sourceNode = nodeId ?? m.groups.id;
     const lat = m.groups.lat ? Number(m.groups.lat) : undefined;
     const lon = m.groups.lon ? Number(m.groups.lon) : undefined;
-    const timestamp = m.groups.ts ? new Date(Number(m.groups.ts) * 1000) : undefined;
     const detected: SerialParseResult = {
       kind: 'target-detected',
       nodeId: sourceNode,
@@ -165,7 +164,6 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       name: m.groups.name,
       lat,
       lon,
-      timestamp,
       raw,
     };
     const alert: SerialParseResult = {
@@ -225,9 +223,9 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     const lon = match.groups.lon ? Number(match.groups.lon) : undefined;
     const hdop = match.groups.hdop ? Number(match.groups.hdop) : undefined;
 
-    // Convert Unix timestamp (seconds) to microseconds for TDoA precision
+    // TS is a device-relative timestamp from firmware (for TDoA calculation)
+    // Store as-is for TDoA precision - do NOT convert to Unix epoch Date
     const detectionTimestamp = match.groups.ts ? Number(match.groups.ts) * 1_000_000 : undefined;
-    const timestamp = match.groups.ts ? new Date(Number(match.groups.ts) * 1000) : undefined;
     const resolvedNodeId = nodeId ?? match.groups.id;
     return [
       {
@@ -246,7 +244,6 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
           lon,
           hdop,
           detectionTimestamp,
-          timestamp: timestamp?.toISOString(),
         },
       },
     ];

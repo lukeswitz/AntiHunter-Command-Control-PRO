@@ -1267,7 +1267,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         return `${nodeId}:TARGET:${mac.toUpperCase()}:${type}`;
       }
 
-      case 'TARGET_DATA': {
+      case 'TARGET_DATA':
+      case 'T_D': {
         const mac = /((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/i.exec(content)?.[1] || '';
         const type = /Type:([^\s]+)/i.exec(content)?.[1] || '';
         return `${nodeId}:TARGET_DATA:${mac.toUpperCase()}:${type}`;
