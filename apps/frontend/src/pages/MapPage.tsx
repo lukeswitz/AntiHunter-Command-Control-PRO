@@ -557,7 +557,7 @@ export function MapPage() {
 
     // Add nodes
     nodeListWithFix.forEach((node) => {
-      if (typeof node.lat === 'number' && typeof node.lon === 'number') {
+      if (hasValidPosition(node.lat, node.lon)) {
         positions.push([node.lat, node.lon]);
       }
     });
@@ -565,22 +565,22 @@ export function MapPage() {
     // Add targets
     if (targetsQuery.data) {
       targetsQuery.data.forEach((target) => {
-        if (typeof target.lat === 'number' && typeof target.lon === 'number') {
-          positions.push([target.lat, target.lon]);
+        if (hasValidPosition(target.lat ?? null, target.lon ?? null)) {
+          positions.push([target.lat!, target.lon!]);
         }
       });
     }
 
     // Add drones
     freshDrones.forEach((drone) => {
-      if (typeof drone.lat === 'number' && typeof drone.lon === 'number') {
+      if (hasValidPosition(drone.lat, drone.lon)) {
         positions.push([drone.lat, drone.lon]);
       }
     });
 
     // Add ADS-B tracks
     adsbTracks.forEach((track) => {
-      if (typeof track.lat === 'number' && typeof track.lon === 'number') {
+      if (hasValidPosition(track.lat, track.lon)) {
         positions.push([track.lat, track.lon]);
       }
     });
@@ -588,7 +588,7 @@ export function MapPage() {
     // Add geofence vertices
     geofences.forEach((geofence) => {
       geofence.polygon.forEach((vertex) => {
-        if (typeof vertex.lat === 'number' && typeof vertex.lon === 'number') {
+        if (hasValidPosition(vertex.lat, vertex.lon)) {
           positions.push([vertex.lat, vertex.lon]);
         }
       });
