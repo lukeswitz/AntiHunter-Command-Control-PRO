@@ -215,6 +215,12 @@ export function SocketBridge() {
       }
 
       if (isAdsbTracksEvent(payload)) {
+        // Check if ADS-B addon is enabled for this user
+        const adsbAddonEnabled = currentUser?.preferences?.notifications?.addons?.adsb ?? false;
+        if (!adsbAddonEnabled) {
+          return; // Skip processing if addon is disabled
+        }
+
         // Keep only tracks that can be plotted (valid position and id); do NOT drop
         // tracks just because callsign/registration is missing.
         const filteredTracks = payload.tracks.filter(
@@ -249,6 +255,12 @@ export function SocketBridge() {
         return;
       }
       if (isAcarsMessagesEvent(payload)) {
+        // Check if ACARS addon is enabled for this user
+        const acarsAddonEnabled = currentUser?.preferences?.notifications?.addons?.acars ?? false;
+        if (!acarsAddonEnabled) {
+          return; // Skip processing if addon is disabled
+        }
+
         const acarsMuted = useMapPreferences.getState().acarsMuted;
         if (!acarsMuted && payload.messages.length > 0) {
           payload.messages.forEach((msg) => {
