@@ -8,6 +8,7 @@ import { buildCommandPayload } from './command-builder';
 import { PrismaService } from '../prisma/prisma.service';
 import { SerialService } from '../serial/serial.service';
 import { SerialCommandAck, SerialCommandResult } from '../serial/serial.types';
+import { TriangulationSessionService } from '../triangulation/triangulation-session.service';
 import { SendCommandDto } from './dto/send-command.dto';
 
 const ACK_TO_COMMAND: Record<string, string> = {
@@ -94,6 +95,7 @@ export class CommandsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly serialService: SerialService,
+    private readonly triangulationSessionService: TriangulationSessionService,
     configService: ConfigService,
   ) {
     this.localSiteId = configService.get<string>('site.id', 'default');
@@ -227,6 +229,26 @@ export class CommandsService {
     });
 
     this.emitUpdate(updated);
+
+    if (ack.ackType === 'TRIANGULATE_ACK' && status === 'OK') {
+      const params = Array.isArray(command.params) ? (command.params as string[]) : [];
+      const mac = params[0];
+      const durationStr = params[1];
+      const duration = parseInt(durationStr, 10);
+
+      if (mac && !isNaN(duration) && command.siteId) {
+        this.triangulationSessionService.startSession(mac, duration, command.siteId, command.id);
+      }
+    }
+
+    if (ack.ackType === 'TRIANGULATE_STOP_ACK') {
+      const params = Array.isArray(command.params) ? (command.params as string[]) : [];
+      const mac = params[0];
+
+      if (mac && command.siteId) {
+        this.triangulationSessionService.stopSession(mac, command.siteId);
+      }
+    }
   }
 
   async handleResult(result: SerialCommandResult): Promise<void> {

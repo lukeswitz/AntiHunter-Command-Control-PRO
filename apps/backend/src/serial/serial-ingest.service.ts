@@ -13,6 +13,7 @@ import { NodesService } from '../nodes/nodes.service';
 import { TakService } from '../tak/tak.service';
 import { TargetsService } from '../targets/targets.service';
 import { TargetTrackingService } from '../tracking/target-tracking.service';
+import { TriangulationSessionService } from '../triangulation/triangulation-session.service';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
@@ -94,6 +95,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
     private readonly inventoryService: InventoryService,
     private readonly commandsService: CommandsService,
     private readonly trackingService: TargetTrackingService,
+    private readonly triangulationSessionService: TriangulationSessionService,
     private readonly gateway: CommandCenterGateway,
     private readonly webhookDispatcher: WebhookDispatcherService,
     private readonly takService: TakService,
@@ -164,8 +166,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           await this.nodesService.upsert({
             id: event.nodeId,
             name: event.nodeId,
-            lat: event.lat ?? 0,
-            lon: event.lon ?? 0,
+            lat: event.lat ?? null,
+            lon: event.lon ?? null,
             lastMessage: event.lastMessage,
             ts: event.timestamp ?? new Date(),
             lastSeen: event.timestamp ?? new Date(),
@@ -177,8 +179,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           this.gateway.emitEvent({
             type: 'node.telemetry',
             nodeId: event.nodeId,
-            lat: event.lat ?? 0,
-            lon: event.lon ?? 0,
+            lat: event.lat ?? null,
+            lon: event.lon ?? null,
             raw: event.raw,
             siteId,
             temperatureC: event.temperatureC ?? null,
@@ -394,7 +396,17 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
               ),
             );
 
-          // Handle TARGET_DATA triangulation messages for TDOA
+          if (
+            event.category?.toLowerCase() === 'triangulation' &&
+            typeof event.data === 'object' &&
+            event.data !== null
+          ) {
+            const triData = event.data as { stage?: string; mac?: string };
+            if ((triData.stage === 'complete' || triData.stage === 'final') && triData.mac) {
+              this.triangulationSessionService.stopSession(triData.mac, siteId);
+            }
+          }
+
           if (
             event.category?.toLowerCase() === 'triangulation' &&
             typeof event.data === 'object' &&
@@ -423,24 +435,32 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             const triHdop = typeof triData.hdop === 'number' ? triData.hdop : undefined;
 
             // Handle TARGET_DATA messages (not just complete stage)
-            if (macFromData && triLat != null && triLon != null && event.nodeId) {
+            const hasValidTriangulationPosition =
+              triLat != null &&
+              triLon != null &&
+              Number.isFinite(triLat) &&
+              Number.isFinite(triLon) &&
+              !(triLat === 0 && triLon === 0);
+            if (macFromData && hasValidTriangulationPosition && event.nodeId) {
               const macString = String(macFromData);
-              const nodeSnapshot = this.nodesService.getSnapshotById(event.nodeId);
-              const nodeLat = nodeSnapshot?.lat ?? undefined;
-              const nodeLon = nodeSnapshot?.lon ?? undefined;
-
-              // Feed to tracking service for TDOA/RSSI triangulation
-              const estimate = this.trackingService.ingestDetection({
-                mac: macString,
-                nodeId: event.nodeId,
-                nodeLat: triLat, // TARGET_DATA includes node's GPS position
-                nodeLon: triLon,
-                rssi: triRssi,
+              const isTriangulationActive = this.triangulationSessionService.isActive(
+                macString,
                 siteId,
-                timestamp: timestamp.getTime(),
-                detectionTimestamp: triDetectionTimestamp, // GPS-synced RTC timestamp
-                hdop: triHdop, // GPS Horizontal Dilution of Precision
-              });
+              );
+
+              const estimate = isTriangulationActive
+                ? this.trackingService.ingestDetection({
+                    mac: macString,
+                    nodeId: event.nodeId,
+                    nodeLat: triLat,
+                    nodeLon: triLon,
+                    rssi: triRssi,
+                    siteId,
+                    timestamp: timestamp.getTime(),
+                    detectionTimestamp: triDetectionTimestamp,
+                    hdop: triHdop,
+                  })
+                : null;
 
               // Update inventory for this detection
               try {

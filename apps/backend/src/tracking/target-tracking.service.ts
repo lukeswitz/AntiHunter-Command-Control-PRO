@@ -8,9 +8,9 @@ const SPEED_OF_LIGHT_M_PER_S = 299_792_458; // meters per second
 const DETECTION_WINDOW_MS = 45_000;
 const PERSIST_INTERVAL_MS = 15_000;
 const PERSIST_DISTANCE_M = 8;
-const MIN_BOOTSTRAP_CONFIDENCE = 0.05;
-const MIN_CONFIDENCE_FOR_PERSIST = 0.1;
-const SINGLE_NODE_CONFIDENCE_FLOOR = 0.08;
+const MIN_BOOTSTRAP_CONFIDENCE = 0.25;
+const MIN_CONFIDENCE_FOR_PERSIST = 0.35;
+const SINGLE_NODE_CONFIDENCE_FLOOR = 0.22;
 const MAX_HISTORY_SIZE = 64;
 const MIN_NODES_FOR_TDOA = 3;
 
@@ -104,6 +104,22 @@ export class TargetTrackingService {
     const nodeLon = this.toFinite(input.nodeLon);
     const measurementLat = this.toFinite(input.targetLat);
     const measurementLon = this.toFinite(input.targetLon);
+
+    // Reject (0, 0) coordinates as invalid
+    const nodeIsNullIsland =
+      nodeLat !== undefined &&
+      nodeLon !== undefined &&
+      Math.abs(nodeLat) < 0.0001 &&
+      Math.abs(nodeLon) < 0.0001;
+    const measurementIsNullIsland =
+      measurementLat !== undefined &&
+      measurementLon !== undefined &&
+      Math.abs(measurementLat) < 0.0001 &&
+      Math.abs(measurementLon) < 0.0001;
+
+    if (nodeIsNullIsland || measurementIsNullIsland) {
+      return null;
+    }
 
     if (
       measurementLat === undefined &&
@@ -228,30 +244,30 @@ export class TargetTrackingService {
       return null;
     }
 
-    // Try TDOA first if we have enough nodes with timestamps
-    const tdoaEstimate = this.tryTDOAEstimate(state);
+    // Always start with RSSI-based triangulation as the baseline
     const rssiEstimate = this.tryRSSIEstimate(state);
 
-    // Hybrid approach: combine TDOA and RSSI if both available
-    if (tdoaEstimate && rssiEstimate) {
+    // RSSI is required - TDOA should only refine it, never replace it
+    if (!rssiEstimate) {
+      return null;
+    }
+
+    // Try to improve RSSI estimate with TDOA if we have enough nodes with timestamps
+    const tdoaEstimate = this.tryTDOAEstimate(state);
+
+    // Use hybrid approach: TDOA refines the RSSI baseline
+    if (tdoaEstimate) {
       this.logger.debug(
         `Using hybrid triangulation (TDOA + RSSI) with ${tdoaEstimate.uniqueNodes} nodes`,
       );
       return this.combineEstimates(tdoaEstimate, rssiEstimate);
     }
 
-    if (tdoaEstimate) {
-      this.logger.debug(
-        `Using TDOA triangulation with ${tdoaEstimate.uniqueNodes} nodes, confidence: ${(tdoaEstimate.confidence * 100).toFixed(1)}%`,
-      );
-    } else if (rssiEstimate) {
-      this.logger.debug(
-        `Using RSSI triangulation with ${rssiEstimate.uniqueNodes} nodes, confidence: ${(rssiEstimate.confidence * 100).toFixed(1)}%`,
-      );
-    }
-
-    // Fallback to whichever method succeeded
-    return tdoaEstimate ?? rssiEstimate;
+    // Fall back to RSSI-only
+    this.logger.debug(
+      `Using RSSI triangulation with ${rssiEstimate.uniqueNodes} nodes, confidence: ${(rssiEstimate.confidence * 100).toFixed(1)}%`,
+    );
+    return rssiEstimate;
   }
 
   private tryRSSIEstimate(state: TrackingState): BaseEstimate | null {
@@ -651,7 +667,19 @@ export class TargetTrackingService {
    * Combine TDOA and RSSI estimates using weighted average
    */
   private combineEstimates(tdoa: BaseEstimate, rssi: BaseEstimate): BaseEstimate {
-    // Weight TDOA more heavily (70%) as it's more accurate
+    // Sanity check: reject TDOA if it's too far from RSSI baseline
+    const distance = this.distanceMeters(tdoa.lat, tdoa.lon, rssi.lat, rssi.lon);
+    const maxReasonableDistance = 5000; // 5km - TDOA should refine, not drastically change position
+
+    if (distance > maxReasonableDistance) {
+      this.logger.warn(
+        `TDOA result (${tdoa.lat.toFixed(6)}, ${tdoa.lon.toFixed(6)}) is ${(distance / 1000).toFixed(1)}km from RSSI baseline ` +
+          `(${rssi.lat.toFixed(6)}, ${rssi.lon.toFixed(6)}). Using RSSI only.`,
+      );
+      return rssi;
+    }
+
+    // Weight TDOA more heavily (70%) as it's more accurate when within reasonable bounds
     const tdoaWeight = 0.7;
     const rssiWeight = 0.3;
 

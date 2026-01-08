@@ -214,6 +214,14 @@ export class TargetsService {
       return false;
     }
 
+    // Reject (0, 0) coordinates as invalid
+    if (Math.abs(lat) < 0.0001 && Math.abs(lon) < 0.0001) {
+      this.logger.warn(
+        `Rejecting tracking estimate for ${normalizedMac}: coordinates are (0, 0) (null island)`,
+      );
+      return false;
+    }
+
     const data: Prisma.TargetUpdateManyMutationInput = {
       lat,
       lon,

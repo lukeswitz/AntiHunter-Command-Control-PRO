@@ -558,7 +558,7 @@ export function MapPage() {
     // Add nodes
     nodeListWithFix.forEach((node) => {
       if (hasValidPosition(node.lat, node.lon)) {
-        positions.push([node.lat, node.lon]);
+        positions.push([node.lat!, node.lon!]);
       }
     });
 
