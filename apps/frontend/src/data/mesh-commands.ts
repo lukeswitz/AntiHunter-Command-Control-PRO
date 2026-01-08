@@ -335,7 +335,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         key: 'duration',
         label: 'Duration (seconds)',
         type: 'duration',
-        placeholder: '30',
+        placeholder: '45',
         required: true,
         min: 20,
         max: 300,

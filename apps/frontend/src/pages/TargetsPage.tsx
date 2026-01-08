@@ -9,7 +9,7 @@ import { useTrackingBannerStore } from '../stores/tracking-banner-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
 import { useTriangulationStore } from '../stores/triangulation-store';
 
-const DEFAULT_TRIANGULATION_DURATION = 30;
+const DEFAULT_TRIANGULATION_DURATION = 60;
 const DEFAULT_SCAN_DURATION = 60;
 const TRIANGULATE_DEBOUNCE_MS = 3000;
 const REFINEMENT_DURATION_MULTIPLIER = 1.5;
