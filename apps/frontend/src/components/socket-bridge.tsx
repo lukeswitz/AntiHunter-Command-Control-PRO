@@ -160,6 +160,60 @@ export function SocketBridge() {
     };
 
     const handleEvent = (payload: unknown) => {
+      // Handle real-time tracking updates from TDOA/RSSI triangulation
+      if (isTrackingUpdateEvent(payload)) {
+        const normalizedMac = normalizeMacKey(payload.mac);
+
+        // Update target position in query cache
+        queryClient.setQueryData(['targets'], (previous: Target[] | undefined) => {
+          if (!previous) {
+            return previous;
+          }
+          let changed = false;
+          const next = previous.map((target) => {
+            if (!target.mac) {
+              return target;
+            }
+            const macKey = normalizeMacKey(target.mac);
+            if (macKey !== normalizedMac) {
+              return target;
+            }
+            const confidence = payload.confidence ?? target.trackingConfidence ?? null;
+            if (
+              Math.abs(target.lat - payload.lat) > 1e-6 ||
+              Math.abs(target.lon - payload.lon) > 1e-6 ||
+              (confidence ?? null) !== (target.trackingConfidence ?? null)
+            ) {
+              changed = true;
+              return {
+                ...target,
+                lat: payload.lat,
+                lon: payload.lon,
+                trackingConfidence: confidence,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return target;
+          });
+          if (changed) {
+            void queryClient.invalidateQueries({ queryKey: ['targets'] });
+          }
+          return changed ? next : previous;
+        });
+
+        // Update triangulation store with method and confidence
+        useTriangulationStore.getState().complete({
+          mac: payload.mac,
+          lat: payload.lat,
+          lon: payload.lon,
+          method: payload.method,
+          confidence: payload.confidence,
+          contributors: payload.contributors,
+        });
+
+        return;
+      }
+
       if (isAdsbTracksEvent(payload)) {
         // Keep only tracks that can be plotted (valid position and id); do NOT drop
         // tracks just because callsign/registration is missing.
@@ -1205,6 +1259,41 @@ function isGeofenceAlertEvent(payload: unknown): payload is {
   }
   const category = typeof base.category === 'string' ? base.category.toLowerCase() : '';
   return category === 'geofence';
+}
+
+function isTrackingUpdateEvent(payload: unknown): payload is {
+  type: 'tracking.update';
+  mac: string;
+  lat: number;
+  lon: number;
+  confidence?: number;
+  method?: 'tdoa' | 'rssi' | 'hybrid';
+  contributors?: Array<{
+    nodeId?: string;
+    weight: number;
+    maxRssi?: number;
+    lat?: number;
+    lon?: number;
+  }>;
+  siteId?: string | null;
+} {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const base = payload as {
+    type?: string;
+    mac?: string;
+    lat?: number;
+    lon?: number;
+  };
+  return (
+    base.type === 'tracking.update' &&
+    typeof base.mac === 'string' &&
+    typeof base.lat === 'number' &&
+    typeof base.lon === 'number' &&
+    Number.isFinite(base.lat) &&
+    Number.isFinite(base.lon)
+  );
 }
 
 function toNumber(value: unknown): number | undefined {

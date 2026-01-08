@@ -13,6 +13,7 @@ import { NodesService } from '../nodes/nodes.service';
 import { TakService } from '../tak/tak.service';
 import { TargetsService } from '../targets/targets.service';
 import { TargetTrackingService } from '../tracking/target-tracking.service';
+import { TriangulationSessionService } from '../triangulation/triangulation-session.service';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
@@ -94,6 +95,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
     private readonly inventoryService: InventoryService,
     private readonly commandsService: CommandsService,
     private readonly trackingService: TargetTrackingService,
+    private readonly triangulationSessionService: TriangulationSessionService,
     private readonly gateway: CommandCenterGateway,
     private readonly webhookDispatcher: WebhookDispatcherService,
     private readonly takService: TakService,
@@ -164,8 +166,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           await this.nodesService.upsert({
             id: event.nodeId,
             name: event.nodeId,
-            lat: event.lat ?? 0,
-            lon: event.lon ?? 0,
+            lat: event.lat ?? null,
+            lon: event.lon ?? null,
             lastMessage: event.lastMessage,
             ts: event.timestamp ?? new Date(),
             lastSeen: event.timestamp ?? new Date(),
@@ -177,8 +179,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           this.gateway.emitEvent({
             type: 'node.telemetry',
             nodeId: event.nodeId,
-            lat: event.lat ?? 0,
-            lon: event.lon ?? 0,
+            lat: event.lat ?? null,
+            lon: event.lon ?? null,
             raw: event.raw,
             siteId,
             temperatureC: event.temperatureC ?? null,
@@ -222,6 +224,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             rssi: event.rssi,
             siteId,
             timestamp: detectionTime.getTime(),
+            detectionTimestamp: event.detectionTimestamp,
           });
 
           const latForRecord = estimate?.lat ?? event.lat ?? nodeLat ?? undefined;
@@ -393,28 +396,138 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
               ),
             );
 
-          const isTriangulationComplete =
+          if (
+            event.category?.toLowerCase() === 'triangulation' &&
+            typeof event.data === 'object' &&
+            event.data !== null
+          ) {
+            const triData = event.data as { stage?: string; mac?: string };
+            if ((triData.stage === 'complete' || triData.stage === 'final') && triData.mac) {
+              this.triangulationSessionService.stopSession(triData.mac, siteId);
+            }
+          }
+
+          if (
             event.category?.toLowerCase() === 'triangulation' &&
             typeof event.data === 'object' &&
             event.data !== null &&
-            (event.data as { stage?: unknown }).stage === 'complete';
-          const macFromData =
-            typeof event.data === 'object' &&
-            event.data !== null &&
             'mac' in (event.data as Record<string, unknown>)
-              ? (event.data as { mac?: unknown }).mac
-              : undefined;
-          if (isTriangulationComplete && macFromData && lat != null && lon != null) {
-            const macString = String(macFromData);
-            void this.targetsService
-              .applyTrackingEstimate(macString, lat, lon, siteId)
-              .catch((error) =>
+          ) {
+            const triData = event.data as {
+              mac?: unknown;
+              lat?: unknown;
+              lon?: unknown;
+              rssi?: unknown;
+              detectionTimestamp?: unknown;
+              hdop?: unknown;
+              stage?: unknown;
+              type?: unknown;
+            };
+
+            const macFromData = triData.mac;
+            const triLat = typeof triData.lat === 'number' ? triData.lat : undefined;
+            const triLon = typeof triData.lon === 'number' ? triData.lon : undefined;
+            const triRssi = typeof triData.rssi === 'number' ? triData.rssi : undefined;
+            const triDetectionTimestamp =
+              typeof triData.detectionTimestamp === 'number'
+                ? triData.detectionTimestamp
+                : undefined;
+            const triHdop = typeof triData.hdop === 'number' ? triData.hdop : undefined;
+
+            // Handle TARGET_DATA messages (not just complete stage)
+            const hasValidTriangulationPosition =
+              triLat != null &&
+              triLon != null &&
+              Number.isFinite(triLat) &&
+              Number.isFinite(triLon) &&
+              !(triLat === 0 && triLon === 0);
+            if (macFromData && hasValidTriangulationPosition && event.nodeId) {
+              const macString = String(macFromData);
+              const isTriangulationActive = this.triangulationSessionService.isActive(
+                macString,
+                siteId,
+              );
+
+              const estimate = isTriangulationActive
+                ? this.trackingService.ingestDetection({
+                    mac: macString,
+                    nodeId: event.nodeId,
+                    nodeLat: triLat,
+                    nodeLon: triLon,
+                    rssi: triRssi,
+                    siteId,
+                    timestamp: timestamp.getTime(),
+                    detectionTimestamp: triDetectionTimestamp,
+                    hdop: triHdop,
+                  })
+                : null;
+
+              // Update inventory for this detection
+              try {
+                await this.inventoryService.recordDetection(
+                  {
+                    kind: 'target-detected',
+                    nodeId: event.nodeId,
+                    mac: macString,
+                    rssi: triRssi ?? 0,
+                    type: triData.type ? String(triData.type) : undefined,
+                    lat: estimate?.lat ?? triLat,
+                    lon: estimate?.lon ?? triLon,
+                    raw: event.raw,
+                  },
+                  siteId,
+                  triLat,
+                  triLon,
+                );
+              } catch (error) {
                 this.logger.warn(
-                  `Failed to apply triangulation estimate for ${macString}: ${
+                  `Failed to update inventory for TARGET_DATA ${macString}: ${
                     error instanceof Error ? error.message : String(error)
                   }`,
-                ),
-              );
+                );
+              }
+
+              // Persist if tracking service recommends
+              if (estimate?.shouldPersist) {
+                await this.trackingService.persistEstimate(estimate.mac, estimate);
+                this.logger.debug(
+                  `Persisted TDOA estimate for ${estimate.mac}: method=${estimate.method}, confidence=${(estimate.confidence * 100).toFixed(1)}%, nodes=${estimate.uniqueNodes}`,
+                );
+              } else if (estimate) {
+                this.logger.debug(
+                  `TDOA estimate not persisted for ${estimate.mac}: confidence=${(estimate.confidence * 100).toFixed(1)}%, method=${estimate.method}, shouldPersist=false`,
+                );
+              }
+
+              // Emit tracking update to WebSocket clients
+              if (estimate) {
+                this.gateway.emitEvent({
+                  type: 'tracking.update',
+                  mac: estimate.mac,
+                  lat: estimate.lat,
+                  lon: estimate.lon,
+                  confidence: estimate.confidence,
+                  method: estimate.method,
+                  contributors: estimate.contributors,
+                  siteId,
+                });
+              }
+            }
+
+            // Handle triangulation complete stage (old behavior)
+            const isTriangulationComplete = triData.stage === 'complete';
+            if (isTriangulationComplete && macFromData && lat != null && lon != null) {
+              const macString = String(macFromData);
+              void this.targetsService
+                .applyTrackingEstimate(macString, lat, lon, siteId)
+                .catch((error) =>
+                  this.logger.warn(
+                    `Failed to apply triangulation estimate for ${macString}: ${
+                      error instanceof Error ? error.message : String(error)
+                    }`,
+                  ),
+                );
+            }
           }
         }
         break;

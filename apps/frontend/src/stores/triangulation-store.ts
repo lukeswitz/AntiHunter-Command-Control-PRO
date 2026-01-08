@@ -11,9 +11,32 @@ interface TriangulationState {
   lat?: number;
   lon?: number;
   lastUpdated?: number;
+  method?: 'tdoa' | 'rssi' | 'hybrid'; // Triangulation method used
+  confidence?: number; // 0-1 confidence score
+  contributors?: Array<{
+    nodeId?: string;
+    weight: number;
+    maxRssi?: number;
+    lat?: number;
+    lon?: number;
+  }>;
   setCountdown: (mac: string, durationSec: number) => void;
   setProcessing: () => void;
-  complete: (params: { mac?: string; lat?: number; lon?: number; link?: string }) => void;
+  complete: (params: {
+    mac?: string;
+    lat?: number;
+    lon?: number;
+    link?: string;
+    method?: 'tdoa' | 'rssi' | 'hybrid';
+    confidence?: number;
+    contributors?: Array<{
+      nodeId?: string;
+      weight: number;
+      maxRssi?: number;
+      lat?: number;
+      lon?: number;
+    }>;
+  }) => void;
   fail: () => void;
   reset: () => void;
 }
@@ -52,7 +75,7 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       set({ status: 'processing', lastUpdated: Date.now() });
     }
   },
-  complete: ({ mac, lat, lon, link }) => {
+  complete: ({ mac, lat, lon, link, method, confidence, contributors }) => {
     const stateMac = get().targetMac;
     const incomingMac = mac ? mac.toUpperCase() : undefined;
     if (stateMac && incomingMac && stateMac !== incomingMac) {
@@ -65,6 +88,9 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       link,
       lat,
       lon,
+      method,
+      confidence,
+      contributors,
       lastUpdated: Date.now(),
     });
   },
@@ -78,6 +104,9 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       link: undefined,
       lat: undefined,
       lon: undefined,
+      method: undefined,
+      confidence: undefined,
+      contributors: undefined,
       lastUpdated: undefined,
     }),
 }));
