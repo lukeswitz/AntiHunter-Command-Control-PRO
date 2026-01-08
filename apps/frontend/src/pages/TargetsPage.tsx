@@ -175,7 +175,10 @@ export function TargetsPage() {
       if (!target.mac) {
         throw new Error('Target MAC unknown');
       }
-      const commandTarget = '@ALL';
+      const commandTarget = normalizeNodeTarget(target.firstNodeId);
+      if (!commandTarget || commandTarget === '@ALL') {
+        throw new Error('First detecting node unknown');
+      }
       await sendCommand({
         target: commandTarget,
         name: 'TRIANGULATE_START',

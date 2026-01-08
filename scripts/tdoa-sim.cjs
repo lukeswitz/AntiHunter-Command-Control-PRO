@@ -197,10 +197,10 @@ async function main() {
 
   const primaryNode = NODES[0];
   endLines.push(
-    `${primaryNode.id}: TRIANGULATION_FINAL: MAC=${TARGET_MAC} GPS=${finalLat},${finalLon} CONF=85.5 UNC=12.3`,
+    `${primaryNode.id}: T_F: MAC=${TARGET_MAC} GPS=${finalLat},${finalLon} CONF=85.5 UNC=12.3`,
   );
   endLines.push(
-    `${primaryNode.id}: TRIANGULATE_COMPLETE: MAC=${TARGET_MAC} Nodes=${NODES.length} https://www.google.com/maps?q=${finalLat},${finalLon}`,
+    `${primaryNode.id}: T_C: MAC=${TARGET_MAC} Nodes=${NODES.length} https://www.google.com/maps?q=${finalLat},${finalLon}`,
   );
 
   await send(endLines);
