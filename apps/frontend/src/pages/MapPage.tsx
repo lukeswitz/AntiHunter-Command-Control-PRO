@@ -585,14 +585,15 @@ export function MapPage() {
       }
     });
 
-    // Add geofence vertices
-    geofences.forEach((geofence) => {
-      geofence.polygon.forEach((vertex) => {
-        if (hasValidPosition(vertex.lat, vertex.lon)) {
-          positions.push([vertex.lat, vertex.lon]);
-        }
+    if (geofencesEnabled) {
+      geofences.forEach((geofence) => {
+        geofence.polygon.forEach((vertex) => {
+          if (hasValidPosition(vertex.lat, vertex.lon)) {
+            positions.push([vertex.lat, vertex.lon]);
+          }
+        });
       });
-    });
+    }
 
     if (positions.length === 0) {
       return false;
@@ -601,7 +602,7 @@ export function MapPage() {
     const bounds = latLngBounds(positions);
     mapRef.current.fitBounds(bounds.pad(0.25));
     return true;
-  }, [mapReady, nodeListWithFix, targetsQuery.data, freshDrones, adsbTracks, geofences]);
+  }, [mapReady, nodeListWithFix, targetsQuery.data, freshDrones, adsbTracks, geofences, geofencesEnabled]);
 
   const handleFitClick = () => {
     if (fitEnabled) {
