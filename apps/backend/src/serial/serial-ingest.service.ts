@@ -444,30 +444,22 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
               );
 
               if (isTriangulationActive) {
-                // During triangulation: Update target with intermediate position for live feel
-                // Each T_D provides node's GPS position as intermediate estimate
+                // During triangulation: T_D messages contain node GPS positions and timestamps
+                // for TDoA calculation. DO NOT use node GPS as target position.
                 // T_F will provide final authoritative position with confidence/uncertainty
 
-                // Update target with intermediate position (live updates during triangulation)
+                // Ensure target exists (but don't update position with node GPS)
                 try {
-                  await this.targetsService.applyTrackingEstimate(
-                    macString,
-                    triLat,
-                    triLon,
-                    siteId,
-                    undefined, // No confidence yet, waiting for T_F
-                    undefined, // No uncertainty yet, waiting for T_F
-                    'triangulation-in-progress', // Mark as in-progress
-                  );
+                  await this.targetsService.ensureTargetExists(macString, siteId);
                 } catch (error) {
                   this.logger.warn(
-                    `Failed to apply intermediate triangulation position for ${macString}: ${
+                    `Failed to ensure target exists for ${macString}: ${
                       error instanceof Error ? error.message : String(error)
                     }`,
                   );
                 }
 
-                // Emit progress to WebSocket for UI display
+                // Emit progress to WebSocket for UI display (detection event only, no position update)
                 this.gateway.emitEvent({
                   type: 'triangulation.detection',
                   mac: macString,
@@ -478,16 +470,26 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
                   hits: typeof triData === 'object' && 'hits' in triData ? triData.hits : undefined,
                   siteId,
                   timestamp: timestamp.toISOString(),
-                  lat: triLat, // Show position on map
-                  lon: triLon,
+                  // DO NOT set lat/lon - these are node coordinates, not target coordinates
                 });
 
                 this.logger.debug(
-                  `Triangulation progress: ${macString} at ${triLat.toFixed(6)},${triLon.toFixed(6)} from ${event.nodeId} RSSI=${triRssi}`,
+                  `Triangulation progress: ${macString} detected by ${event.nodeId} at ${triLat.toFixed(6)},${triLon.toFixed(6)} RSSI=${triRssi}`,
                 );
               } else {
                 // Not triangulating - this might be normal tracking (future feature)
-                // For now, just update inventory without position calculation
+                // Auto-promote MAC to target if it doesn't exist
+                try {
+                  await this.targetsService.ensureTargetExists(macString, siteId);
+                } catch (error) {
+                  this.logger.warn(
+                    `Failed to ensure target exists for ${macString}: ${
+                      error instanceof Error ? error.message : String(error)
+                    }`,
+                  );
+                }
+
+                // Update inventory without position calculation
                 try {
                   await this.inventoryService.recordDetection(
                     {
@@ -524,7 +526,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
                 typeof triData === 'object' &&
                 'confidence' in triData &&
                 typeof triData.confidence === 'number'
-                  ? triData.confidence / 100.0 // Firmware sends as percentage
+                  ? triData.confidence / 100.0
                   : undefined;
               const uncertainty =
                 typeof triData === 'object' &&

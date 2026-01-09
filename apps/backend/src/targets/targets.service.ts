@@ -283,6 +283,59 @@ export class TargetsService {
     }
   }
 
+  /**
+   * Ensure a target exists for the given MAC address without updating its position.
+   * This is useful during triangulation when T_D messages arrive but we don't want
+   * to change the target's position (only T_F should do that).
+   */
+  async ensureTargetExists(mac: string, siteId?: string | null): Promise<boolean> {
+    let normalizedMac: string;
+    try {
+      normalizedMac = normalizeMac(mac);
+    } catch {
+      this.logger.warn(`Skipping target creation for invalid MAC ${mac}`);
+      return false;
+    }
+
+    const where: Prisma.TargetWhereInput = { mac: normalizedMac };
+    if (siteId !== undefined) {
+      where.siteId = siteId ?? null;
+    }
+
+    try {
+      // Check if target already exists
+      const existing = await this.prisma.target.findFirst({ where });
+
+      if (existing) {
+        // Target already exists, nothing to do
+        return true;
+      }
+
+      // Create new target without position (will be set by T_F)
+      const target = await this.prisma.target.create({
+        data: {
+          mac: normalizedMac,
+          name: normalizedMac,
+          lat: 0, // Placeholder - will be updated by T_F
+          lon: 0, // Placeholder - will be updated by T_F
+          status: TargetStatus.ACTIVE,
+          siteId: siteId ?? null,
+        },
+      });
+
+      this.changes$.next({ type: 'upsert', target });
+      this.logger.log(`Created target ${normalizedMac} from triangulation T_D message`);
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to ensure target exists for ${normalizedMac}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return false;
+    }
+  }
+
   async clearAll(): Promise<{ deleted: number }> {
     const result = await this.prisma.target.deleteMany();
     return { deleted: result.count };

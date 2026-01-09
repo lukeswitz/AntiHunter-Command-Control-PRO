@@ -164,12 +164,12 @@ export function SocketBridge() {
       if (isTrackingUpdateEvent(payload)) {
         const normalizedMac = normalizeMacKey(payload.mac);
 
+        let changed = false;
         // Update target position in query cache
         queryClient.setQueryData(['targets'], (previous: Target[] | undefined) => {
           if (!previous) {
             return previous;
           }
-          let changed = false;
           const next = previous.map((target) => {
             if (!target.mac) {
               return target;
@@ -195,11 +195,12 @@ export function SocketBridge() {
             }
             return target;
           });
-          if (changed) {
-            void queryClient.invalidateQueries({ queryKey: ['targets'] });
-          }
           return changed ? next : previous;
         });
+
+        if (changed) {
+          void queryClient.invalidateQueries({ queryKey: ['targets'] });
+        }
 
         // Update triangulation store with method and confidence
         useTriangulationStore.getState().complete({
@@ -255,9 +256,10 @@ export function SocketBridge() {
               updatedAt: new Date().toISOString(),
             };
           });
-          void queryClient.invalidateQueries({ queryKey: ['targets'] });
           return next;
         });
+
+        void queryClient.invalidateQueries({ queryKey: ['targets'] });
 
         // Update triangulation store with final result
         useTriangulationStore.getState().complete({
