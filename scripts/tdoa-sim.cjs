@@ -175,7 +175,7 @@ async function main() {
       const rssi = Math.round(-65 - 20 * Math.log10(dist / 100));
 
       lines.push(
-        `${node.id}: TARGET_DATA: ${TARGET_MAC} RSSI:${rssi} Type:WiFi GPS=${node.lat.toFixed(6)},${node.lon.toFixed(6)} HDOP=0.9 TS=${ts}`,
+        `${node.id}: T_D: ${TARGET_MAC} Hits=2 RSSI:${rssi} Type:WiFi GPS=${node.lat.toFixed(6)},${node.lon.toFixed(6)} HDOP=0.9 TS=${ts}`,
       );
 
       console.log(

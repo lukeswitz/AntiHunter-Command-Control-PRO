@@ -434,7 +434,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
                 : undefined;
             const triHdop = typeof triData.hdop === 'number' ? triData.hdop : undefined;
 
-            // Handle TARGET_DATA messages (not just complete stage)
+            // Handle TARGET_DATA messages during triangulation
             const hasValidTriangulationPosition =
               triLat != null &&
               triLon != null &&
@@ -448,81 +448,144 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
                 siteId,
               );
 
-              const estimate = isTriangulationActive
-                ? this.trackingService.ingestDetection({
-                    mac: macString,
-                    nodeId: event.nodeId,
-                    nodeLat: triLat,
-                    nodeLon: triLon,
-                    rssi: triRssi,
+              if (isTriangulationActive) {
+                // During triangulation: Update target with intermediate position for live feel
+                // Each T_D provides node's GPS position as intermediate estimate
+                // T_F will provide final authoritative position with confidence/uncertainty
+
+                // Update target with intermediate position (live updates during triangulation)
+                try {
+                  await this.targetsService.applyTrackingEstimate(
+                    macString,
+                    triLat,
+                    triLon,
                     siteId,
-                    timestamp: timestamp.getTime(),
-                    detectionTimestamp: triDetectionTimestamp,
-                    hdop: triHdop,
-                  })
-                : null;
+                    undefined, // No confidence yet, waiting for T_F
+                    undefined, // No uncertainty yet, waiting for T_F
+                    'triangulation-in-progress', // Mark as in-progress
+                  );
+                } catch (error) {
+                  this.logger.warn(
+                    `Failed to apply intermediate triangulation position for ${macString}: ${
+                      error instanceof Error ? error.message : String(error)
+                    }`,
+                  );
+                }
 
-              // Update inventory for this detection
-              try {
-                await this.inventoryService.recordDetection(
-                  {
-                    kind: 'target-detected',
-                    nodeId: event.nodeId,
-                    mac: macString,
-                    rssi: triRssi ?? 0,
-                    type: triData.type ? String(triData.type) : undefined,
-                    lat: estimate?.lat ?? triLat,
-                    lon: estimate?.lon ?? triLon,
-                    raw: event.raw,
-                  },
-                  siteId,
-                  triLat,
-                  triLon,
-                );
-              } catch (error) {
-                this.logger.warn(
-                  `Failed to update inventory for TARGET_DATA ${macString}: ${
-                    error instanceof Error ? error.message : String(error)
-                  }`,
-                );
-              }
-
-              // Persist if tracking service recommends
-              if (estimate?.shouldPersist) {
-                await this.trackingService.persistEstimate(estimate.mac, estimate);
-                this.logger.debug(
-                  `Persisted TDOA estimate for ${estimate.mac}: method=${estimate.method}, confidence=${(estimate.confidence * 100).toFixed(1)}%, nodes=${estimate.uniqueNodes}`,
-                );
-              } else if (estimate) {
-                this.logger.debug(
-                  `TDOA estimate not persisted for ${estimate.mac}: confidence=${(estimate.confidence * 100).toFixed(1)}%, method=${estimate.method}, shouldPersist=false`,
-                );
-              }
-
-              // Emit tracking update to WebSocket clients
-              if (estimate) {
+                // Emit progress to WebSocket for UI display
                 this.gateway.emitEvent({
-                  type: 'tracking.update',
-                  mac: estimate.mac,
-                  lat: estimate.lat,
-                  lon: estimate.lon,
-                  confidence: estimate.confidence,
-                  method: estimate.method,
-                  contributors: estimate.contributors,
+                  type: 'triangulation.detection',
+                  mac: macString,
+                  nodeId: event.nodeId,
+                  nodeLat: triLat, // Node's GPS position
+                  nodeLon: triLon, // Node's GPS position
+                  rssi: triRssi,
+                  hits: typeof triData === 'object' && 'hits' in triData ? triData.hits : undefined,
+                  siteId,
+                  timestamp: timestamp.toISOString(),
+                  lat: triLat, // Show position on map
+                  lon: triLon,
+                });
+
+                this.logger.debug(
+                  `Triangulation progress: ${macString} at ${triLat.toFixed(6)},${triLon.toFixed(6)} from ${event.nodeId} RSSI=${triRssi}`,
+                );
+              } else {
+                // Not triangulating - this might be normal tracking (future feature)
+                // For now, just update inventory without position calculation
+                try {
+                  await this.inventoryService.recordDetection(
+                    {
+                      kind: 'target-detected',
+                      nodeId: event.nodeId,
+                      mac: macString,
+                      rssi: triRssi ?? 0,
+                      type: triData.type ? String(triData.type) : undefined,
+                      lat: triLat,
+                      lon: triLon,
+                      raw: event.raw,
+                    },
+                    siteId,
+                    triLat,
+                    triLon,
+                  );
+                } catch (error) {
+                  this.logger.warn(
+                    `Failed to update inventory for TARGET_DATA ${macString}: ${
+                      error instanceof Error ? error.message : String(error)
+                    }`,
+                  );
+                }
+              }
+            }
+
+            // Handle T_F (final) - PRIMARY source of triangulation results
+            const isTriangulationFinal = triData.stage === 'final';
+            if (isTriangulationFinal && macFromData) {
+              const macString = String(macFromData);
+              const finalLat = typeof triData.lat === 'number' ? triData.lat : undefined;
+              const finalLon = typeof triData.lon === 'number' ? triData.lon : undefined;
+              const confidence =
+                typeof triData === 'object' && 'confidence' in triData && typeof triData.confidence === 'number'
+                  ? triData.confidence / 100.0 // Firmware sends as percentage
+                  : undefined;
+              const uncertainty =
+                typeof triData === 'object' && 'uncertainty' in triData && typeof triData.uncertainty === 'number'
+                  ? triData.uncertainty
+                  : undefined;
+
+              if (finalLat != null && finalLon != null) {
+                this.logger.log(
+                  `Triangulation FINAL for ${macString}: ${finalLat.toFixed(6)},${finalLon.toFixed(6)} ` +
+                    `confidence=${confidence?.toFixed(2)} uncertainty=${uncertainty?.toFixed(1)}m`,
+                );
+
+                await this.targetsService
+                  .applyTrackingEstimate(
+                    macString,
+                    finalLat,
+                    finalLon,
+                    siteId,
+                    confidence,
+                    uncertainty,
+                    'firmware-triangulation',
+                  )
+                  .catch((error) =>
+                    this.logger.warn(
+                      `Failed to apply T_F result for ${macString}: ${
+                        error instanceof Error ? error.message : String(error)
+                      }`,
+                    ),
+                  );
+
+                // Notify clients
+                this.gateway.emitEvent({
+                  type: 'triangulation.complete',
+                  mac: macString,
+                  lat: finalLat,
+                  lon: finalLon,
+                  confidence,
+                  uncertainty,
+                  method: 'firmware',
                   siteId,
                 });
               }
             }
 
-            // Handle triangulation complete stage (old behavior)
+            // Handle T_C (complete) - Fallback for older firmware or progress updates
             const isTriangulationComplete = triData.stage === 'complete';
             if (isTriangulationComplete && macFromData && lat != null && lon != null) {
               const macString = String(macFromData);
+              this.logger.debug(
+                `Triangulation COMPLETE (T_C) for ${macString}: ${lat.toFixed(6)},${lon.toFixed(6)}`,
+              );
+              // T_C is informational - T_F should be the primary update
+              // Only apply if we haven't received T_F yet
               void this.targetsService
                 .applyTrackingEstimate(macString, lat, lon, siteId)
                 .catch((error) =>
                   this.logger.warn(
-                    `Failed to apply triangulation estimate for ${macString}: ${
+                    `Failed to apply T_C result for ${macString}: ${
                       error instanceof Error ? error.message : String(error)
                     }`,
                   ),

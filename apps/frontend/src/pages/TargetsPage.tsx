@@ -601,7 +601,7 @@ export function TargetsPage() {
                     Location {renderSortIcon('lat')}
                   </button>
                 </th>
-                <th>TDOA</th>
+                <th>Triangulation</th>
                 <th aria-sort={ariaSort('updated')}>
                   <button
                     type="button"

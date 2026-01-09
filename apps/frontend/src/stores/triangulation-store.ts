@@ -2,17 +2,28 @@ import { create } from 'zustand';
 
 type TriangulationStatus = 'idle' | 'running' | 'processing' | 'success' | 'failed';
 
+interface DetectionEvent {
+  nodeId: string;
+  nodeLat: number;
+  nodeLon: number;
+  rssi?: number;
+  hits?: number;
+  timestamp: number;
+  lat?: number; // Intermediate target position
+  lon?: number; // Intermediate target position
+}
+
 interface TriangulationState {
   status: TriangulationStatus;
   targetMac?: string;
   startedAt?: number;
   endsAt?: number;
   link?: string;
-  lat?: number;
-  lon?: number;
+  lat?: number; // Current/final target position
+  lon?: number; // Current/final target position
   lastUpdated?: number;
-  method?: 'tdoa' | 'rssi' | 'hybrid'; // Triangulation method used
-  confidence?: number; // 0-1 confidence score
+  confidence?: number; // 0-1 confidence score from firmware
+  detections: DetectionEvent[]; // Live detection events for visual effects
   contributors?: Array<{
     nodeId?: string;
     weight: number;
@@ -22,12 +33,12 @@ interface TriangulationState {
   }>;
   setCountdown: (mac: string, durationSec: number) => void;
   setProcessing: () => void;
+  addDetection: (detection: DetectionEvent) => void; // Add live detection for visuals
   complete: (params: {
     mac?: string;
     lat?: number;
     lon?: number;
     link?: string;
-    method?: 'tdoa' | 'rssi' | 'hybrid';
     confidence?: number;
     contributors?: Array<{
       nodeId?: string;
@@ -45,6 +56,7 @@ const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000; // safety window while waiting for 
 
 export const useTriangulationStore = create<TriangulationState>((set, get) => ({
   status: 'idle',
+  detections: [],
   setCountdown: (mac, durationSec) => {
     const now = Date.now();
     set({
@@ -55,6 +67,7 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       link: undefined,
       lat: undefined,
       lon: undefined,
+      detections: [], // Clear previous detections
       lastUpdated: now,
     });
     // auto-transition to processing when countdown elapses
@@ -75,7 +88,27 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       set({ status: 'processing', lastUpdated: Date.now() });
     }
   },
-  complete: ({ mac, lat, lon, link, method, confidence, contributors }) => {
+  addDetection: (detection) => {
+    const current = get();
+    if (current.status !== 'running' && current.status !== 'processing') {
+      return; // Ignore detections when not triangulating
+    }
+
+    // Add detection with animation timestamp
+    const newDetection = { ...detection, timestamp: Date.now() };
+
+    // Keep last 10 detections for visuals (prevent memory leak on long sessions)
+    const updatedDetections = [...current.detections, newDetection].slice(-10);
+
+    // Update target position if provided (live movement)
+    set({
+      detections: updatedDetections,
+      lat: detection.lat ?? current.lat,
+      lon: detection.lon ?? current.lon,
+      lastUpdated: Date.now(),
+    });
+  },
+  complete: ({ mac, lat, lon, link, confidence, contributors }) => {
     const stateMac = get().targetMac;
     const incomingMac = mac ? mac.toUpperCase() : undefined;
     if (stateMac && incomingMac && stateMac !== incomingMac) {
@@ -88,7 +121,6 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       link,
       lat,
       lon,
-      method,
       confidence,
       contributors,
       lastUpdated: Date.now(),
@@ -104,9 +136,9 @@ export const useTriangulationStore = create<TriangulationState>((set, get) => ({
       link: undefined,
       lat: undefined,
       lon: undefined,
-      method: undefined,
       confidence: undefined,
       contributors: undefined,
+      detections: [],
       lastUpdated: undefined,
     }),
 }));
