@@ -206,7 +206,6 @@ export function SocketBridge() {
           mac: payload.mac,
           lat: payload.lat,
           lon: payload.lon,
-          method: payload.method,
           confidence: payload.confidence,
           contributors: payload.contributors,
         });

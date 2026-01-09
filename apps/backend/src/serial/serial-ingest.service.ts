@@ -428,11 +428,6 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             const triLat = typeof triData.lat === 'number' ? triData.lat : undefined;
             const triLon = typeof triData.lon === 'number' ? triData.lon : undefined;
             const triRssi = typeof triData.rssi === 'number' ? triData.rssi : undefined;
-            const triDetectionTimestamp =
-              typeof triData.detectionTimestamp === 'number'
-                ? triData.detectionTimestamp
-                : undefined;
-            const triHdop = typeof triData.hdop === 'number' ? triData.hdop : undefined;
 
             // Handle TARGET_DATA messages during triangulation
             const hasValidTriangulationPosition =
@@ -526,11 +521,15 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
               const finalLat = typeof triData.lat === 'number' ? triData.lat : undefined;
               const finalLon = typeof triData.lon === 'number' ? triData.lon : undefined;
               const confidence =
-                typeof triData === 'object' && 'confidence' in triData && typeof triData.confidence === 'number'
+                typeof triData === 'object' &&
+                'confidence' in triData &&
+                typeof triData.confidence === 'number'
                   ? triData.confidence / 100.0 // Firmware sends as percentage
                   : undefined;
               const uncertainty =
-                typeof triData === 'object' && 'uncertainty' in triData && typeof triData.uncertainty === 'number'
+                typeof triData === 'object' &&
+                'uncertainty' in triData &&
+                typeof triData.uncertainty === 'number'
                   ? triData.uncertainty
                   : undefined;
 
