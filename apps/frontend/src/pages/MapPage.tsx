@@ -602,7 +602,15 @@ export function MapPage() {
     const bounds = latLngBounds(positions);
     mapRef.current.fitBounds(bounds.pad(0.25));
     return true;
-  }, [mapReady, nodeListWithFix, targetsQuery.data, freshDrones, adsbTracks, geofences, geofencesEnabled]);
+  }, [
+    mapReady,
+    nodeListWithFix,
+    targetsQuery.data,
+    freshDrones,
+    adsbTracks,
+    geofences,
+    geofencesEnabled,
+  ]);
 
   const handleFitClick = () => {
     if (fitEnabled) {
