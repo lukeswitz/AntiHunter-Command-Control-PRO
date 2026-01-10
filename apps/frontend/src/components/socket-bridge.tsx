@@ -160,7 +160,125 @@ export function SocketBridge() {
     };
 
     const handleEvent = (payload: unknown) => {
+      // Handle real-time tracking updates from TDOA/RSSI triangulation
+      if (isTrackingUpdateEvent(payload)) {
+        const normalizedMac = normalizeMacKey(payload.mac);
+
+        let changed = false;
+        // Update target position in query cache
+        queryClient.setQueryData(['targets'], (previous: Target[] | undefined) => {
+          if (!previous) {
+            return previous;
+          }
+          const next = previous.map((target) => {
+            if (!target.mac) {
+              return target;
+            }
+            const macKey = normalizeMacKey(target.mac);
+            if (macKey !== normalizedMac) {
+              return target;
+            }
+            const confidence = payload.confidence ?? target.trackingConfidence ?? null;
+            if (
+              Math.abs(target.lat - payload.lat) > 1e-6 ||
+              Math.abs(target.lon - payload.lon) > 1e-6 ||
+              (confidence ?? null) !== (target.trackingConfidence ?? null)
+            ) {
+              changed = true;
+              return {
+                ...target,
+                lat: payload.lat,
+                lon: payload.lon,
+                trackingConfidence: confidence,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return target;
+          });
+          return changed ? next : previous;
+        });
+
+        if (changed) {
+          void queryClient.invalidateQueries({ queryKey: ['targets'] });
+        }
+
+        // Update triangulation store with method and confidence
+        useTriangulationStore.getState().complete({
+          mac: payload.mac,
+          lat: payload.lat,
+          lon: payload.lon,
+          confidence: payload.confidence,
+          contributors: payload.contributors,
+        });
+
+        return;
+      }
+
+      // Handle live triangulation detections for Hollywood-style animations
+      if (isTriangulationDetectionEvent(payload)) {
+        useTriangulationStore.getState().addDetection({
+          nodeId: payload.nodeId,
+          nodeLat: payload.nodeLat,
+          nodeLon: payload.nodeLon,
+          rssi: payload.rssi,
+          hits: payload.hits,
+          timestamp: Date.now(),
+          lat: payload.lat,
+          lon: payload.lon,
+        });
+        return;
+      }
+
+      // Handle triangulation complete (T_F final result)
+      if (isTriangulationCompleteEvent(payload)) {
+        const normalizedMac = normalizeMacKey(payload.mac);
+
+        // Update target with final position and stats
+        queryClient.setQueryData(['targets'], (previous: Target[] | undefined) => {
+          if (!previous) {
+            return previous;
+          }
+          const next = previous.map((target) => {
+            if (!target.mac) {
+              return target;
+            }
+            const macKey = normalizeMacKey(target.mac);
+            if (macKey !== normalizedMac) {
+              return target;
+            }
+            return {
+              ...target,
+              lat: payload.lat,
+              lon: payload.lon,
+              trackingConfidence: payload.confidence ?? null,
+              trackingUncertainty: payload.uncertainty ?? null,
+              triangulationMethod: payload.method ?? null,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+          return next;
+        });
+
+        void queryClient.invalidateQueries({ queryKey: ['targets'] });
+
+        // Update triangulation store with final result
+        useTriangulationStore.getState().complete({
+          mac: payload.mac,
+          lat: payload.lat,
+          lon: payload.lon,
+          confidence: payload.confidence,
+        });
+
+        return;
+      }
+
       if (isAdsbTracksEvent(payload)) {
+        // Check if ADS-B addon is enabled for this user
+        const adsbAddonEnabled = currentUser?.preferences?.notifications?.addons?.adsb ?? false;
+        if (!adsbAddonEnabled) {
+          return; // Skip processing if addon is disabled
+        }
+
         // Keep only tracks that can be plotted (valid position and id); do NOT drop
         // tracks just because callsign/registration is missing.
         const filteredTracks = payload.tracks.filter(
@@ -195,6 +313,12 @@ export function SocketBridge() {
         return;
       }
       if (isAcarsMessagesEvent(payload)) {
+        // Check if ACARS addon is enabled for this user
+        const acarsAddonEnabled = currentUser?.preferences?.notifications?.addons?.acars ?? false;
+        if (!acarsAddonEnabled) {
+          return; // Skip processing if addon is disabled
+        }
+
         const acarsMuted = useMapPreferences.getState().acarsMuted;
         if (!acarsMuted && payload.messages.length > 0) {
           payload.messages.forEach((msg) => {
@@ -1207,6 +1331,41 @@ function isGeofenceAlertEvent(payload: unknown): payload is {
   return category === 'geofence';
 }
 
+function isTrackingUpdateEvent(payload: unknown): payload is {
+  type: 'tracking.update';
+  mac: string;
+  lat: number;
+  lon: number;
+  confidence?: number;
+  method?: string;
+  contributors?: Array<{
+    nodeId?: string;
+    weight: number;
+    maxRssi?: number;
+    lat?: number;
+    lon?: number;
+  }>;
+  siteId?: string | null;
+} {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const base = payload as {
+    type?: string;
+    mac?: string;
+    lat?: number;
+    lon?: number;
+  };
+  return (
+    base.type === 'tracking.update' &&
+    typeof base.mac === 'string' &&
+    typeof base.lat === 'number' &&
+    typeof base.lon === 'number' &&
+    Number.isFinite(base.lat) &&
+    Number.isFinite(base.lon)
+  );
+}
+
 function toNumber(value: unknown): number | undefined {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : undefined;
@@ -1290,4 +1449,67 @@ function extractTrackingSample(payload: unknown): {
     band,
     timestamp,
   };
+}
+
+function isTriangulationDetectionEvent(payload: unknown): payload is {
+  type: 'triangulation.detection';
+  mac: string;
+  nodeId: string;
+  nodeLat: number;
+  nodeLon: number;
+  rssi?: number;
+  hits?: number;
+  lat?: number;
+  lon?: number;
+  timestamp?: string;
+  siteId?: string | null;
+} {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const base = payload as {
+    type?: string;
+    mac?: string;
+    nodeId?: string;
+    nodeLat?: number;
+    nodeLon?: number;
+  };
+  return (
+    base.type === 'triangulation.detection' &&
+    typeof base.mac === 'string' &&
+    typeof base.nodeId === 'string' &&
+    typeof base.nodeLat === 'number' &&
+    typeof base.nodeLon === 'number' &&
+    Number.isFinite(base.nodeLat) &&
+    Number.isFinite(base.nodeLon)
+  );
+}
+
+function isTriangulationCompleteEvent(payload: unknown): payload is {
+  type: 'triangulation.complete';
+  mac: string;
+  lat: number;
+  lon: number;
+  confidence?: number;
+  uncertainty?: number;
+  method?: string;
+  siteId?: string | null;
+} {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const base = payload as {
+    type?: string;
+    mac?: string;
+    lat?: number;
+    lon?: number;
+  };
+  return (
+    base.type === 'triangulation.complete' &&
+    typeof base.mac === 'string' &&
+    typeof base.lat === 'number' &&
+    typeof base.lon === 'number' &&
+    Number.isFinite(base.lat) &&
+    Number.isFinite(base.lon)
+  );
 }

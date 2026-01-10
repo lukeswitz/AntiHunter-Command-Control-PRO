@@ -10,6 +10,7 @@ import { SerialModule } from '../serial/serial.module';
 import { TakModule } from '../tak/tak.module';
 import { TargetsModule } from '../targets/targets.module';
 import { TargetTrackingService } from '../tracking/target-tracking.service';
+import { TriangulationModule } from '../triangulation/triangulation.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { WsModule } from '../ws/ws.module';
 
@@ -25,6 +26,7 @@ import { WsModule } from '../ws/ws.module';
     DronesModule,
     AlertRulesModule,
     WebhooksModule,
+    TriangulationModule,
   ],
   providers: [SerialIngestService, TargetTrackingService],
 })

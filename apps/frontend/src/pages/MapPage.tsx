@@ -167,7 +167,8 @@ export function MapPage() {
     );
     const triMac =
       triangulationState.status === 'success' &&
-      triangulationState.link &&
+      (triangulationState.link ||
+        (triangulationState.lat != null && triangulationState.lon != null)) &&
       triangulationState.targetMac &&
       triangulationState.lastUpdated &&
       Date.now() - triangulationState.lastUpdated < 10_000
@@ -178,6 +179,10 @@ export function MapPage() {
       const comment = commentMap[target.id];
       const lastSeen = target.updatedAt ?? target.createdAt;
       const targetMacUpper = target.mac ? target.mac.toUpperCase() : null;
+      // Check if target has been triangulated (persisted data or recent triangulation)
+      const hasPersistedTriangulation =
+        target.trackingConfidence != null && target.trackingConfidence > 0;
+      const isRecentTriangulation = triMac != null && targetMacUpper === triMac;
       return {
         id: target.id,
         mac: target.mac ?? undefined,
@@ -193,7 +198,10 @@ export function MapPage() {
         trackingSince: trackingEntry?.since ?? null,
         trackingConfidence:
           typeof target.trackingConfidence === 'number' ? target.trackingConfidence : undefined,
-        triangulatedRecent: triMac != null && targetMacUpper === triMac,
+        trackingUncertainty:
+          typeof target.trackingUncertainty === 'number' ? target.trackingUncertainty : undefined,
+        triangulationMethod: target.triangulationMethod ?? undefined,
+        triangulatedRecent: hasPersistedTriangulation || isRecentTriangulation,
         history: [
           {
             lat: target.lat,
@@ -549,33 +557,43 @@ export function MapPage() {
 
     // Add nodes
     nodeListWithFix.forEach((node) => {
-      if (typeof node.lat === 'number' && typeof node.lon === 'number') {
-        positions.push([node.lat, node.lon]);
+      if (hasValidPosition(node.lat, node.lon)) {
+        positions.push([node.lat!, node.lon!]);
       }
     });
 
+    // Add targets
+    if (targetsQuery.data) {
+      targetsQuery.data.forEach((target) => {
+        if (hasValidPosition(target.lat ?? null, target.lon ?? null)) {
+          positions.push([target.lat!, target.lon!]);
+        }
+      });
+    }
+
     // Add drones
     freshDrones.forEach((drone) => {
-      if (typeof drone.lat === 'number' && typeof drone.lon === 'number') {
+      if (hasValidPosition(drone.lat, drone.lon)) {
         positions.push([drone.lat, drone.lon]);
       }
     });
 
     // Add ADS-B tracks
     adsbTracks.forEach((track) => {
-      if (typeof track.lat === 'number' && typeof track.lon === 'number') {
+      if (hasValidPosition(track.lat, track.lon)) {
         positions.push([track.lat, track.lon]);
       }
     });
 
-    // Add geofence vertices
-    geofences.forEach((geofence) => {
-      geofence.polygon.forEach((vertex) => {
-        if (typeof vertex.lat === 'number' && typeof vertex.lon === 'number') {
-          positions.push([vertex.lat, vertex.lon]);
-        }
+    if (geofencesEnabled) {
+      geofences.forEach((geofence) => {
+        geofence.polygon.forEach((vertex) => {
+          if (hasValidPosition(vertex.lat, vertex.lon)) {
+            positions.push([vertex.lat, vertex.lon]);
+          }
+        });
       });
-    });
+    }
 
     if (positions.length === 0) {
       return false;
@@ -584,7 +602,15 @@ export function MapPage() {
     const bounds = latLngBounds(positions);
     mapRef.current.fitBounds(bounds.pad(0.25));
     return true;
-  }, [mapReady, nodeListWithFix, freshDrones, adsbTracks, geofences]);
+  }, [
+    mapReady,
+    nodeListWithFix,
+    targetsQuery.data,
+    freshDrones,
+    adsbTracks,
+    geofences,
+    geofencesEnabled,
+  ]);
 
   const handleFitClick = () => {
     if (fitEnabled) {

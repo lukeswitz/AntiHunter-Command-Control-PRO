@@ -7,8 +7,8 @@ const EARTH_RADIUS_M = 6_371_000;
 const DETECTION_WINDOW_MS = 45_000;
 const PERSIST_INTERVAL_MS = 15_000;
 const PERSIST_DISTANCE_M = 8;
-const MIN_BOOTSTRAP_CONFIDENCE = 0.18;
-const MIN_CONFIDENCE_FOR_PERSIST = 0.3;
+const MIN_BOOTSTRAP_CONFIDENCE = 0.25;
+const MIN_CONFIDENCE_FOR_PERSIST = 0.35;
 const SINGLE_NODE_CONFIDENCE_FLOOR = 0.22;
 const MAX_HISTORY_SIZE = 64;
 
@@ -24,6 +24,8 @@ export interface TargetTrackingInput {
   rssi?: number;
   siteId?: string | null;
   timestamp?: number;
+  detectionTimestamp?: number;
+  hdop?: number;
 }
 
 interface DetectionEntry {
@@ -36,6 +38,8 @@ interface DetectionEntry {
   rssi?: number;
   timestamp: number;
   source: DetectionSource;
+  detectionTimestamp?: number; // (microseconds)
+  hdop?: number;
 }
 
 interface InternalEstimate {
@@ -98,6 +102,22 @@ export class TargetTrackingService {
     const measurementLat = this.toFinite(input.targetLat);
     const measurementLon = this.toFinite(input.targetLon);
 
+    // Reject (0, 0) coordinates as invalid
+    const nodeIsNullIsland =
+      nodeLat !== undefined &&
+      nodeLon !== undefined &&
+      Math.abs(nodeLat) < 0.0001 &&
+      Math.abs(nodeLon) < 0.0001;
+    const measurementIsNullIsland =
+      measurementLat !== undefined &&
+      measurementLon !== undefined &&
+      Math.abs(measurementLat) < 0.0001 &&
+      Math.abs(measurementLon) < 0.0001;
+
+    if (nodeIsNullIsland || measurementIsNullIsland) {
+      return null;
+    }
+
     if (
       measurementLat === undefined &&
       measurementLon === undefined &&
@@ -123,7 +143,7 @@ export class TargetTrackingService {
       measurementLat !== undefined && measurementLon !== undefined,
     );
 
-    state.detections.push({
+    const detection: DetectionEntry = {
       nodeId: input.nodeId,
       lat: latForEntry,
       lon: lonForEntry,
@@ -132,8 +152,20 @@ export class TargetTrackingService {
       weight,
       rssi: this.toFinite(input.rssi),
       timestamp: now,
-      source: measurementLat !== undefined && measurementLon !== undefined ? 'target' : 'node',
-    });
+      source: (measurementLat !== undefined && measurementLon !== undefined
+        ? 'target'
+        : 'node') as DetectionSource,
+      detectionTimestamp: this.toFinite(input.detectionTimestamp),
+      hdop: this.toFinite(input.hdop),
+    };
+
+    state.detections.push(detection);
+
+    if (input.detectionTimestamp !== undefined) {
+      this.logger.debug(
+        `Ingested detection for ${normalizedMac} from node ${input.nodeId}: RSSI=${input.rssi}, detectionTimestamp=${input.detectionTimestamp}μs, nodeLat=${nodeLat}, nodeLon=${nodeLon}`,
+      );
+    }
 
     if (state.detections.length > MAX_HISTORY_SIZE) {
       state.detections.splice(0, state.detections.length - MAX_HISTORY_SIZE);
@@ -185,6 +217,9 @@ export class TargetTrackingService {
         estimate.lat,
         estimate.lon,
         estimate.siteId ?? undefined,
+        estimate.confidence,
+        estimate.spreadMeters,
+        undefined, // Method determined by firmware, not tracking service
       );
 
       if (updated) {
@@ -201,6 +236,24 @@ export class TargetTrackingService {
   }
 
   private buildEstimate(state: TrackingState): BaseEstimate | null {
+    const { detections } = state;
+    if (!detections.length) {
+      return null;
+    }
+
+    // Simple RSSI-based position estimation
+    // Note: This is for continuous tracking, NOT triangulation
+    // Triangulation is done by firmware and received via T_F messages
+    const rssiEstimate = this.tryRSSIEstimate(state);
+
+    if (!rssiEstimate) {
+      return null;
+    }
+
+    return rssiEstimate;
+  }
+
+  private tryRSSIEstimate(state: TrackingState): BaseEstimate | null {
     const { detections } = state;
     if (!detections.length) {
       return null;

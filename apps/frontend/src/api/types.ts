@@ -204,6 +204,8 @@ export interface Target {
   createdBy?: string | null;
   deviceType?: string | null;
   trackingConfidence?: number | null;
+  trackingUncertainty?: number | null;
+  triangulationMethod?: string | null;
   firstNodeId?: string | null;
   status: TargetStatus;
   createdAt: string;

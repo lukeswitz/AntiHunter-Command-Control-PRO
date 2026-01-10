@@ -9,9 +9,62 @@ import { useTrackingBannerStore } from '../stores/tracking-banner-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
 import { useTriangulationStore } from '../stores/triangulation-store';
 
-const DEFAULT_TRIANGULATION_DURATION = 300;
+const DEFAULT_TRIANGULATION_DURATION = 60;
 const DEFAULT_SCAN_DURATION = 60;
 const TRIANGULATE_DEBOUNCE_MS = 3000;
+const REFINEMENT_DURATION_MULTIPLIER = 1.5;
+const MAX_REFINEMENT_ATTEMPTS = 3;
+
+type TDOAQuality = 'high' | 'medium' | 'low' | 'none';
+
+interface TDOAQualityInfo {
+  quality: TDOAQuality;
+  color: string;
+  label: string;
+  needsRefinement: boolean;
+}
+
+function assessTDOAQuality(
+  confidence: number | null | undefined,
+  uncertainty: number | null | undefined,
+): TDOAQualityInfo {
+  if (confidence == null || uncertainty == null) {
+    return {
+      quality: 'none',
+      color: '#6b7280',
+      label: 'No Data',
+      needsRefinement: false,
+    };
+  }
+
+  // High quality: >70% confidence <100m uncertainty
+  if (confidence > 0.7 && uncertainty < 100) {
+    return {
+      quality: 'high',
+      color: '#10b981',
+      label: 'High Quality',
+      needsRefinement: false,
+    };
+  }
+
+  // Medium quality: >50% confidence <300m uncertainty
+  if (confidence > 0.5 && uncertainty < 300) {
+    return {
+      quality: 'medium',
+      color: '#f59e0b',
+      label: 'Medium Quality',
+      needsRefinement: false,
+    };
+  }
+
+  // Low quality: needs refinement
+  return {
+    quality: 'low',
+    color: '#ef4444',
+    label: 'Low Quality',
+    needsRefinement: true,
+  };
+}
 
 type TargetSortKey =
   | 'name'
@@ -77,6 +130,7 @@ export function TargetsPage() {
   const [triangulateLocked, setTriangulateLocked] = useState(false);
   const triangulateCooldownRef = useRef<number | null>(null);
   const triangulateGuardRef = useRef<boolean>(false);
+  const refinementAttemptsRef = useRef<Record<string, number>>({});
   const startTriangulationCountdown = useTriangulationStore((state) => state.setCountdown);
   const requestTrackingCountdown = useTrackingBannerStore((state) => state.requestCountdown);
   useEffect(() => {
@@ -121,7 +175,10 @@ export function TargetsPage() {
       if (!target.mac) {
         throw new Error('Target MAC unknown');
       }
-      const commandTarget = '@ALL';
+      const commandTarget = normalizeNodeTarget(target.firstNodeId);
+      if (!commandTarget || commandTarget === '@ALL') {
+        throw new Error('First detecting node unknown');
+      }
       await sendCommand({
         target: commandTarget,
         name: 'TRIANGULATE_START',
@@ -246,6 +303,67 @@ export function TargetsPage() {
     const duration = Math.max(20, Math.min(300, Math.round(parsed)));
     void triangulateMutation.mutateAsync({ target, duration }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
+      window.alert(message);
+    });
+  };
+
+  const handleRefineTriangulation = (target: Target) => {
+    if (!target.mac) {
+      window.alert('Target MAC unknown.');
+      return;
+    }
+    if (triangulateLocked || triangulateGuardRef.current || triangulateMutation.isPending) {
+      window.alert('Triangulation commands are cooling down. Please wait a moment.');
+      return;
+    }
+
+    // Check refinement attempts
+    const attempts = refinementAttemptsRef.current[target.id] ?? 0;
+    if (attempts >= MAX_REFINEMENT_ATTEMPTS) {
+      const resetConfirmed = window.confirm(
+        `This target has already been refined ${attempts} times.\n\n` +
+          'Further refinement may not improve accuracy significantly.\n\n' +
+          'Reset attempt counter and refine again?',
+      );
+      if (resetConfirmed) {
+        refinementAttemptsRef.current[target.id] = 0;
+      } else {
+        return;
+      }
+    }
+
+    const quality = assessTDOAQuality(target.trackingConfidence, target.trackingUncertainty);
+
+    // Calculate adaptive duration based on current quality
+    let duration = DEFAULT_TRIANGULATION_DURATION;
+    if (quality.quality === 'low') {
+      // Low quality: use maximum duration for best chance at refinement
+      duration = 300;
+    } else if (quality.quality === 'medium') {
+      // Medium quality: use extended duration
+      duration = Math.round(DEFAULT_TRIANGULATION_DURATION * REFINEMENT_DURATION_MULTIPLIER);
+    }
+
+    const currentAttempts = refinementAttemptsRef.current[target.id] ?? 0;
+    const confirmed = window.confirm(
+      `Refine triangulation with optimized settings?\n\n` +
+        `Current Quality: ${quality.label}\n` +
+        `Confidence: ${target.trackingConfidence != null ? (target.trackingConfidence * 100).toFixed(1) + '%' : 'N/A'}\n` +
+        `Uncertainty: ${target.trackingUncertainty != null ? '±' + target.trackingUncertainty.toFixed(1) + 'm' : 'N/A'}\n\n` +
+        `Duration: ${duration}s (optimized for refinement)\n` +
+        `Refinement Attempt: ${currentAttempts + 1}/${MAX_REFINEMENT_ATTEMPTS}`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    // Increment refinement attempts
+    refinementAttemptsRef.current[target.id] = currentAttempts + 1;
+
+    beginTriangulateCooldown();
+    void triangulateMutation.mutateAsync({ target, duration }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to refine triangulation.';
       window.alert(message);
     });
   };
@@ -483,6 +601,7 @@ export function TargetsPage() {
                     Location {renderSortIcon('lat')}
                   </button>
                 </th>
+                <th>Triangulation</th>
                 <th aria-sort={ariaSort('updated')}>
                   <button
                     type="button"
@@ -511,6 +630,12 @@ export function TargetsPage() {
                   .split('_')
                   .map((segment) => segment.charAt(0) + segment.slice(1).toLowerCase())
                   .join(' ');
+                const hasTriangulation =
+                  target.trackingConfidence != null || target.trackingUncertainty != null;
+                const tdoaQuality = assessTDOAQuality(
+                  target.trackingConfidence,
+                  target.trackingUncertainty,
+                );
 
                 return (
                   <tr key={target.id} className={tracking ? 'tracking-row' : undefined}>
@@ -522,6 +647,29 @@ export function TargetsPage() {
                     <td>{statusLabel}</td>
                     <td>{firstNode}</td>
                     <td>{location}</td>
+                    <td>
+                      {hasTriangulation ? (
+                        <div style={{ color: tdoaQuality.color, fontWeight: 500 }}>
+                          <div>
+                            <span style={{ fontSize: '0.85em', opacity: 0.8 }}>Conf: </span>
+                            {target.trackingConfidence != null
+                              ? `${(target.trackingConfidence * 100).toFixed(1)}%`
+                              : 'N/A'}
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.85em', opacity: 0.8 }}>Unc: </span>
+                            {target.trackingUncertainty != null
+                              ? `±${target.trackingUncertainty.toFixed(1)}m`
+                              : 'N/A'}
+                          </div>
+                          <div style={{ fontSize: '0.75em', marginTop: '2px' }}>
+                            {tdoaQuality.label}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color: '#6b7280' }}>N/A</div>
+                      )}
+                    </td>
                     <td>{new Date(target.updatedAt).toLocaleString()}</td>
                     <td>
                       <textarea
@@ -559,6 +707,40 @@ export function TargetsPage() {
                       >
                         Triangulate
                       </button>
+                      {hasTriangulation && (
+                        <button
+                          type="button"
+                          className="control-chip"
+                          style={{
+                            backgroundColor: tdoaQuality.needsRefinement
+                              ? '#ef444420'
+                              : '#f59e0b20',
+                            borderColor: tdoaQuality.needsRefinement ? '#ef4444' : '#f59e0b',
+                          }}
+                          onClick={() => {
+                            if (!canSendCommands) {
+                              window.alert(
+                                'You need OPERATOR or ADMIN privileges to refine triangulation.',
+                              );
+                              return;
+                            }
+                            handleRefineTriangulation(target);
+                          }}
+                          disabled={
+                            triangulateMutation.isPending ||
+                            triangulateLocked ||
+                            !target.mac ||
+                            !canSendCommands
+                          }
+                          title={
+                            tdoaQuality.needsRefinement
+                              ? 'Low quality - refine with optimized parameters'
+                              : 'Refine triangulation for better accuracy'
+                          }
+                        >
+                          {tdoaQuality.needsRefinement ? '⚠ Refine' : 'Refine'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={`control-chip ${tracking ? 'is-active' : ''}`}
