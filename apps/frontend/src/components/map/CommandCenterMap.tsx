@@ -1287,21 +1287,6 @@ export function CommandCenterMap({
                                 </span>
                               </div>
                             )}
-                            {target.triangulationMethod && (
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ opacity: 0.75 }}>Method:</span>
-                                <span
-                                  style={{
-                                    fontWeight: 600,
-                                    textTransform: 'uppercase',
-                                    fontSize: '0.7rem',
-                                    letterSpacing: '0.02rem',
-                                  }}
-                                >
-                                  {target.triangulationMethod}
-                                </span>
-                              </div>
-                            )}
                           </div>
                         </div>
                       </>

@@ -159,6 +159,7 @@ async function main() {
   console.log('Starting RSSI-based triangulation scan...\n');
 
   for (let i = 0; i < count; i++) {
+    const baseTime = Date.now() / 1000; // Unix timestamp in seconds
     const lines = [];
 
     console.log(`[${i + 1}/${count}] Detection Round ${i + 1}`);
@@ -166,13 +167,14 @@ async function main() {
     for (const node of NODES) {
       const dist = distance(targetLat, targetLon, node.lat, node.lon);
       const rssi = Math.round(-65 - 20 * Math.log10(dist / 100));
+      const ts = baseTime.toFixed(6);
 
       lines.push(
-        `${node.id}: T_D: ${TARGET_MAC} RSSI:${rssi} Hits=2 Type:WiFi GPS=${node.lat.toFixed(6)},${node.lon.toFixed(6)} HDOP=0.9`,
+        `${node.id}: T_D: ${TARGET_MAC} RSSI:${rssi} Hits=2 Type:WiFi GPS=${node.lat.toFixed(6)},${node.lon.toFixed(6)} HDOP=0.9 TS=${ts}`,
       );
 
       console.log(
-        `  ${node.id}: dist=${dist.toFixed(1)}m, RSSI=${rssi}dBm`,
+        `  ${node.id}: dist=${dist.toFixed(1)}m, RSSI=${rssi}dBm, TS=${ts}`,
       );
     }
 
