@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * TDOA Simulator - Tests Time Difference of Arrival triangulation
+ * Triangulation Simulator - Tests firmware-based RSSI triangulation
  *
  * Simulates 4 static nodes detecting a single STATIC target (MAC: AA:BB:CC:DD:EE:FF)
- * positioned inside the node constellation. Each detection includes GPS-disciplined
- * RTC timestamps as Unix seconds with microsecond precision, calculated from signal
- * propagation time to simulate realistic TDoA measurements.
+ * positioned inside the node constellation. Each detection includes RSSI values
+ * calculated from distance-based path loss. Triangulation is performed in firmware,
+ * which sends T_F (final) messages with the calculated position.
  *
  * Usage: node scripts/tdoa-sim.cjs --token "<YOUR_ADMIN_JWT>"
  *
@@ -41,7 +41,6 @@ const nodeCount = getArg('--nodes', 4);
 const interval = getArg('--interval', 3000);
 const count = getArg('--count', 20);
 
-const SPEED_OF_LIGHT = 299792458;
 const TARGET_MAC = 'AA:BB:CC:DD:EE:FF';
 
 const NODES = [
@@ -127,7 +126,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\nTDOA Simulator`);
+  console.log(`\nTriangulation Simulator (RSSI-based)`);
   console.log(`   Nodes: ${NODES.length}`);
   console.log(`   Interval: ${interval}ms`);
   console.log(`   Detections: ${count}\n`);
@@ -157,19 +156,15 @@ async function main() {
   console.log(`  ✓ Target created from ${NODES.length} initial detections\n`);
   await delay(2000);
 
-  console.log('Starting TDOA triangulation scan...\n');
+  console.log('Starting RSSI-based triangulation scan...\n');
 
   for (let i = 0; i < count; i++) {
-    const baseTime = Date.now() / 1000; // Unix timestamp in seconds
     const lines = [];
 
-    console.log(`[${i + 1}/${count}] TDOA Detection ${i + 1}`);
+    console.log(`[${i + 1}/${count}] Detection Round ${i + 1}`);
 
     for (const node of NODES) {
       const dist = distance(targetLat, targetLon, node.lat, node.lon);
-      const propTime = dist / SPEED_OF_LIGHT;
-      const detectionTime = baseTime + propTime;
-      const ts = detectionTime.toFixed(6);
       const rssi = Math.round(-65 - 20 * Math.log10(dist / 100));
 
       lines.push(
@@ -177,7 +172,7 @@ async function main() {
       );
 
       console.log(
-        `  ${node.id}: dist=${dist.toFixed(1)}m, propTime=${(propTime * 1e6).toFixed(2)}µs, TS=${ts}, RSSI=${rssi}dBm`,
+        `  ${node.id}: dist=${dist.toFixed(1)}m, RSSI=${rssi}dBm`,
       );
     }
 

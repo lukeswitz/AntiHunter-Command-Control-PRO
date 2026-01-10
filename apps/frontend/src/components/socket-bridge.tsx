@@ -1337,7 +1337,7 @@ function isTrackingUpdateEvent(payload: unknown): payload is {
   lat: number;
   lon: number;
   confidence?: number;
-  method?: 'tdoa' | 'rssi' | 'hybrid';
+  method?: string;
   contributors?: Array<{
     nodeId?: string;
     weight: number;

@@ -444,11 +444,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
               );
 
               if (isTriangulationActive) {
-                // During triangulation: T_D messages contain node GPS positions and timestamps
-                // for TDoA calculation. DO NOT use node GPS as target position.
+                // During triangulation: T_D messages contain node GPS positions and timestamps.
                 // T_F will provide final authoritative position with confidence/uncertainty
-
-                // Ensure target exists (but don't update position with node GPS)
                 try {
                   await this.targetsService.ensureTargetExists(macString, siteId);
                 } catch (error) {
@@ -464,21 +461,19 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
                   type: 'triangulation.detection',
                   mac: macString,
                   nodeId: event.nodeId,
-                  nodeLat: triLat, // Node's GPS position
-                  nodeLon: triLon, // Node's GPS position
+                  nodeLat: triLat,
+                  nodeLon: triLon,
                   rssi: triRssi,
                   hits: typeof triData === 'object' && 'hits' in triData ? triData.hits : undefined,
                   siteId,
                   timestamp: timestamp.toISOString(),
-                  // DO NOT set lat/lon - these are node coordinates, not target coordinates
                 });
 
                 this.logger.debug(
                   `Triangulation progress: ${macString} detected by ${event.nodeId} at ${triLat.toFixed(6)},${triLon.toFixed(6)} RSSI=${triRssi}`,
                 );
               } else {
-                // Not triangulating - this might be normal tracking (future feature)
-                // Auto-promote MAC to target if it doesn't exist
+                // Auto-promote MAC to target if it doesn't exist and we see T_D from FW
                 try {
                   await this.targetsService.ensureTargetExists(macString, siteId);
                 } catch (error) {
