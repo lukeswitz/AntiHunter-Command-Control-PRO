@@ -1,5 +1,8 @@
 name: Setup Test - Windows
 
+permissions:
+   contents: read
+
 on:
   push:
     branches: [main]

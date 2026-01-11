@@ -1,5 +1,8 @@
 name: Setup Test - Linux
 
+permissions:
+   contents: read
+
 on:
   push:
     branches: [main]
