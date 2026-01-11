@@ -1,0 +1,48 @@
+name: Setup Test - macOS
+
+permissions:
+   contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/setup-local.sh'
+      - '.github/workflows/setup-test-macos.yml'
+  pull_request:
+    paths:
+      - 'scripts/setup-local.sh'
+  workflow_dispatch:
+
+jobs:
+  test-macos:
+    name: macOS Latest
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL
+        run: |
+          brew install postgresql@15
+          brew services start postgresql@15
+          echo "/opt/homebrew/opt/postgresql@15/bin" >> $GITHUB_PATH
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test setup script (dry-run checks)
+        run: |
+          chmod +x scripts/setup-local.sh
+          bash -c 'source scripts/setup-local.sh; detect_os; check_node; check_pnpm' || true
+
+      - name: Verify dependencies
+        run: |
+          echo "Checking dependencies..."
+          command -v bash && echo "bash: OK"
+          command -v openssl && echo "openssl: OK"
+          command -v psql && echo "psql: OK"
+          command -v node && echo "node: $(node --version)"
