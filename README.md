@@ -1,7 +1,20 @@
 <p align="center">
+  
   <img src="TopREADMElogo.png" alt="AntiHunter Command Center Logo" width="320" />
 </p>
 
+<div align="center">
+
+  ![GitHub repo size](https://img.shields.io/github/repo-size/lukeswitz/AntiHunter-Command-Control-PRO) ![GitHub License](https://img.shields.io/github/license/lukeswitz/AntiHunter-Command-Control-PRO)
+
+
+  
+  [![CI](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/ci.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/ci.yml) [![CodeQL](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/github-code-scanning/codeql) [![Dependabot Updates](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/dependabot/dependabot-updates) 
+  
+[![Setup Test - Linux](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-linux.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-linux.yml) [![Setup Test - macOS](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-macos.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-macos.yml) [![Setup Test - Windows](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-windows.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-windows.yml)
+
+</div>
+  
 <h1 align="center">AntiHunter Command & Control Pro</h1>
 
 AntiHunter Command & Control PRO is the companion operations platform for the AntiHunter SIGINT mesh network. Flash your AntiHunter detection nodes with the AntiHunter builds, then connect them here to orchestrate the entire perimeter defense mission. The Command Center ingests every heartbeat, target hit, triangulation update, and vibration alert from the mesh, renders nodes and geofences on a live map, automates scan/baseline/triangulation workflows, and drives alarm cues, exports, and audit trails.
