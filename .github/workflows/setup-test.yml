@@ -1,5 +1,8 @@
 name: Multi-Distro Setup Test
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
