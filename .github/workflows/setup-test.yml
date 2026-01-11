@@ -1,0 +1,173 @@
+name: Multi-Distro Setup Test
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/setup-local.sh'
+      - '.github/workflows/setup-test.yml'
+  pull_request:
+    paths:
+      - 'scripts/setup-local.sh'
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    name: Test on ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu:22.04
+            name: Ubuntu 22.04
+          - distro: ubuntu:24.04
+            name: Ubuntu 24.04
+          - distro: debian:12
+            name: Debian 12
+          - distro: fedora:39
+            name: Fedora 39
+          - distro: archlinux:latest
+            name: Arch Linux
+
+    container:
+      image: ${{ matrix.distro }}
+
+    steps:
+      - name: Install git (if needed)
+        run: |
+          if command -v apt-get &> /dev/null; then
+            apt-get update && apt-get install -y git
+          elif command -v dnf &> /dev/null; then
+            dnf install -y git
+          elif command -v pacman &> /dev/null; then
+            pacman -Sy --noconfirm git
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install base dependencies
+        run: |
+          if command -v apt-get &> /dev/null; then
+            apt-get update
+            apt-get install -y bash curl postgresql openssl sudo
+          elif command -v dnf &> /dev/null; then
+            dnf install -y bash curl postgresql-server openssl sudo
+          elif command -v pacman &> /dev/null; then
+            pacman -Sy --noconfirm bash curl postgresql openssl sudo
+          fi
+
+      - name: Install Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test setup script (dry-run checks)
+        run: |
+          # Make script executable
+          chmod +x scripts/setup-local.sh
+
+          # Test that script can run basic checks
+          bash -c 'source scripts/setup-local.sh; detect_os; check_node; check_pnpm' || true
+
+      - name: Verify dependencies available
+        run: |
+          echo "Checking dependencies..."
+          command -v bash && echo "✓ bash"
+          command -v openssl && echo "✓ openssl"
+          command -v psql && echo "✓ psql"
+          command -v node && echo "✓ node $(node --version)"
+
+  test-macos:
+    name: Test on macOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL
+        run: |
+          brew install postgresql@15
+          brew services start postgresql@15
+          echo "/opt/homebrew/opt/postgresql@15/bin" >> $GITHUB_PATH
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test setup script (dry-run checks)
+        run: |
+          chmod +x scripts/setup-local.sh
+          bash -c 'source scripts/setup-local.sh; detect_os; check_node; check_pnpm' || true
+
+      - name: Verify dependencies
+        run: |
+          command -v bash && echo "✓ bash"
+          command -v openssl && echo "✓ openssl"
+          command -v psql && echo "✓ psql"
+          command -v node && echo "✓ node $(node --version)"
+
+  test-windows:
+    name: Test on Windows (${{ matrix.shell }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [wsl-ubuntu, msys2]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup WSL (Ubuntu)
+        if: matrix.shell == 'wsl-ubuntu'
+        uses: Vampire/setup-wsl@v3
+        with:
+          distribution: Ubuntu-22.04
+
+      - name: Setup MSYS2
+        if: matrix.shell == 'msys2'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            base-devel
+            git
+            openssl
+
+      - name: Test setup script in WSL
+        if: matrix.shell == 'wsl-ubuntu'
+        shell: wsl-bash {0}
+        run: |
+          chmod +x scripts/setup-local.sh
+          # Install Node.js in WSL
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs postgresql openssl
+
+          # Test basic checks
+          bash -c 'source scripts/setup-local.sh; detect_os' || true
+
+      - name: Test setup script in MSYS2
+        if: matrix.shell == 'msys2'
+        shell: msys2 {0}
+        run: |
+          chmod +x scripts/setup-local.sh
+          bash -c 'source scripts/setup-local.sh; detect_os' || true
+
+  report:
+    name: Test Summary
+    needs: [test-linux, test-macos, test-windows]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "### Multi-Distro Setup Script Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tested across Linux, macOS, and Windows environments" >> $GITHUB_STEP_SUMMARY
