@@ -32,12 +32,15 @@ jobs:
 
     container:
       image: ${{ matrix.distro }}
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        TZ: UTC
 
     steps:
       - name: Install git (if needed)
         run: |
           if command -v apt-get &> /dev/null; then
-            apt-get update && apt-get install -y git
+            DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git
           elif command -v dnf &> /dev/null; then
             dnf install -y git
           elif command -v pacman &> /dev/null; then
@@ -50,8 +53,8 @@ jobs:
       - name: Install base dependencies
         run: |
           if command -v apt-get &> /dev/null; then
-            apt-get update
-            apt-get install -y bash curl postgresql openssl sudo
+            DEBIAN_FRONTEND=noninteractive apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y bash curl postgresql openssl sudo
           elif command -v dnf &> /dev/null; then
             dnf install -y bash curl postgresql-server openssl sudo
           elif command -v pacman &> /dev/null; then
