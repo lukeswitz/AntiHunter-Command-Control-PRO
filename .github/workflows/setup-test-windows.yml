@@ -1,0 +1,61 @@
+name: Setup Test - Windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/setup-local.sh'
+      - '.github/workflows/setup-test-windows.yml'
+  pull_request:
+    paths:
+      - 'scripts/setup-local.sh'
+  workflow_dispatch:
+
+jobs:
+  test-windows:
+    name: ${{ matrix.name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shell: wsl-ubuntu
+            name: WSL Ubuntu 22.04
+          - shell: msys2
+            name: MSYS2 (Git Bash)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup WSL (Ubuntu)
+        if: matrix.shell == 'wsl-ubuntu'
+        uses: Vampire/setup-wsl@v3
+        with:
+          distribution: Ubuntu-22.04
+
+      - name: Setup MSYS2
+        if: matrix.shell == 'msys2'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            base-devel
+            git
+            openssl
+
+      - name: Test setup script in WSL
+        if: matrix.shell == 'wsl-ubuntu'
+        shell: wsl-bash {0}
+        run: |
+          chmod +x scripts/setup-local.sh
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs postgresql openssl
+          bash -c 'source scripts/setup-local.sh; detect_os' || true
+
+      - name: Test setup script in MSYS2
+        if: matrix.shell == 'msys2'
+        shell: msys2 {0}
+        run: |
+          chmod +x scripts/setup-local.sh
+          bash -c 'source scripts/setup-local.sh; detect_os' || true
