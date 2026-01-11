@@ -8,7 +8,6 @@
   ![GitHub repo size](https://img.shields.io/github/repo-size/lukeswitz/AntiHunter-Command-Control-PRO) ![GitHub License](https://img.shields.io/github/license/lukeswitz/AntiHunter-Command-Control-PRO)
 
 
-  
   [![CI](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/ci.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/ci.yml) [![CodeQL](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/github-code-scanning/codeql) [![Dependabot Updates](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/dependabot/dependabot-updates) 
   
 [![Setup Test - Linux](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-linux.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-linux.yml) [![Setup Test - macOS](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-macos.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-macos.yml) [![Setup Test - Windows](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-windows.yml/badge.svg)](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/actions/workflows/setup-test-windows.yml)
@@ -19,10 +18,13 @@
 
 AntiHunter Command & Control PRO is the companion operations platform for the AntiHunter SIGINT mesh network. Flash your AntiHunter detection nodes with the AntiHunter builds, then connect them here to orchestrate the entire perimeter defense mission. The Command Center ingests every heartbeat, target hit, triangulation update, and vibration alert from the mesh, renders nodes and geofences on a live map, automates scan/baseline/triangulation workflows, and drives alarm cues, exports, and audit trails.
 
-> **Firmware note:** The companion firmware for mesh detection nodes lives in [lukeswitz/AntiHunter](https://github.com/lukeswitz/AntiHunter). Flash those builds to your field hardware before connecting them to this Command Center.
-
 > **Early Release:** This is a beta build. Expect stability issues, breaking changes, and evolving features.
 
+> [!NOTE]
+> **Firmware:** The companion firmware for mesh detection nodes lives in [lukeswitz/AntiHunter](https://github.com/lukeswitz/AntiHunter). Flash those builds to your field hardware before connecting them to this Command Center.
+>  
+
+> [!IMPORTANT]
 > **Security disclosure:** The platform has **not** undergone formal penetration testing or hardening for Internet-exposed deployments. Run it on trusted networks only, behind your own perimeter controls, until a full security review is complete.
 
 ---
@@ -53,6 +55,9 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
 17. [Operations & Maintenance](#operations--maintenance)
 18. [Troubleshooting](#troubleshooting)
 19. [Legal Disclaimer](#legal-disclaimer)
+
+## Quick Start
+- [Production](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/blob/main/scripts/deploy-production.sh) and [local](https://github.com/lukeswitz/AntiHunter-Command-Control-PRO/blob/main/scripts/setup-local.sh) deployment scripts are available. Alternatively, follow all steps [below](#prerequisites)
 
 ---
 
