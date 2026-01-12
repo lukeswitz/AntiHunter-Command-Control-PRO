@@ -822,10 +822,14 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     const ports = await getAvailablePorts();
     const candidates: string[] = [];
 
+    // If a specific device path is configured, ONLY try that path
+    // Don't fall back to other ports - respect the user's explicit configuration
     if (preferred) {
       candidates.push(preferred);
+      return candidates;
     }
 
+    // Only use autoselect when no specific path is configured
     const hints = ['meshtastic', 'cp210', 'ch34', 'silicon', 'usb serial', 'ttyusb', 'ttyacm'];
     const prioritized = ports
       .filter((port) => {

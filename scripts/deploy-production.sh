@@ -407,7 +407,7 @@ install_nodejs() {
         fi
     fi
     
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - || \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash - || \
         error_exit "Failed to add NodeSource repository"
     
     sudo apt-get install -y nodejs || error_exit "Failed to install Node.js"

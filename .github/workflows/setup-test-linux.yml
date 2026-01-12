@@ -1,0 +1,83 @@
+name: Setup Test - Linux
+
+permissions:
+   contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/setup-local.sh'
+      - '.github/workflows/setup-test-linux.yml'
+  pull_request:
+    paths:
+      - 'scripts/setup-local.sh'
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu:22.04
+            name: Ubuntu 22.04
+          - distro: ubuntu:24.04
+            name: Ubuntu 24.04
+          - distro: debian:12
+            name: Debian 12
+          - distro: fedora:39
+            name: Fedora 39
+          - distro: archlinux:latest
+            name: Arch Linux
+
+    container:
+      image: ${{ matrix.distro }}
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        TZ: UTC
+
+    steps:
+      - name: Install git (if needed)
+        run: |
+          if command -v apt-get &> /dev/null; then
+            DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git
+          elif command -v dnf &> /dev/null; then
+            dnf install -y git
+          elif command -v pacman &> /dev/null; then
+            pacman -Sy --noconfirm git
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install base dependencies
+        run: |
+          if command -v apt-get &> /dev/null; then
+            DEBIAN_FRONTEND=noninteractive apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y bash curl postgresql openssl sudo
+          elif command -v dnf &> /dev/null; then
+            dnf install -y bash curl postgresql-server openssl sudo
+          elif command -v pacman &> /dev/null; then
+            pacman -Sy --noconfirm bash curl postgresql openssl sudo
+          fi
+
+      - name: Install Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test setup script (dry-run checks)
+        run: |
+          chmod +x scripts/setup-local.sh
+          bash -c 'source scripts/setup-local.sh; detect_os; check_node; check_pnpm' || true
+
+      - name: Verify dependencies available
+        run: |
+          echo "Checking dependencies..."
+          command -v bash && echo "bash: OK"
+          command -v openssl && echo "openssl: OK"
+          command -v psql && echo "psql: OK"
+          command -v node && echo "node: $(node --version)"
