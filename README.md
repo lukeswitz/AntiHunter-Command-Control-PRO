@@ -25,21 +25,22 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
 3. [Architecture](#architecture)
 4. [Security & Hardening](#security--hardening)
 5. [Repository Layout](#repository-layout)
-6. [Prerequisites](#prerequisites)
-7. [Platform Setup](#platform-setup)
-8. [Installation](#installation)
-9. [Configuration](#configuration)
-10. [Database & Migrations](#database--migrations)
-11. [Running the Stack](#running-the-stack)
+6. [Quick Start](#quick-start)
+7. [Prerequisites](#prerequisites)
+8. [Platform Setup](#platform-setup)
+9. [Installation](#installation)
+10. [Configuration](#configuration)
+11. [Database & Migrations](#database--migrations)
+12. [Running the Stack](#running-the-stack)
     - [Updating an Existing Deployment](#updating-an-existing-deployment)
-12. [Running with Docker](#running-with-docker)
-13. [Building for Production](#building-for-production)
-14. [Production Deployment](#production-deployment)
-15. [Serial Hardware & Meshtastic Sniffer](#serial-hardware--meshtastic-sniffer)
-16. [Useful Scripts](#useful-scripts)
-17. [Operations & Maintenance](#operations--maintenance)
-18. [Troubleshooting](#troubleshooting)
-19. [Legal Disclaimer](#legal-disclaimer)
+13. [Running with Docker](#running-with-docker)
+14. [Building for Production](#building-for-production)
+15. [Production Deployment](#production-deployment)
+16. [Serial Hardware & Meshtastic Sniffer](#serial-hardware--meshtastic-sniffer)
+17. [Useful Scripts](#useful-scripts)
+18. [Operations & Maintenance](#operations--maintenance)
+19. [Troubleshooting](#troubleshooting)
+20. [Legal Disclaimer](#legal-disclaimer)
 
 ---
 
@@ -386,6 +387,61 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 |- tsconfig.base.json
 `- README.md
 ```
+
+## Quick Start
+
+### Automated Setup (Linux/macOS)
+
+The fastest way to get AntiHunter Command Center running locally:
+```bash
+# Download and run the setup script
+curl -o setup-local.sh https://raw.githubusercontent.com/TheRealSirHaXalot/AntiHunter-Command-Control-PRO/main/scripts/setup-local.sh
+chmod +x setup-local.sh
+./setup-local.sh
+```
+
+The script will:
+- Check and install prerequisites (Node.js, pnpm, PostgreSQL)
+- Clone the repository
+- Configure the database with secure credentials
+- Install dependencies
+- Set up environment files
+- Run database migrations and seed data
+
+**Important:** Run the script as a regular user (not with `sudo`). The script will prompt for sudo when needed for system packages.
+
+### Manual Quick Start
+
+If you prefer manual setup or are on Windows:
+```bash
+# 1. Clone repository
+git clone https://github.com/TheRealSirHaXalot/AntiHunter-Command-Control-PRO.git
+cd AntiHunter-Command-Control-PRO
+
+# 2. Install dependencies
+pnpm install
+
+# 3. Set up database (PostgreSQL required)
+createdb command_center
+createuser command_center -P  # Enter password when prompted
+
+# 4. Configure backend
+cd apps/backend
+cp .env.example .env
+# Edit .env with your database credentials
+
+# 5. Run migrations and seed
+pnpm prisma migrate deploy
+pnpm prisma db seed
+
+# 6. Start application
+cd ../..
+pnpm AHCC
+```
+
+Access the web interface at `http://localhost:5173` and log in with the credentials displayed after setup.
+
+For production deployments, Docker, and advanced configuration, see the full [Installation](#installation) section below.
 
 ## Prerequisites
 
