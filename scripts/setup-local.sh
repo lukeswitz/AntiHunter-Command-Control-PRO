@@ -1014,6 +1014,90 @@ EOF
     echo ""
 }
 
+check_build_tools() {
+    step "Checking build tools..."
+    
+    local missing_tools=()
+    
+    # Check essential build tools
+    if ! command -v gcc >/dev/null 2>&1; then
+        missing_tools+=("gcc")
+    fi
+    
+    if ! command -v g++ >/dev/null 2>&1; then
+        missing_tools+=("g++")
+    fi
+    
+    if ! command -v make >/dev/null 2>&1; then
+        missing_tools+=("make")
+    fi
+    
+    if ! command -v python3 >/dev/null 2>&1; then
+        missing_tools+=("python3")
+    fi
+    
+    # Check for pkg-config
+    if ! command -v pkg-config >/dev/null 2>&1; then
+        missing_tools+=("pkg-config")
+    fi
+    
+    if [[ ${#missing_tools[@]} -eq 0 ]]; then
+        success "Build tools are installed"
+        return 0
+    fi
+    
+    warn "Missing build tools: ${missing_tools[*]}"
+    
+    if ! prompt_yes_no "Install build tools automatically?"; then
+        warn "Build tools required for native dependencies (e.g., argon2, serialport)"
+        if prompt_yes_no "Continue anyway?"; then
+            return 0
+        fi
+        return 1
+    fi
+    
+    case "$PKG_MANAGER" in
+        apt)
+            info "Installing build tools via apt..."
+            sudo apt-get update
+            sudo apt-get install -y build-essential pkg-config libssl-dev \
+            python3 make gcc g++
+        ;;
+        yum|dnf)
+            info "Installing build tools via $PKG_MANAGER..."
+            sudo $PKG_MANAGER groupinstall -y "Development Tools"
+            sudo $PKG_MANAGER install -y python3 pkg-config openssl-devel
+        ;;
+        pacman)
+            info "Installing build tools via pacman..."
+            sudo pacman -S --noconfirm base-devel python pkg-config openssl
+        ;;
+        brew)
+            info "Installing build tools via Homebrew..."
+            brew install pkg-config python3
+        ;;
+        *)
+            error "Cannot auto-install build tools for your system"
+            echo "Please install manually:"
+            echo "  - gcc/g++ compiler"
+            echo "  - make"
+            echo "  - python3"
+            echo "  - pkg-config"
+            echo "  - openssl development headers"
+            return 1
+        ;;
+    esac
+    
+    if [[ $? -eq 0 ]]; then
+        success "Build tools installed"
+        return 0
+    else
+        error "Failed to install build tools"
+        return 1
+    fi
+}
+
+
 main() {
     echo -e "${BLUE}"
     cat <<'EOF'
@@ -1028,6 +1112,7 @@ EOF
     echo -e "${NC}"
 
     detect_os
+    check_build_tools
     check_git
     clone_repository
     prompt_configuration
