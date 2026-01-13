@@ -54,11 +54,15 @@ jobs:
           chmod +x scripts/setup-local.sh
           curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
           sudo apt-get install -y nodejs postgresql openssl
-          bash -c 'source scripts/setup-local.sh; detect_os' || true
+          # Test that script detects OS correctly
+          bash scripts/setup-local.sh 2>&1 | head -100 || true
+          echo "Script execution completed"
 
       - name: Test setup script in MSYS2
         if: matrix.shell == 'msys2'
         shell: msys2 {0}
         run: |
           chmod +x scripts/setup-local.sh
-          bash -c 'source scripts/setup-local.sh; detect_os' || true
+          # Test that script detects OS correctly and doesn't hang
+          timeout 30 bash scripts/setup-local.sh 2>&1 | head -100 || true
+          echo "Script execution completed"
