@@ -45,6 +45,19 @@ else
     NC=''
 fi
 
+# Ensure color codes are properly interpreted even in non-interactive environments
+if [[ -z "$CYAN" ]]; then
+    if [[ -z "${NO_COLOR:-}" ]]; then
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        CYAN='\033[0;36m'
+        MAGENTA='\033[0;35m'
+        NC='\033[0m'
+    fi
+fi
+
 log() { echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $*"; }
 info() { echo -e "${CYAN}[INFO]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
@@ -58,17 +71,17 @@ fix_repository_permissions() {
         info "Fixing repository permissions..."
         local current_user
         local current_group
-        
+
         if [[ "$OS" == "macos" ]] || [[ "$OS" == "linux" ]]; then
             current_user=$(whoami)
-            
+
             # Get primary group (different on macOS vs Linux)
             if [[ "$OS" == "macos" ]]; then
                 current_group=$(id -gn "$current_user")
             else
                 current_group=$(id -gn)
             fi
-            
+
             # Fix ownership
             info "Setting ownership to $current_user:$current_group"
             if [[ -w "$REPO_DIR" ]]; then
@@ -77,16 +90,16 @@ fix_repository_permissions() {
             else
                 sudo chown -R "$current_user:$current_group" "$REPO_DIR"
             fi
-            
+
             # Fix permissions
             chmod -R u+rwX "$REPO_DIR"
-            
+
             # Clean any problematic cache files
             find "$REPO_DIR" -name "*.timestamp-*" -delete 2>/dev/null || true
             if [[ -d "$REPO_DIR/node_modules/.cache" ]]; then
                 find "$REPO_DIR/node_modules/.cache" -type d -exec rm -rf {} + 2>/dev/null || true
             fi
-            
+
             success "Repository permissions fixed for user: $current_user"
         elif [[ "$OS" == "windows" ]]; then
             # On Windows (Git Bash/MSYS2), ownership is usually handled by the filesystem
@@ -98,12 +111,12 @@ fix_repository_permissions() {
 
 install_dependencies() {
     step "Installing application dependencies..."
-    
+
     if ! command -v pnpm >/dev/null 2>&1; then
         warn "pnpm not available, skipping dependency installation"
         return 0
     fi
-    
+
     if [[ ! -f "$REPO_DIR/package.json" ]]; then
         error "package.json not found at $REPO_DIR"
         if prompt_yes_no "Continue anyway?"; then
@@ -112,7 +125,7 @@ install_dependencies() {
         fi
         return 1
     fi
-    
+
     cd "$REPO_DIR" || {
         error "Cannot change to repository directory: $REPO_DIR"
         if prompt_yes_no "Continue anyway?"; then
@@ -120,22 +133,22 @@ install_dependencies() {
         fi
         return 1
     }
-    
+
     info "Running pnpm install in $REPO_DIR..."
     info "This may take several minutes, especially for native module compilation..."
-    
+
     # For ARM systems, note that native modules may take longer
     if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
         info "ARM architecture detected - native module compilation may take extra time"
     fi
-    
+
     # Run pnpm install
     if pnpm install; then
         success "Dependencies installed successfully"
         fix_repository_permissions
         return 0
     fi
-    
+
     # If we reach here, installation failed
     {
         error "Failed to install dependencies"
@@ -144,28 +157,28 @@ install_dependencies() {
         echo ""
         error "Common causes and solutions:"
         echo ""
-        
+
         # Check for build tools
         if ! command -v gcc >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
             error "  Missing build tools (gcc, python3)"
             echo "  Solution: Re-run this script and accept build tools installation"
             echo "  Or manually install: sudo apt-get install -y build-essential python3 python3-dev"
         fi
-        
+
         # Check for ARM-specific issues
         if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
             error "  ARM architecture detected - native modules may need additional dependencies"
             echo "  Solution: Install ARM build dependencies:"
             echo "  sudo apt-get install -y python3-dev libnode-dev libudev-dev"
         fi
-        
+
         # Check for permission issues
         if [[ ! -w "$REPO_DIR" ]]; then
             error "  Repository directory is not writable"
             echo "  Solution: Fix permissions with:"
             echo "  sudo chown -R $(whoami):$(whoami) $REPO_DIR"
         fi
-        
+
         # Check Node version
         if command -v node >/dev/null 2>&1; then
             local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
@@ -174,18 +187,18 @@ install_dependencies() {
                 echo "  Solution: Install Node.js 20 or later"
             fi
         fi
-        
+
         echo ""
         error "To see full error details, scroll up or check the output above"
         echo ""
-        
+
         if prompt_yes_no "Try installing dependencies with verbose logging?"; then
             info "Running pnpm install with verbose output..."
             pnpm install --reporter=verbose || {
                 error "Installation failed again"
             }
         fi
-        
+
         echo ""
         if prompt_yes_no "Continue anyway?"; then
             warn "Continuing without dependencies installed"
@@ -202,9 +215,10 @@ detect_os() {
         OS="macos"
         PKG_MANAGER="brew"
         DISTRO="macos"
+        DISTRO_NAME="macOS"
     elif [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux" ]]; then
         OS="linux"
-        
+
         # Detect specific Linux distribution
         if [[ -f /etc/os-release ]]; then
             . /etc/os-release
@@ -218,7 +232,7 @@ detect_os() {
             DISTRO="unknown"
             DISTRO_NAME="Linux"
         fi
-        
+
         # Detect package manager
         if command -v apt-get >/dev/null 2>&1; then
             PKG_MANAGER="apt"
@@ -235,35 +249,37 @@ detect_os() {
         OS="windows"
         PKG_MANAGER="none"
         DISTRO="windows"
+        DISTRO_NAME="Windows"
     else
         OS="unknown"
         PKG_MANAGER="unknown"
         DISTRO="unknown"
+        DISTRO_NAME="Unknown"
     fi
-    
+
     # Detect architecture
     ARCH=$(uname -m)
     case "$ARCH" in
         x86_64|amd64)
             ARCH_TYPE="x64"
-        ;;
+            ;;
         aarch64|arm64)
             ARCH_TYPE="arm64"
-        ;;
+            ;;
         armv7l|armv7)
             ARCH_TYPE="armv7"
-        ;;
+            ;;
         armv6l)
             ARCH_TYPE="armv6"
-        ;;
+            ;;
         i686|i386)
             ARCH_TYPE="x86"
-        ;;
+            ;;
         *)
             ARCH_TYPE="$ARCH"
-        ;;
+            ;;
     esac
-    
+
     info "Detected OS: $OS ($DISTRO_NAME ${DISTRO_VERSION:-})"
     info "Architecture: $ARCH_TYPE ($ARCH)"
     info "Package Manager: $PKG_MANAGER"
@@ -289,13 +305,13 @@ CLONE_DIR=""
 prompt_yes_no() {
     local prompt="$1"
     local response
-    
+
     # In CI/non-interactive environments, default to "no" to avoid hanging
     if [[ ! -t 0 ]] || [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
         warn "Non-interactive environment detected - defaulting to 'no' for: $prompt"
         return 1
     fi
-    
+
     while true; do
         read -p "$prompt (y/n): " -r response
         case "${response,,}" in
@@ -319,21 +335,21 @@ check_git() {
         case "$PKG_MANAGER" in
             apt)
                 sudo apt-get update && sudo apt-get install -y git
-            ;;
+                ;;
             yum|dnf)
                 sudo $PKG_MANAGER install -y git
-            ;;
+                ;;
             pacman)
                 sudo pacman -S --noconfirm git
-            ;;
+                ;;
             brew)
                 brew install git
-            ;;
+                ;;
             *)
                 error "Cannot auto-install Git for your system"
                 echo "Please install Git from: https://git-scm.com/"
                 return 1
-            ;;
+                ;;
         esac
         
         hash -r
@@ -374,7 +390,7 @@ clone_repository() {
     REPO_URL="https://github.com/TheRealSirHaXalot/AntiHunter-Command-Control-PRO.git"
     info "Repository: $REPO_URL"
     echo ""
-    
+
     read -p "Where to clone the repo [folder]: " CLONE_DIR
     CLONE_DIR=${CLONE_DIR:-repository}
     
@@ -423,12 +439,12 @@ prompt_configuration() {
     echo -e "${BLUE}  Version: $VERSION${NC}"
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    
+
     while [[ -z "$SITE_ID" ]]; do
         read -p "Site ID [default]: " SITE_ID
         SITE_ID=${SITE_ID:-default}
     done
-    
+
     read -p "Site Name [$SITE_ID]: " SITE_NAME
     if [[ -z "$SITE_NAME" ]]; then
         if [[ "$SITE_ID" == "default" ]]; then
@@ -437,13 +453,13 @@ prompt_configuration() {
             SITE_NAME="$SITE_ID"
         fi
     fi
-    
+
     echo ""
     DB_PASSWORD=$(openssl rand -base64 32 2>/dev/null | tr -d "=+/" | cut -c1-32 || echo "changeme$(date +%s)")
     info "Generated database password: $DB_PASSWORD"
     read -p "Press Enter to accept or type custom password: " custom_db_pass
     [[ -n "$custom_db_pass" ]] && DB_PASSWORD="$custom_db_pass"
-    
+
     echo ""
     while [[ -z "$ADMIN_EMAIL" ]]; do
         read -p "Admin email [admin@example.com]: " ADMIN_EMAIL
@@ -453,12 +469,12 @@ prompt_configuration() {
             ADMIN_EMAIL=""
         fi
     done
-    
+
     ADMIN_PASSWORD=$(openssl rand -base64 16 2>/dev/null | tr -d "=+/" | cut -c1-16 || echo "admin$(date +%s)")
     info "Generated admin password: $ADMIN_PASSWORD"
     read -p "Press Enter to accept or type custom password: " custom_admin_pass
     [[ -n "$custom_admin_pass" ]] && ADMIN_PASSWORD="$custom_admin_pass"
-    
+
     echo ""
     info "Serial device configuration (for mesh hardware)"
     echo "Common paths:"
@@ -467,12 +483,12 @@ prompt_configuration() {
     echo "  Windows: COM3, COM4, etc."
     read -p "Serial device path (or 'skip' to configure later): " SERIAL_DEVICE
     SERIAL_DEVICE=${SERIAL_DEVICE:-skip}
-    
+
     if [[ "$SERIAL_DEVICE" != "skip" ]]; then
         read -p "Serial baud rate [115200]: " SERIAL_BAUD
         SERIAL_BAUD=${SERIAL_BAUD:-115200}
     fi
-    
+
     echo ""
     echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}Configuration Summary:${NC}"
@@ -494,7 +510,7 @@ prompt_configuration() {
     fi
     echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    
+
     if ! prompt_yes_no "Proceed with setup?"; then
         warn "Setup cancelled by user"
         if prompt_yes_no "Do you want to reconfigure?"; then
@@ -512,7 +528,7 @@ install_homebrew() {
         success "Homebrew already installed"
         return 0
     fi
-    
+
     info "Homebrew not found"
     if prompt_yes_no "Install Homebrew?"; then
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -540,21 +556,21 @@ install_node() {
             fi
             info "Installing Node.js via Homebrew..."
             brew install node@20 && brew link node@20 --force --overwrite
-        ;;
+            ;;
         apt)
             info "Installing Node.js via apt..."
             info "Distribution: $DISTRO, Architecture: $ARCH_TYPE"
-            
+
             # For ARM systems (Raspberry Pi), use NodeSource with architecture awareness
             if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
                 info "ARM architecture detected - using NodeSource repository"
-                
+
                 # Verify curl is installed
                 if ! command -v curl >/dev/null 2>&1; then
                     info "Installing curl first..."
                     sudo apt-get update && sudo apt-get install -y curl
                 fi
-                
+
                 # Use NodeSource setup script which handles ARM architectures
                 if curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -; then
                     sudo apt-get install -y nodejs
@@ -576,16 +592,16 @@ install_node() {
                     return 1
                 fi
             fi
-        ;;
+            ;;
         yum|dnf)
             info "Installing Node.js via $PKG_MANAGER..."
             curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
             sudo $PKG_MANAGER install -y nodejs
-        ;;
+            ;;
         pacman)
             info "Installing Node.js via pacman..."
             sudo pacman -S --noconfirm nodejs npm
-        ;;
+            ;;
         *)
             error "Cannot auto-install Node.js for your system"
             echo ""
@@ -598,13 +614,13 @@ install_node() {
                 echo "  sudo apt-get install -y nodejs"
             fi
             return 1
-        ;;
+            ;;
     esac
 }
 
 check_node() {
     step "Checking Node.js installation..."
-    
+
     if command -v node >/dev/null 2>&1; then
         local node_version
         node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
@@ -615,7 +631,7 @@ check_node() {
             warn "Found Node.js $node_version, but 20+ is required"
         fi
     fi
-    
+
     error "Node.js 20+ not found"
     if prompt_yes_no "Install Node.js 20 automatically?"; then
         if install_node; then
@@ -649,13 +665,13 @@ check_node() {
 
 check_node_gyp() {
     step "Checking node-gyp (required for native modules like argon2)..."
-    
+
     # Check if node-gyp is available globally
     if command -v node-gyp >/dev/null 2>&1; then
         success "node-gyp $(node-gyp --version) found"
         return 0
     fi
-    
+
     # Check if installed via npm but not in PATH
     if command -v npm >/dev/null 2>&1; then
         if npm list -g node-gyp >/dev/null 2>&1; then
@@ -663,10 +679,10 @@ check_node_gyp() {
             return 0
         fi
     fi
-    
+
     warn "node-gyp not found - required for native modules (argon2, serialport)"
     info "Installing node-gyp globally..."
-    
+
     if command -v npm >/dev/null 2>&1; then
         if npm install -g node-gyp; then
             hash -r
@@ -676,7 +692,7 @@ check_node_gyp() {
             fi
         fi
     fi
-    
+
     warn "Could not install node-gyp globally"
     info "This may cause native module compilation failures"
     return 0
@@ -684,14 +700,14 @@ check_node_gyp() {
 
 check_pnpm() {
     step "Checking pnpm installation..."
-    
+
     if command -v pnpm >/dev/null 2>&1; then
         success "pnpm $(pnpm --version) found"
         return 0
     fi
-    
+
     info "pnpm not found"
-    
+
     # Check if Node.js is available and version is sufficient
     if ! command -v node >/dev/null 2>&1; then
         warn "Node.js not found - cannot install pnpm"
@@ -701,7 +717,7 @@ check_pnpm() {
         fi
         return 1
     fi
-    
+
     local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
     if [[ $node_version -lt 20 ]]; then
         warn "Node.js $node_version is too old for pnpm (need 20+)"
@@ -712,7 +728,7 @@ check_pnpm() {
         fi
         return 1
     fi
-    
+
     if prompt_yes_no "Install pnpm?"; then
         if command -v corepack >/dev/null 2>&1; then
             info "Installing pnpm via corepack..."
@@ -725,7 +741,7 @@ check_pnpm() {
                 fi
             fi
         fi
-        
+
         if command -v npm >/dev/null 2>&1; then
             info "Trying npm installation method..."
             npm install -g pnpm
@@ -737,7 +753,7 @@ check_pnpm() {
                 fi
             fi
         fi
-        
+
         error "Failed to install pnpm"
         if prompt_yes_no "Continue anyway?"; then
             warn "Continuing without pnpm - you'll need to install it manually"
@@ -745,7 +761,7 @@ check_pnpm() {
         fi
         return 1
     fi
-    
+
     if prompt_yes_no "Continue without pnpm?"; then
         warn "Continuing without pnpm - you'll need to install it manually"
         return 0
@@ -760,10 +776,10 @@ install_postgresql() {
                 install_homebrew || return 1
             fi
             info "Installing PostgreSQL via Homebrew..."
-            brew install postgresql@15
-            brew services start postgresql@15
+            brew install postgresql
+            brew services start postgresql
             sleep 3
-        ;;
+            ;;
         apt)
             info "Installing PostgreSQL via apt..."
             sudo apt-get update
@@ -771,7 +787,7 @@ install_postgresql() {
             sudo systemctl start postgresql
             sudo systemctl enable postgresql
             sleep 3
-        ;;
+            ;;
         yum|dnf)
             info "Installing PostgreSQL via $PKG_MANAGER..."
             sudo $PKG_MANAGER install -y postgresql-server postgresql-contrib
@@ -779,7 +795,7 @@ install_postgresql() {
             sudo systemctl start postgresql
             sudo systemctl enable postgresql
             sleep 3
-        ;;
+            ;;
         pacman)
             info "Installing PostgreSQL via pacman..."
             sudo pacman -S --noconfirm postgresql
@@ -787,22 +803,22 @@ install_postgresql() {
             sudo systemctl start postgresql
             sudo systemctl enable postgresql
             sleep 3
-        ;;
+            ;;
         *)
             error "Cannot auto-install PostgreSQL for your system"
             return 1
-        ;;
+            ;;
     esac
 }
 
 check_postgresql() {
     step "Checking PostgreSQL installation..."
-    
+
     if command -v psql >/dev/null 2>&1; then
         success "PostgreSQL found: $(psql --version)"
         return 0
     fi
-    
+
     error "PostgreSQL not found"
     if prompt_yes_no "Install PostgreSQL automatically?"; then
         if install_postgresql; then
@@ -843,16 +859,16 @@ check_postgresql() {
 
 setup_postgresql() {
     step "Setting up PostgreSQL database..."
-    
+
     if ! command -v psql >/dev/null 2>&1; then
         warn "PostgreSQL not available, skipping database setup"
         return 0
     fi
-    
+
     # Check if PostgreSQL service is running
     info "Checking if PostgreSQL is running..."
     local pg_running=false
-    
+
     if [[ "$OS" == "linux" ]]; then
         if systemctl is-active --quiet postgresql 2>/dev/null || systemctl is-active --quiet postgresql@*.service 2>/dev/null; then
             pg_running=true
@@ -864,7 +880,7 @@ setup_postgresql() {
             pg_running=true
         fi
     fi
-    
+
     if [[ "$pg_running" == "false" ]]; then
         warn "PostgreSQL is installed but not running"
         if prompt_yes_no "Start PostgreSQL service?"; then
@@ -883,15 +899,26 @@ setup_postgresql() {
             elif [[ "$OS" == "macos" ]]; then
                 info "Starting PostgreSQL service..."
                 if command -v brew >/dev/null 2>&1; then
-                    brew services start postgresql@15 || brew services start postgresql || {
-                        error "Failed to start PostgreSQL"
+                    # Try to detect installed PostgreSQL version
+                    local pg_service="postgresql"
+                    if brew list postgresql@16 &>/dev/null; then
+                        pg_service="postgresql@16"
+                    elif brew list postgresql@15 &>/dev/null; then
+                        pg_service="postgresql@15"
+                    elif brew list postgresql@14 &>/dev/null; then
+                        pg_service="postgresql@14"
+                    fi
+
+                    info "Attempting to start PostgreSQL service: $pg_service"
+                    brew services start "$pg_service" || {
+                        error "Failed to start PostgreSQL service: $pg_service"
                         if ! prompt_yes_no "Continue anyway?"; then
                             return 1
                         fi
                         return 0
                     }
                     sleep 2
-                    success "PostgreSQL service started"
+                    success "PostgreSQL service started: $pg_service"
                 fi
             fi
         else
@@ -904,11 +931,85 @@ setup_postgresql() {
     else
         success "PostgreSQL is running"
     fi
-    
+
+    # Check if database already exists
+    info "Checking if database '$DB_NAME' already exists..."
+    local db_exists
+    if [[ "$OS" == "macos" ]]; then
+        db_exists=$(psql postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null || echo "0")
+    else
+        db_exists=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null || echo "0")
+    fi
+
+    if [[ "$db_exists" == "1" ]]; then
+        warn "Database '$DB_NAME' already exists!"
+
+        # Check if the database is empty
+        local table_count
+        if [[ "$OS" == "macos" ]]; then
+            table_count=$(psql postgres -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_catalog = '$DB_NAME'" 2>/dev/null || echo "0")
+        else
+            table_count=$(sudo -u postgres psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_catalog = '$DB_NAME'" 2>/dev/null || echo "0")
+        fi
+
+        if [[ "$table_count" -eq "0" ]]; then
+            warn "Database '$DB_NAME' exists but is empty (no tables found)"
+            warn "An empty database cannot be used with this application"
+
+            if prompt_yes_no "Do you want to drop and recreate the empty database?"; then
+                info "Dropping existing empty database..."
+                if [[ "$OS" == "macos" ]]; then
+                    echo "DROP DATABASE IF EXISTS \"$DB_NAME\";" | psql postgres
+                else
+                    echo "DROP DATABASE IF EXISTS \"$DB_NAME\";" | sudo -u postgres psql
+                fi
+                info "Database dropped, will create new one"
+                db_exists="0"  # Mark as not existing so it will be created
+            else
+                error "Cannot proceed with empty database"
+                if ! prompt_yes_no "Continue anyway?"; then
+                    return 1
+                fi
+                return 0
+            fi
+        else
+            info "Database '$DB_NAME' contains $table_count tables"
+            if prompt_yes_no "Do you want to use the existing database?"; then
+                info "Using existing database: $DB_NAME"
+            else
+                if prompt_yes_no "Do you want to drop and recreate the database?"; then
+                    info "Dropping existing database..."
+                    if [[ "$OS" == "macos" ]]; then
+                        echo "DROP DATABASE IF EXISTS \"$DB_NAME\";" | psql postgres
+                    else
+                        echo "DROP DATABASE IF EXISTS \"$DB_NAME\";" | sudo -u postgres psql
+                    fi
+                    info "Database dropped, will create new one"
+                    db_exists="0"  # Mark as not existing so it will be created
+                else
+                    warn "Skipping database creation - you'll need to configure manually"
+                    if ! prompt_yes_no "Continue anyway?"; then
+                        return 1
+                    fi
+                    return 0
+                fi
+            fi
+        fi
+    else
+        info "Database '$DB_NAME' does not exist, will create it"
+    fi
+
     # Determine PostgreSQL superuser method
     local PG_SUPER_CMD=""
     if [[ "$OS" == "macos" ]]; then
-        PG_SUPER_CMD="psql postgres"
+        # For Homebrew PostgreSQL on macOS, try to find the correct superuser approach
+        if sudo -u postgres psql -c '\q' 2>/dev/null; then
+            PG_SUPER_CMD="sudo -u postgres psql"
+        elif psql -U $(whoami) postgres -c '\q' 2>/dev/null; then
+            PG_SUPER_CMD="psql -U $(whoami) postgres"
+        else
+            PG_SUPER_CMD="psql postgres"
+        fi
     elif sudo -u postgres psql -c '\q' 2>/dev/null; then
         PG_SUPER_CMD="sudo -u postgres psql"
     else
@@ -940,37 +1041,58 @@ END
     fi
     
     success "PostgreSQL user configured"
-    
+
+    # Ensure proper schema permissions for the user
+    info "Ensuring proper schema permissions for user: $DB_USER"
+    local schema_perms_sql="GRANT ALL PRIVILEGES ON SCHEMA public TO \"$DB_USER\";"
+    if ! echo "$schema_perms_sql" | eval $PG_SUPER_CMD -d "$DB_NAME" 2>&1; then
+        warn "Could not grant schema privileges using superuser method, trying direct method..."
+        # Try alternative method using the user's own connection
+        if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "$schema_perms_sql" 2>&1; then
+            warn "Could not grant schema privileges (may need manual intervention)"
+            # Try to create the schema if it doesn't exist
+            if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "CREATE SCHEMA IF NOT EXISTS public;" 2>&1; then
+                error "Cannot create schema or grant permissions - manual setup required"
+            else
+                info "Created public schema, but permissions may still need manual setup"
+            fi
+        else
+            success "Schema privileges granted using direct method"
+        fi
+    else
+        success "Schema privileges configured"
+    fi
+
     # Fix collation version mismatch if present
     info "Checking for collation version mismatches..."
-    
+
     # Always attempt to fix collation issues to prevent database creation failures
     local collation_output
     collation_output=$(eval $PG_SUPER_CMD -c "SELECT 1" 2>&1 || true)
-    
+
     if echo "$collation_output" | grep -q "collation version mismatch"; then
         warn "Detected collation version mismatch - attempting comprehensive fix"
-        
+
         # Fix template0 (need to make it connectable first)
         info "Fixing template0..."
         echo "UPDATE pg_database SET datallowconn = TRUE WHERE datname = 'template0';" | eval $PG_SUPER_CMD 2>/dev/null || true
         echo "ALTER DATABASE template0 REFRESH COLLATION VERSION;" | eval $PG_SUPER_CMD -d template0 2>/dev/null || true
         echo "UPDATE pg_database SET datallowconn = FALSE WHERE datname = 'template0';" | eval $PG_SUPER_CMD 2>/dev/null || true
-        
+
         # Fix template1 (this is critical as it's used for new databases)
         info "Fixing template1..."
         echo "ALTER DATABASE template1 REFRESH COLLATION VERSION;" | eval $PG_SUPER_CMD -d template1 2>/dev/null || true
-        
+
         # Reindex system catalogs in template1
         info "Reindexing template1 system catalogs..."
         echo "REINDEX SYSTEM template1;" | eval $PG_SUPER_CMD -d template1 2>/dev/null || true
-        
+
         # Fix postgres database
         info "Fixing postgres database..."
         echo "ALTER DATABASE postgres REFRESH COLLATION VERSION;" | eval $PG_SUPER_CMD 2>/dev/null || true
-        
+
         success "Collation version fixes applied"
-        
+
         # Verify fix worked by checking again
         if (eval $PG_SUPER_CMD -c "SELECT 1" 2>&1 || true) | grep -q "collation version mismatch"; then
             warn "Collation warnings persist but continuing - this may not affect functionality"
@@ -978,7 +1100,7 @@ END
     else
         info "No collation version mismatches detected"
     fi
-    
+
     # Create or update database
     if echo "SELECT 1" | eval $PG_SUPER_CMD -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
         info "Database '$DB_NAME' already exists"
@@ -987,22 +1109,22 @@ END
         local create_output
         create_output=$(echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";" | eval $PG_SUPER_CMD 2>&1)
         local create_status=$?
-        
+
         # Check if creation actually failed (ignore warnings)
         if [[ $create_status -ne 0 ]]; then
             # Filter out warnings from actual errors
             local error_lines
             error_lines=$(echo "$create_output" | grep -i "^ERROR:" || true)
-            
+
             if [[ -n "$error_lines" ]]; then
                 error "Failed to create database"
                 error "Details: $error_lines"
-                
+
                 # Check if it's a collation-related error
                 if echo "$error_lines" | grep -qi "collation"; then
                     warn "This appears to be a collation-related error"
                     info "Attempting to create database with explicit template..."
-                    
+
                     # Try creating with template0 which has minimal collation dependencies
                     create_output=$(echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\" TEMPLATE template0;" | eval $PG_SUPER_CMD 2>&1)
                     if [[ $? -eq 0 ]] && ! echo "$create_output" | grep -qi "^ERROR:"; then
@@ -1037,17 +1159,29 @@ END
 GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";
 "
     echo "$grant_sql" | eval $PG_SUPER_CMD 2>&1
-    
-    # Grant schema privileges on the target database
-    local schema_sql="GRANT ALL ON SCHEMA public TO \"$DB_USER\";"
-    if ! echo "$schema_sql" | eval $PG_SUPER_CMD -d "$DB_NAME" 2>&1; then
-        warn "Could not grant schema privileges (may not be critical)"
-    fi
-    
-    # Test connection with new credentials
+
     info "Testing database connection..."
     if PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
         success "Database connection verified"
+
+        local schema_sql="GRANT ALL ON SCHEMA public TO \"$DB_USER\";"
+        if ! echo "$schema_sql" | eval $PG_SUPER_CMD -d "$DB_NAME" 2>&1; then
+            warn "Could not grant schema privileges using superuser method, trying direct method..."
+            # Try alternative method using the user's own connection
+            if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "$schema_sql" 2>&1; then
+                warn "Could not grant schema privileges (may need manual intervention)"
+                # Try to create the schema if it doesn't exist
+                if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "CREATE SCHEMA IF NOT EXISTS public;" 2>&1; then
+                    error "Cannot create schema or grant permissions - manual setup required"
+                else
+                    info "Created public schema, but permissions may still need manual setup"
+                fi
+            else
+                success "Schema privileges granted using direct method"
+            fi
+        else
+            success "Schema privileges configured"
+        fi
     else
         error "Cannot connect to database with provided credentials"
         error "Connection string: postgresql://$DB_USER:***@$DB_HOST:$DB_PORT/$DB_NAME"
@@ -1084,7 +1218,7 @@ GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";
 
 create_backend_env() {
     step "Creating backend environment configuration..."
-    
+
     local backend_dir="$REPO_DIR/apps/backend"
     if [[ ! -d "$backend_dir" ]]; then
         error "Backend directory not found: $backend_dir"
@@ -1094,10 +1228,10 @@ create_backend_env() {
         fi
         return 1
     fi
-    
+
     local env_file="$backend_dir/.env"
     local database_url="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
-    
+
     cat > "$env_file" <<EOF
 # AntiHunter Command Center - Backend Configuration
 # Generated by local setup script on $(date)
@@ -1112,7 +1246,7 @@ SITE_ID=$SITE_ID
 SITE_NAME=$SITE_NAME
 
 EOF
-    
+
     if [[ "$SERIAL_DEVICE" != "skip" ]]; then
         cat >> "$env_file" <<EOF
 SERIAL_DEVICE=$SERIAL_DEVICE
@@ -1128,7 +1262,7 @@ SERIAL_RECONNECT_MAX_ATTEMPTS=0
 SERIAL_PROTOCOL=meshtastic-rewrite
 EOF
     fi
-    
+
     cat >> "$env_file" <<EOF
 
 ALLOW_FOREVER=true
@@ -1139,7 +1273,7 @@ DRONES_RECORD_INVENTORY=true
 
 CLUSTER_WORKERS=1
 EOF
-    
+
     success "Backend environment configured at $env_file"
 }
 
@@ -1151,7 +1285,7 @@ setup_database() {
     if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
         error "Cannot connect to database. Prisma migrations will fail."
         error "Database URL: postgresql://$DB_USER:***@$DB_HOST:$DB_PORT/$DB_NAME"
-        
+
         if prompt_yes_no "Attempt to fix database authentication now?"; then
             info "Resetting database user password..."
             if [[ "$OS" == "macos" ]]; then
@@ -1159,9 +1293,9 @@ setup_database() {
             else
                 echo "ALTER USER \"$DB_USER\" WITH PASSWORD '$DB_PASSWORD';" | sudo -u postgres psql
             fi
-            
+
             sleep 1
-            
+
             if PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
                 success "Database connection restored"
             else
@@ -1176,19 +1310,32 @@ setup_database() {
             fi
             return 0
         fi
+    else
+        success "Database connection verified"
+
+        # Check if this is a fresh database that needs Prisma initialization
+        info "Checking if database needs Prisma initialization..."
+        local has_migrations_table
+        has_migrations_table=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '_prisma_migrations');" 2>/dev/null || echo "f")
+
+        if [[ "$has_migrations_table" == "f" ]]; then
+            info "Prisma migrations table not found - this appears to be a fresh database"
+            warn "Database needs schema initialization before migrations can run"
+            info "Will initialize schema after changing to backend directory"
+        fi
     fi
-    
+
     if ! command -v pnpm >/dev/null 2>&1; then
         warn "pnpm not available, skipping database setup"
         return 0
     fi
-    
+
     local backend_dir="$REPO_DIR/apps/backend"
     if [[ ! -d "$backend_dir" ]]; then
         warn "Backend directory not found, skipping database setup"
         return 0
     fi
-    
+
     cd "$backend_dir" || {
         error "Cannot change to backend directory"
         if prompt_yes_no "Continue anyway?"; then
@@ -1196,7 +1343,23 @@ setup_database() {
         fi
         return 1
     }
-    
+
+    # If this is a fresh database, initialize it first
+    if [[ "$has_migrations_table" == "f" ]]; then
+        info "Initializing database schema with prisma db push..."
+        if pnpm prisma db push; then
+            success "Database schema initialized with db push"
+            has_migrations_table="db_push_used"  # Mark that we used db push
+        else
+            error "Failed to initialize database schema"
+            if prompt_yes_no "Continue anyway?"; then
+                warn "Continuing without proper database initialization"
+            else
+                return 1
+            fi
+        fi
+    fi
+
     info "Generating Prisma client..."
     pnpm prisma:generate || pnpm prisma generate || {
         error "Failed to generate Prisma client"
@@ -1206,30 +1369,73 @@ setup_database() {
         fi
         return 1
     }
-    
+
     info "Running database migrations..."
-    pnpm prisma migrate deploy || pnpm prisma db push || {
-        error "Database migrations failed"
-        if prompt_yes_no "Continue anyway?"; then
-            warn "Continuing - you'll need to run migrations manually"
-            return 0
+
+    # For databases initialized with db push, we need to create the migrations table
+    if [[ "$has_migrations_table" == "db_push_used" ]]; then
+        info "Database was initialized with db push - setting up migration tracking..."
+        # Try to create an initial migration to establish proper tracking
+        if pnpm prisma migrate dev --name init --create-only; then
+            if pnpm prisma migrate resolve --applied "init"; then
+                success "Migration tracking established successfully"
+            else
+                warn "Could not mark migration as applied, but schema is synchronized"
+            fi
+        else
+            warn "Could not create initial migration, but schema is synchronized via db push"
         fi
-        return 1
-    }
-    
+    # For fresh databases (no migrations table), use migrate dev to create initial migration
+    elif [[ "$has_migrations_table" == "f" ]]; then
+        info "Fresh database detected - creating initial migration..."
+        if pnpm prisma migrate dev --name init; then
+            success "Initial migration created and applied successfully"
+        else
+            warn "Initial migration failed, trying db push as fallback..."
+            if pnpm prisma db push; then
+                success "Database schema pushed successfully"
+                warn "Note: Using db push instead of migrations - migration tracking may not work properly"
+            else
+                error "Both migration methods failed"
+                if prompt_yes_no "Continue anyway?"; then
+                    warn "Continuing - you'll need to set up migrations manually"
+                    return 0
+                fi
+                return 1
+            fi
+        fi
+    else
+        # For existing databases with migrations table, use migrate deploy
+        if pnpm prisma migrate deploy; then
+            success "Database migrations applied successfully"
+        else
+            warn "migrate deploy failed, trying migrate reset..."
+            if pnpm prisma migrate reset --force; then
+                success "Database reset and migrated successfully"
+            else
+                error "Migration methods failed"
+                if prompt_yes_no "Continue anyway?"; then
+                    warn "Continuing - you'll need to run migrations manually"
+                    return 0
+                fi
+                return 1
+            fi
+        fi
+    fi
+
     info "Seeding database..."
     export ADMIN_EMAIL="$ADMIN_EMAIL"
     export ADMIN_PASSWORD="$ADMIN_PASSWORD"
     export SITE_ID="$SITE_ID"
     export SITE_NAME="$SITE_NAME"
-    
+
     pnpm prisma db seed || pnpm db:seed || {
         warn "Seeding reported an error, checking if admin user was created..."
         
         if command -v psql >/dev/null 2>&1; then
             local user_count
             user_count=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT COUNT(*) FROM \"User\" WHERE email = '$ADMIN_EMAIL';" 2>/dev/null || echo "0")
-            
+
             if [[ "$user_count" -eq 0 ]]; then
                 error "Database seeding failed"
                 if prompt_yes_no "Continue anyway?"; then
@@ -1244,7 +1450,7 @@ setup_database() {
             warn "Cannot verify seeding without psql, assuming success"
         fi
     }
-    
+
     success "Database setup complete"
 }
 
@@ -1315,10 +1521,10 @@ EOF
 
 check_build_tools() {
     step "Checking build tools..."
-    
+
     local missing_tools=()
     local needs_installation=false
-    
+
     # Check essential build tools
     if ! command -v gcc >/dev/null 2>&1; then
         missing_tools+=("gcc")
@@ -1333,28 +1539,28 @@ check_build_tools() {
             fi
         fi
     fi
-    
+
     if ! command -v g++ >/dev/null 2>&1; then
         missing_tools+=("g++")
         needs_installation=true
     fi
-    
+
     if ! command -v make >/dev/null 2>&1; then
         missing_tools+=("make")
         needs_installation=true
     fi
-    
+
     if ! command -v python3 >/dev/null 2>&1; then
         missing_tools+=("python3")
         needs_installation=true
     fi
-    
+
     # Check for pkg-config
     if ! command -v pkg-config >/dev/null 2>&1; then
         missing_tools+=("pkg-config")
         needs_installation=true
     fi
-    
+
     # For ARM systems, check for additional Python development packages
     if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
         if [[ "$PKG_MANAGER" == "apt" ]]; then
@@ -1365,15 +1571,15 @@ check_build_tools() {
             fi
         fi
     fi
-    
+
     if [[ "$needs_installation" == "false" ]]; then
         success "Build tools are installed"
         return 0
     fi
-    
+
     warn "Missing build tools: ${missing_tools[*]}"
     info "These are required for native Node.js modules (argon2, serialport, etc.)"
-    
+
     if ! prompt_yes_no "Install build tools automatically?"; then
         warn "Build tools required for native dependencies"
         if prompt_yes_no "Continue anyway?"; then
@@ -1381,32 +1587,32 @@ check_build_tools() {
         fi
         return 1
     fi
-    
+
     case "$PKG_MANAGER" in
         apt)
             info "Installing build tools via apt..."
             info "Distribution: $DISTRO, Architecture: $ARCH_TYPE"
-            
+
             # Update package list
             sudo apt-get update || warn "apt-get update failed, continuing anyway"
-            
+
             # Base packages for all apt-based systems
             local apt_packages="build-essential pkg-config libssl-dev python3 make gcc g++"
-            
+
             # ARM-specific packages for node-gyp native module compilation
             if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
                 info "Installing ARM-specific build dependencies for node-gyp..."
                 apt_packages="$apt_packages python3-dev python3-pip"
-                
+
                 # Check if libnode-dev is available (helps with some native modules)
                 if apt-cache show libnode-dev >/dev/null 2>&1; then
                     apt_packages="$apt_packages libnode-dev"
                 fi
             fi
-            
+
             # Additional useful packages for native module builds
             apt_packages="$apt_packages libudev-dev"
-            
+
             # Install all packages
             info "Installing: $apt_packages"
             if sudo apt-get install -y $apt_packages; then
@@ -1458,10 +1664,10 @@ check_build_tools() {
             return 1
         ;;
     esac
-    
+
     if [[ $? -eq 0 ]]; then
         success "Build tools installed"
-        
+
         # Verify key tools are now available
         hash -r
         if command -v gcc >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
@@ -1517,37 +1723,37 @@ main() {
     echo -e "${BLUE}"
     cat <<'EOF'
     ___          __  _ __  __            __
-    /   |  ____  / /_(_) / / /_  ______  / /____  _____
-    / /| | / __ \/ __/ / /_/ / / / / __ \/ __/ _ \/ ___/
-/ ___ |/ / / / /_/ / __  / /_/ / / / / /_/  __/ /
+   /   |  ____  / /_(_) / / /_  ______  / /____  _____
+  / /| | / __ \/ __/ / /_/ / / / / __ \/ __/ _ \/ ___/
+ / ___ |/ / / / /_/ / __  / /_/ / / / / /_/  __/ /
 /_/  |_/_/ /_/\__/_/_/ /_/\__,_/_/ /_/\__/\___/_/
 
-        Command & Control Pro - Local Setup
+         Command & Control Pro - Local Setup
 EOF
     echo -e "${NC}"
-    
+
     detect_os
     print_diagnostic_info
-    
+
     check_build_tools
     check_git
     clone_repository
     prompt_configuration
-    
+
     echo ""
     log "Starting local setup..."
     echo ""
-    
+
     check_node
     check_pnpm
     check_node_gyp
     check_postgresql
-    
+
     setup_postgresql
     install_dependencies
     create_backend_env
     setup_database
-    
+
     print_summary
 }
 
