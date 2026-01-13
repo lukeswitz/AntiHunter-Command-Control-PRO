@@ -45,6 +45,19 @@ else
     NC=''
 fi
 
+# Ensure color codes are properly interpreted even in non-interactive environments
+if [[ -z "$CYAN" ]]; then
+    if [[ -z "${NO_COLOR:-}" ]]; then
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        CYAN='\033[0;36m'
+        MAGENTA='\033[0;35m'
+        NC='\033[0m'
+    fi
+fi
+
 log() { echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $*"; }
 info() { echo -e "${CYAN}[INFO]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
@@ -1146,17 +1159,29 @@ END
 GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";
 "
     echo "$grant_sql" | eval $PG_SUPER_CMD 2>&1
-    
-    # Grant schema privileges on the target database
-    local schema_sql="GRANT ALL ON SCHEMA public TO \"$DB_USER\";"
-    if ! echo "$schema_sql" | eval $PG_SUPER_CMD -d "$DB_NAME" 2>&1; then
-        warn "Could not grant schema privileges (may not be critical)"
-    fi
-    
-    # Test connection with new credentials
+
     info "Testing database connection..."
     if PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
         success "Database connection verified"
+
+        local schema_sql="GRANT ALL ON SCHEMA public TO \"$DB_USER\";"
+        if ! echo "$schema_sql" | eval $PG_SUPER_CMD -d "$DB_NAME" 2>&1; then
+            warn "Could not grant schema privileges using superuser method, trying direct method..."
+            # Try alternative method using the user's own connection
+            if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "$schema_sql" 2>&1; then
+                warn "Could not grant schema privileges (may need manual intervention)"
+                # Try to create the schema if it doesn't exist
+                if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "CREATE SCHEMA IF NOT EXISTS public;" 2>&1; then
+                    error "Cannot create schema or grant permissions - manual setup required"
+                else
+                    info "Created public schema, but permissions may still need manual setup"
+                fi
+            else
+                success "Schema privileges granted using direct method"
+            fi
+        else
+            success "Schema privileges configured"
+        fi
     else
         error "Cannot connect to database with provided credentials"
         error "Connection string: postgresql://$DB_USER:***@$DB_HOST:$DB_PORT/$DB_NAME"
