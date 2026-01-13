@@ -390,7 +390,7 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 
 ## Quick Start
 
-### Automated Setup (Ubuntu Linux/macOS) 
+### Automated Setup (Ubuntu, Debian Linux/macOS)
 
 The fastest way to get AntiHunter Command Center running locally. Script is a work in progress (to support more systems):
 
