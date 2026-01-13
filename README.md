@@ -390,9 +390,10 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 
 ## Quick Start
 
-### Automated Setup (Linux/macOS)
+### Automated Setup (Ubuntu Linux/macOS) 
 
-The fastest way to get AntiHunter Command Center running locally:
+The fastest way to get AntiHunter Command Center running locally. Script is a work in progress (to support more systems):
+
 ```bash
 # Download and run the setup script
 curl -o setup-local.sh https://raw.githubusercontent.com/TheRealSirHaXalot/AntiHunter-Command-Control-PRO/main/scripts/setup-local.sh
@@ -400,7 +401,7 @@ chmod +x setup-local.sh
 ./setup-local.sh
 ```
 
-The script will:
+**The script will:**
 - Check and install prerequisites (Node.js, pnpm, PostgreSQL)
 - Clone the repository
 - Configure the database with secure credentials
@@ -408,7 +409,7 @@ The script will:
 - Set up environment files
 - Run database migrations and seed data
 
-**Important:** Run the script as a regular user (not with `sudo`). The script will prompt for sudo when needed for system packages.
+**Important:** Run the script as a regular user (not with `sudo`). The script will prompt for sudo when needed.
 
 ### Manual Quick Start
 
