@@ -202,6 +202,7 @@ detect_os() {
         OS="macos"
         PKG_MANAGER="brew"
         DISTRO="macos"
+        DISTRO_NAME="macOS"
     elif [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux" ]]; then
         OS="linux"
 
@@ -235,10 +236,12 @@ detect_os() {
         OS="windows"
         PKG_MANAGER="none"
         DISTRO="windows"
+        DISTRO_NAME="Windows"
     else
         OS="unknown"
         PKG_MANAGER="unknown"
         DISTRO="unknown"
+        DISTRO_NAME="Unknown"
     fi
 
     # Detect architecture
@@ -691,6 +694,28 @@ check_pnpm() {
     fi
 
     info "pnpm not found"
+
+    # Check if Node.js is available and version is sufficient
+    if ! command -v node >/dev/null 2>&1; then
+        warn "Node.js not found - cannot install pnpm"
+        if prompt_yes_no "Continue without pnpm?"; then
+            warn "You'll need to install Node.js 20+ and pnpm manually later"
+            return 0
+        fi
+        return 1
+    fi
+
+    local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+    if [[ $node_version -lt 20 ]]; then
+        warn "Node.js $node_version is too old for pnpm (need 20+)"
+        warn "Please install Node.js 20+ first, then run this script again"
+        if prompt_yes_no "Continue without pnpm?"; then
+            warn "You'll need to upgrade Node.js to 20+ and install pnpm manually"
+            return 0
+        fi
+        return 1
+    fi
+
     if prompt_yes_no "Install pnpm?"; then
         if command -v corepack >/dev/null 2>&1; then
             info "Installing pnpm via corepack..."
@@ -738,8 +763,8 @@ install_postgresql() {
                 install_homebrew || return 1
             fi
             info "Installing PostgreSQL via Homebrew..."
-            brew install postgresql@15
-            brew services start postgresql@15
+            brew install postgresql
+            brew services start postgresql
             sleep 3
             ;;
         apt)
@@ -861,15 +886,26 @@ setup_postgresql() {
             elif [[ "$OS" == "macos" ]]; then
                 info "Starting PostgreSQL service..."
                 if command -v brew >/dev/null 2>&1; then
-                    brew services start postgresql@15 || brew services start postgresql || {
-                        error "Failed to start PostgreSQL"
+                    # Try to detect installed PostgreSQL version
+                    local pg_service="postgresql"
+                    if brew list postgresql@16 &>/dev/null; then
+                        pg_service="postgresql@16"
+                    elif brew list postgresql@15 &>/dev/null; then
+                        pg_service="postgresql@15"
+                    elif brew list postgresql@14 &>/dev/null; then
+                        pg_service="postgresql@14"
+                    fi
+
+                    info "Attempting to start PostgreSQL service: $pg_service"
+                    brew services start "$pg_service" || {
+                        error "Failed to start PostgreSQL service: $pg_service"
                         if ! prompt_yes_no "Continue anyway?"; then
                             return 1
                         fi
                         return 0
                     }
                     sleep 2
-                    success "PostgreSQL service started"
+                    success "PostgreSQL service started: $pg_service"
                 fi
             fi
         else
@@ -883,10 +919,84 @@ setup_postgresql() {
         success "PostgreSQL is running"
     fi
 
+    # Check if database already exists
+    info "Checking if database '$DB_NAME' already exists..."
+    local db_exists
+    if [[ "$OS" == "macos" ]]; then
+        db_exists=$(psql postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null || echo "0")
+    else
+        db_exists=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null || echo "0")
+    fi
+
+    if [[ "$db_exists" == "1" ]]; then
+        warn "Database '$DB_NAME' already exists!"
+
+        # Check if the database is empty
+        local table_count
+        if [[ "$OS" == "macos" ]]; then
+            table_count=$(psql postgres -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_catalog = '$DB_NAME'" 2>/dev/null || echo "0")
+        else
+            table_count=$(sudo -u postgres psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_catalog = '$DB_NAME'" 2>/dev/null || echo "0")
+        fi
+
+        if [[ "$table_count" -eq "0" ]]; then
+            warn "Database '$DB_NAME' exists but is empty (no tables found)"
+            warn "An empty database cannot be used with this application"
+
+            if prompt_yes_no "Do you want to drop and recreate the empty database?"; then
+                info "Dropping existing empty database..."
+                if [[ "$OS" == "macos" ]]; then
+                    echo "DROP DATABASE IF EXISTS \"$DB_NAME\";" | psql postgres
+                else
+                    echo "DROP DATABASE IF EXISTS \"$DB_NAME\";" | sudo -u postgres psql
+                fi
+                info "Database dropped, will create new one"
+                db_exists="0"  # Mark as not existing so it will be created
+            else
+                error "Cannot proceed with empty database"
+                if ! prompt_yes_no "Continue anyway?"; then
+                    return 1
+                fi
+                return 0
+            fi
+        else
+            info "Database '$DB_NAME' contains $table_count tables"
+            if prompt_yes_no "Do you want to use the existing database?"; then
+                info "Using existing database: $DB_NAME"
+            else
+                if prompt_yes_no "Do you want to drop and recreate the database?"; then
+                    info "Dropping existing database..."
+                    if [[ "$OS" == "macos" ]]; then
+                        echo "DROP DATABASE IF EXISTS \"$DB_NAME\";" | psql postgres
+                    else
+                        echo "DROP DATABASE IF EXISTS \"$DB_NAME\";" | sudo -u postgres psql
+                    fi
+                    info "Database dropped, will create new one"
+                    db_exists="0"  # Mark as not existing so it will be created
+                else
+                    warn "Skipping database creation - you'll need to configure manually"
+                    if ! prompt_yes_no "Continue anyway?"; then
+                        return 1
+                    fi
+                    return 0
+                fi
+            fi
+        fi
+    else
+        info "Database '$DB_NAME' does not exist, will create it"
+    fi
+
     # Determine PostgreSQL superuser method
     local PG_SUPER_CMD=""
     if [[ "$OS" == "macos" ]]; then
-        PG_SUPER_CMD="psql postgres"
+        # For Homebrew PostgreSQL on macOS, try to find the correct superuser approach
+        if sudo -u postgres psql -c '\q' 2>/dev/null; then
+            PG_SUPER_CMD="sudo -u postgres psql"
+        elif psql -U $(whoami) postgres -c '\q' 2>/dev/null; then
+            PG_SUPER_CMD="psql -U $(whoami) postgres"
+        else
+            PG_SUPER_CMD="psql postgres"
+        fi
     elif sudo -u postgres psql -c '\q' 2>/dev/null; then
         PG_SUPER_CMD="sudo -u postgres psql"
     else
@@ -918,6 +1028,27 @@ END
     fi
     
     success "PostgreSQL user configured"
+
+    # Ensure proper schema permissions for the user
+    info "Ensuring proper schema permissions for user: $DB_USER"
+    local schema_perms_sql="GRANT ALL PRIVILEGES ON SCHEMA public TO \"$DB_USER\";"
+    if ! echo "$schema_perms_sql" | eval $PG_SUPER_CMD -d "$DB_NAME" 2>&1; then
+        warn "Could not grant schema privileges using superuser method, trying direct method..."
+        # Try alternative method using the user's own connection
+        if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "$schema_perms_sql" 2>&1; then
+            warn "Could not grant schema privileges (may need manual intervention)"
+            # Try to create the schema if it doesn't exist
+            if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "CREATE SCHEMA IF NOT EXISTS public;" 2>&1; then
+                error "Cannot create schema or grant permissions - manual setup required"
+            else
+                info "Created public schema, but permissions may still need manual setup"
+            fi
+        else
+            success "Schema privileges granted using direct method"
+        fi
+    else
+        success "Schema privileges configured"
+    fi
 
     # Fix collation version mismatch if present
     info "Checking for collation version mismatches..."
@@ -1129,7 +1260,7 @@ setup_database() {
     if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
         error "Cannot connect to database. Prisma migrations will fail."
         error "Database URL: postgresql://$DB_USER:***@$DB_HOST:$DB_PORT/$DB_NAME"
-        
+
         if prompt_yes_no "Attempt to fix database authentication now?"; then
             info "Resetting database user password..."
             if [[ "$OS" == "macos" ]]; then
@@ -1137,9 +1268,9 @@ setup_database() {
             else
                 echo "ALTER USER \"$DB_USER\" WITH PASSWORD '$DB_PASSWORD';" | sudo -u postgres psql
             fi
-            
+
             sleep 1
-            
+
             if PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
                 success "Database connection restored"
             else
@@ -1153,6 +1284,19 @@ setup_database() {
                 return 1
             fi
             return 0
+        fi
+    else
+        success "Database connection verified"
+
+        # Check if this is a fresh database that needs Prisma initialization
+        info "Checking if database needs Prisma initialization..."
+        local has_migrations_table
+        has_migrations_table=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '_prisma_migrations');" 2>/dev/null || echo "f")
+
+        if [[ "$has_migrations_table" == "f" ]]; then
+            info "Prisma migrations table not found - this appears to be a fresh database"
+            warn "Database needs schema initialization before migrations can run"
+            info "Will initialize schema after changing to backend directory"
         fi
     fi
 
@@ -1175,6 +1319,22 @@ setup_database() {
         return 1
     }
 
+    # If this is a fresh database, initialize it first
+    if [[ "$has_migrations_table" == "f" ]]; then
+        info "Initializing database schema with prisma db push..."
+        if pnpm prisma db push; then
+            success "Database schema initialized with db push"
+            has_migrations_table="t"  # Mark as initialized
+        else
+            error "Failed to initialize database schema"
+            if prompt_yes_no "Continue anyway?"; then
+                warn "Continuing without proper database initialization"
+            else
+                return 1
+            fi
+        fi
+    fi
+
     info "Generating Prisma client..."
     pnpm prisma:generate || pnpm prisma generate || {
         error "Failed to generate Prisma client"
@@ -1186,14 +1346,44 @@ setup_database() {
     }
 
     info "Running database migrations..."
-    pnpm prisma migrate deploy || pnpm prisma db push || {
-        error "Database migrations failed"
-        if prompt_yes_no "Continue anyway?"; then
-            warn "Continuing - you'll need to run migrations manually"
-            return 0
+
+    # For fresh databases (no migrations table), use migrate dev to create initial migration
+    if [[ "$has_migrations_table" == "f" ]]; then
+        info "Fresh database detected - creating initial migration..."
+        if pnpm prisma migrate dev --name init; then
+            success "Initial migration created and applied successfully"
+        else
+            warn "Initial migration failed, trying db push as fallback..."
+            if pnpm prisma db push; then
+                success "Database schema pushed successfully"
+                warn "Note: Using db push instead of migrations - migration tracking may not work properly"
+            else
+                error "Both migration methods failed"
+                if prompt_yes_no "Continue anyway?"; then
+                    warn "Continuing - you'll need to set up migrations manually"
+                    return 0
+                fi
+                return 1
+            fi
         fi
-        return 1
-    }
+    else
+        # For existing databases with migrations table, use migrate deploy
+        if pnpm prisma migrate deploy; then
+            success "Database migrations applied successfully"
+        else
+            warn "migrate deploy failed, trying migrate reset..."
+            if pnpm prisma migrate reset --force; then
+                success "Database reset and migrated successfully"
+            else
+                error "Migration methods failed"
+                if prompt_yes_no "Continue anyway?"; then
+                    warn "Continuing - you'll need to run migrations manually"
+                    return 0
+                fi
+                return 1
+            fi
+        fi
+    fi
 
     info "Seeding database..."
     export ADMIN_EMAIL="$ADMIN_EMAIL"
