@@ -411,38 +411,9 @@ chmod +x setup-local.sh
 
 **Important:** Run the script as a regular user (not with `sudo`). The script will prompt for sudo when needed.
 
-### Manual Quick Start
-
-If you prefer manual setup or are on Windows:
-```bash
-# 1. Clone repository
-git clone https://github.com/TheRealSirHaXalot/AntiHunter-Command-Control-PRO.git
-cd AntiHunter-Command-Control-PRO
-
-# 2. Install dependencies
-pnpm install
-
-# 3. Set up database (PostgreSQL required)
-createdb command_center
-createuser command_center -P  # Enter password when prompted
-
-# 4. Configure backend
-cd apps/backend
-cp .env.example .env
-# Edit .env with your database credentials
-
-# 5. Run migrations and seed
-pnpm prisma migrate deploy
-pnpm prisma db seed
-
-# 6. Start application
-cd ../..
-pnpm AHCC
-```
-
 Access the web interface at `http://localhost:5173` and log in with the credentials displayed after setup.
 
-For production deployments, Docker, and advanced configuration, see the full [Installation](#installation) section below.
+For production deployments, Docker, and advanced configuration, follow the directions below:
 
 ## Prerequisites
 
