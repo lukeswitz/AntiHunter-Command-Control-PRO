@@ -7,11 +7,18 @@ set -euo pipefail
 # No hardening, firewall, or reverse proxy - just gets the app running
 #############################################################################
 
-# Prevent running as root
+# Prevent running as root - script should be run as regular user with sudo access
 if [[ "$EUID" -eq 0 ]]; then
     echo -e "\033[0;31m[ERROR]\033[0m This script should NOT be run with sudo or as root"
-    echo "Run as a regular user: ./setup-local.sh"
-    echo "The script will prompt for sudo when needed for system packages"
+    echo ""
+    echo "Correct usage:"
+    echo "  ./setup-local.sh        (as regular user)"
+    echo ""
+    echo "The script will prompt for sudo where needed for:"
+    echo "  - Installing system packages (Node.js, PostgreSQL, build tools)"
+    echo "  - Setting up PostgreSQL database"
+    echo "  - Fixing file permissions"
+    echo ""
     exit 1
 fi
 
@@ -50,19 +57,25 @@ fix_repository_permissions() {
     if [[ -d "$REPO_DIR" ]]; then
         info "Fixing repository permissions..."
         local current_user
+        local current_group
+        
         if [[ "$OS" == "macos" ]] || [[ "$OS" == "linux" ]]; then
             current_user=$(whoami)
-            if [[ "$EUID" -eq 0 ]]; then
-                warn "Script running as root - this may cause permission issues"
-                warn "Consider running as a regular user with sudo access instead"
+            
+            # Get primary group (different on macOS vs Linux)
+            if [[ "$OS" == "macos" ]]; then
+                current_group=$(id -gn "$current_user")
+            else
+                current_group=$(id -gn)
             fi
             
             # Fix ownership
+            info "Setting ownership to $current_user:$current_group"
             if [[ -w "$REPO_DIR" ]]; then
-                chown -R "$current_user:$current_user" "$REPO_DIR" 2>/dev/null || \
-                sudo chown -R "$current_user:$current_user" "$REPO_DIR"
+                chown -R "$current_user:$current_group" "$REPO_DIR" 2>/dev/null || \
+                sudo chown -R "$current_user:$current_group" "$REPO_DIR"
             else
-                sudo chown -R "$current_user:$current_user" "$REPO_DIR"
+                sudo chown -R "$current_user:$current_group" "$REPO_DIR"
             fi
             
             # Fix permissions
@@ -70,9 +83,14 @@ fix_repository_permissions() {
             
             # Clean any problematic cache files
             find "$REPO_DIR" -name "*.timestamp-*" -delete 2>/dev/null || true
-            find "$REPO_DIR/node_modules/.cache" -type d -exec rm -rf {} + 2>/dev/null || true
+            if [[ -d "$REPO_DIR/node_modules/.cache" ]]; then
+                find "$REPO_DIR/node_modules/.cache" -type d -exec rm -rf {} + 2>/dev/null || true
+            fi
             
             success "Repository permissions fixed for user: $current_user"
+        elif [[ "$OS" == "windows" ]]; then
+            # On Windows (Git Bash/MSYS2), ownership is usually handled by the filesystem
+            warn "Windows detected - skipping ownership changes"
         fi
     fi
 }
@@ -104,30 +122,104 @@ install_dependencies() {
     }
     
     info "Running pnpm install in $REPO_DIR..."
-    pnpm install || {
+    info "This may take several minutes, especially for native module compilation..."
+    
+    # For ARM systems, note that native modules may take longer
+    if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
+        info "ARM architecture detected - native module compilation may take extra time"
+    fi
+    
+    # Run pnpm install
+    if pnpm install; then
+        success "Dependencies installed successfully"
+        fix_repository_permissions
+        return 0
+    fi
+    
+    # If we reach here, installation failed
+    {
         error "Failed to install dependencies"
         error "Current directory: $(pwd)"
         error "Package.json exists: $(test -f package.json && echo 'yes' || echo 'no')"
+        echo ""
+        error "Common causes and solutions:"
+        echo ""
         
+        # Check for build tools
+        if ! command -v gcc >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+            error "  Missing build tools (gcc, python3)"
+            echo "  Solution: Re-run this script and accept build tools installation"
+            echo "  Or manually install: sudo apt-get install -y build-essential python3 python3-dev"
+        fi
+        
+        # Check for ARM-specific issues
+        if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
+            error "  ARM architecture detected - native modules may need additional dependencies"
+            echo "  Solution: Install ARM build dependencies:"
+            echo "  sudo apt-get install -y python3-dev libnode-dev libudev-dev"
+        fi
+        
+        # Check for permission issues
+        if [[ ! -w "$REPO_DIR" ]]; then
+            error "  Repository directory is not writable"
+            echo "  Solution: Fix permissions with:"
+            echo "  sudo chown -R $(whoami):$(whoami) $REPO_DIR"
+        fi
+        
+        # Check Node version
+        if command -v node >/dev/null 2>&1; then
+            local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+            if [[ $node_version -lt 20 ]]; then
+                error "  Node.js version is too old: v$node_version (need v20+)"
+                echo "  Solution: Install Node.js 20 or later"
+            fi
+        fi
+        
+        echo ""
+        error "To see full error details, scroll up or check the output above"
+        echo ""
+        
+        if prompt_yes_no "Try installing dependencies with verbose logging?"; then
+            info "Running pnpm install with verbose output..."
+            pnpm install --reporter=verbose || {
+                error "Installation failed again"
+            }
+        fi
+        
+        echo ""
         if prompt_yes_no "Continue anyway?"; then
-            warn "Continuing - you'll need to install dependencies manually with: pnpm install"
+            warn "Continuing without dependencies installed"
+            warn "You'll need to manually run: cd $REPO_DIR && pnpm install"
             return 0
         fi
         return 1
     }
-    
-    success "Dependencies installed"
-    
-    # Fix permissions after installation
-    fix_repository_permissions
 }
 
 detect_os() {
+    # Detect OS type
     if [[ "$OSTYPE" == "darwin"* ]]; then
         OS="macos"
         PKG_MANAGER="brew"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        DISTRO="macos"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux" ]]; then
         OS="linux"
+        
+        # Detect specific Linux distribution
+        if [[ -f /etc/os-release ]]; then
+            . /etc/os-release
+            DISTRO="${ID:-unknown}"
+            DISTRO_VERSION="${VERSION_ID:-unknown}"
+            DISTRO_NAME="${NAME:-Linux}"
+        elif [[ -f /etc/debian_version ]]; then
+            DISTRO="debian"
+            DISTRO_NAME="Debian"
+        else
+            DISTRO="unknown"
+            DISTRO_NAME="Linux"
+        fi
+        
+        # Detect package manager
         if command -v apt-get >/dev/null 2>&1; then
             PKG_MANAGER="apt"
         elif command -v yum >/dev/null 2>&1; then
@@ -139,14 +231,42 @@ detect_os() {
         else
             PKG_MANAGER="unknown"
         fi
-    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
         OS="windows"
         PKG_MANAGER="none"
+        DISTRO="windows"
     else
         OS="unknown"
         PKG_MANAGER="unknown"
+        DISTRO="unknown"
     fi
-    info "Detected OS: $OS (Package Manager: $PKG_MANAGER)"
+    
+    # Detect architecture
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64|amd64)
+            ARCH_TYPE="x64"
+        ;;
+        aarch64|arm64)
+            ARCH_TYPE="arm64"
+        ;;
+        armv7l|armv7)
+            ARCH_TYPE="armv7"
+        ;;
+        armv6l)
+            ARCH_TYPE="armv6"
+        ;;
+        i686|i386)
+            ARCH_TYPE="x86"
+        ;;
+        *)
+            ARCH_TYPE="$ARCH"
+        ;;
+    esac
+    
+    info "Detected OS: $OS ($DISTRO_NAME ${DISTRO_VERSION:-})"
+    info "Architecture: $ARCH_TYPE ($ARCH)"
+    info "Package Manager: $PKG_MANAGER"
 }
 
 DB_NAME="command_center"
@@ -169,6 +289,13 @@ CLONE_DIR=""
 prompt_yes_no() {
     local prompt="$1"
     local response
+    
+    # In CI/non-interactive environments, default to "no" to avoid hanging
+    if [[ ! -t 0 ]] || [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        warn "Non-interactive environment detected - defaulting to 'no' for: $prompt"
+        return 1
+    fi
+    
     while true; do
         read -p "$prompt (y/n): " -r response
         case "${response,,}" in
@@ -192,21 +319,21 @@ check_git() {
         case "$PKG_MANAGER" in
             apt)
                 sudo apt-get update && sudo apt-get install -y git
-                ;;
+            ;;
             yum|dnf)
                 sudo $PKG_MANAGER install -y git
-                ;;
+            ;;
             pacman)
                 sudo pacman -S --noconfirm git
-                ;;
+            ;;
             brew)
                 brew install git
-                ;;
+            ;;
             *)
                 error "Cannot auto-install Git for your system"
                 echo "Please install Git from: https://git-scm.com/"
                 return 1
-                ;;
+            ;;
         esac
         
         hash -r
@@ -248,21 +375,8 @@ clone_repository() {
     info "Repository: $REPO_URL"
     echo ""
     
-    # Check common subdirectories first
-    for subdir in ./antihunter-command-center ./AntiHunter-Command-Control-PRO; do
-        if [[ -d "$subdir" ]] && [[ -f "$subdir/package.json" ]] && [[ -d "$subdir/apps" ]]; then
-            local abs_path=$(cd "$subdir" && pwd)
-            info "Found existing repository at: $abs_path"
-            if prompt_yes_no "Use this repository?"; then
-                REPO_DIR="$abs_path"
-                success "Using existing repository at: $REPO_DIR"
-                return 0
-            fi
-        fi
-    done
-    
-    read -p "Clone into directory [./antihunter-command-center]: " CLONE_DIR
-    CLONE_DIR=${CLONE_DIR:-./antihunter-command-center}
+    read -p "Where to clone the repo [folder]: " CLONE_DIR
+    CLONE_DIR=${CLONE_DIR:-repository}
     
     # Expand to absolute path
     CLONE_DIR=$(cd "$(dirname "$CLONE_DIR")" 2>/dev/null && pwd)/$(basename "$CLONE_DIR") || echo "$CLONE_DIR"
@@ -309,12 +423,12 @@ prompt_configuration() {
     echo -e "${BLUE}  Version: $VERSION${NC}"
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-
+    
     while [[ -z "$SITE_ID" ]]; do
         read -p "Site ID [default]: " SITE_ID
         SITE_ID=${SITE_ID:-default}
     done
-
+    
     read -p "Site Name [$SITE_ID]: " SITE_NAME
     if [[ -z "$SITE_NAME" ]]; then
         if [[ "$SITE_ID" == "default" ]]; then
@@ -323,13 +437,13 @@ prompt_configuration() {
             SITE_NAME="$SITE_ID"
         fi
     fi
-
+    
     echo ""
     DB_PASSWORD=$(openssl rand -base64 32 2>/dev/null | tr -d "=+/" | cut -c1-32 || echo "changeme$(date +%s)")
     info "Generated database password: $DB_PASSWORD"
     read -p "Press Enter to accept or type custom password: " custom_db_pass
     [[ -n "$custom_db_pass" ]] && DB_PASSWORD="$custom_db_pass"
-
+    
     echo ""
     while [[ -z "$ADMIN_EMAIL" ]]; do
         read -p "Admin email [admin@example.com]: " ADMIN_EMAIL
@@ -339,12 +453,12 @@ prompt_configuration() {
             ADMIN_EMAIL=""
         fi
     done
-
+    
     ADMIN_PASSWORD=$(openssl rand -base64 16 2>/dev/null | tr -d "=+/" | cut -c1-16 || echo "admin$(date +%s)")
     info "Generated admin password: $ADMIN_PASSWORD"
     read -p "Press Enter to accept or type custom password: " custom_admin_pass
     [[ -n "$custom_admin_pass" ]] && ADMIN_PASSWORD="$custom_admin_pass"
-
+    
     echo ""
     info "Serial device configuration (for mesh hardware)"
     echo "Common paths:"
@@ -353,12 +467,12 @@ prompt_configuration() {
     echo "  Windows: COM3, COM4, etc."
     read -p "Serial device path (or 'skip' to configure later): " SERIAL_DEVICE
     SERIAL_DEVICE=${SERIAL_DEVICE:-skip}
-
+    
     if [[ "$SERIAL_DEVICE" != "skip" ]]; then
         read -p "Serial baud rate [115200]: " SERIAL_BAUD
         SERIAL_BAUD=${SERIAL_BAUD:-115200}
     fi
-
+    
     echo ""
     echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}Configuration Summary:${NC}"
@@ -380,7 +494,7 @@ prompt_configuration() {
     fi
     echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-
+    
     if ! prompt_yes_no "Proceed with setup?"; then
         warn "Setup cancelled by user"
         if prompt_yes_no "Do you want to reconfigure?"; then
@@ -398,7 +512,7 @@ install_homebrew() {
         success "Homebrew already installed"
         return 0
     fi
-
+    
     info "Homebrew not found"
     if prompt_yes_no "Install Homebrew?"; then
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -426,32 +540,71 @@ install_node() {
             fi
             info "Installing Node.js via Homebrew..."
             brew install node@20 && brew link node@20 --force --overwrite
-            ;;
+        ;;
         apt)
             info "Installing Node.js via apt..."
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-            ;;
+            info "Distribution: $DISTRO, Architecture: $ARCH_TYPE"
+            
+            # For ARM systems (Raspberry Pi), use NodeSource with architecture awareness
+            if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
+                info "ARM architecture detected - using NodeSource repository"
+                
+                # Verify curl is installed
+                if ! command -v curl >/dev/null 2>&1; then
+                    info "Installing curl first..."
+                    sudo apt-get update && sudo apt-get install -y curl
+                fi
+                
+                # Use NodeSource setup script which handles ARM architectures
+                if curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -; then
+                    sudo apt-get install -y nodejs
+                else
+                    error "NodeSource setup failed"
+                    warn "Trying alternative method with distribution repository..."
+                    sudo apt-get update
+                    sudo apt-get install -y nodejs npm || {
+                        error "Failed to install Node.js from distribution repository"
+                        return 1
+                    }
+                fi
+            else
+                # Standard x64 installation
+                if curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -; then
+                    sudo apt-get install -y nodejs
+                else
+                    error "NodeSource setup failed"
+                    return 1
+                fi
+            fi
+        ;;
         yum|dnf)
             info "Installing Node.js via $PKG_MANAGER..."
             curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
             sudo $PKG_MANAGER install -y nodejs
-            ;;
+        ;;
         pacman)
             info "Installing Node.js via pacman..."
             sudo pacman -S --noconfirm nodejs npm
-            ;;
+        ;;
         *)
             error "Cannot auto-install Node.js for your system"
-            echo "Please install Node.js 20+ from: https://nodejs.org/"
+            echo ""
+            echo "Please install Node.js 20+ manually:"
+            echo "  Website: https://nodejs.org/"
+            echo ""
+            if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
+                echo "For ARM systems (Raspberry Pi):"
+                echo "  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+                echo "  sudo apt-get install -y nodejs"
+            fi
             return 1
-            ;;
+        ;;
     esac
 }
 
 check_node() {
     step "Checking Node.js installation..."
-
+    
     if command -v node >/dev/null 2>&1; then
         local node_version
         node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
@@ -462,7 +615,7 @@ check_node() {
             warn "Found Node.js $node_version, but 20+ is required"
         fi
     fi
-
+    
     error "Node.js 20+ not found"
     if prompt_yes_no "Install Node.js 20 automatically?"; then
         if install_node; then
@@ -494,15 +647,72 @@ check_node() {
     fi
 }
 
+check_node_gyp() {
+    step "Checking node-gyp (required for native modules like argon2)..."
+    
+    # Check if node-gyp is available globally
+    if command -v node-gyp >/dev/null 2>&1; then
+        success "node-gyp $(node-gyp --version) found"
+        return 0
+    fi
+    
+    # Check if installed via npm but not in PATH
+    if command -v npm >/dev/null 2>&1; then
+        if npm list -g node-gyp >/dev/null 2>&1; then
+            success "node-gyp found (npm global)"
+            return 0
+        fi
+    fi
+    
+    warn "node-gyp not found - required for native modules (argon2, serialport)"
+    info "Installing node-gyp globally..."
+    
+    if command -v npm >/dev/null 2>&1; then
+        if npm install -g node-gyp; then
+            hash -r
+            if command -v node-gyp >/dev/null 2>&1; then
+                success "node-gyp installed: $(node-gyp --version)"
+                return 0
+            fi
+        fi
+    fi
+    
+    warn "Could not install node-gyp globally"
+    info "This may cause native module compilation failures"
+    return 0
+}
+
 check_pnpm() {
     step "Checking pnpm installation..."
-
+    
     if command -v pnpm >/dev/null 2>&1; then
         success "pnpm $(pnpm --version) found"
         return 0
     fi
-
+    
     info "pnpm not found"
+    
+    # Check if Node.js is available and version is sufficient
+    if ! command -v node >/dev/null 2>&1; then
+        warn "Node.js not found - cannot install pnpm"
+        if prompt_yes_no "Continue without pnpm?"; then
+            warn "You'll need to install Node.js 20+ and pnpm manually later"
+            return 0
+        fi
+        return 1
+    fi
+    
+    local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+    if [[ $node_version -lt 20 ]]; then
+        warn "Node.js $node_version is too old for pnpm (need 20+)"
+        warn "Please install Node.js 20+ first, then run this script again"
+        if prompt_yes_no "Continue without pnpm?"; then
+            warn "You'll need to upgrade Node.js to 20+ and install pnpm manually"
+            return 0
+        fi
+        return 1
+    fi
+    
     if prompt_yes_no "Install pnpm?"; then
         if command -v corepack >/dev/null 2>&1; then
             info "Installing pnpm via corepack..."
@@ -527,7 +737,7 @@ check_pnpm() {
                 fi
             fi
         fi
-
+        
         error "Failed to install pnpm"
         if prompt_yes_no "Continue anyway?"; then
             warn "Continuing without pnpm - you'll need to install it manually"
@@ -553,7 +763,7 @@ install_postgresql() {
             brew install postgresql@15
             brew services start postgresql@15
             sleep 3
-            ;;
+        ;;
         apt)
             info "Installing PostgreSQL via apt..."
             sudo apt-get update
@@ -561,7 +771,7 @@ install_postgresql() {
             sudo systemctl start postgresql
             sudo systemctl enable postgresql
             sleep 3
-            ;;
+        ;;
         yum|dnf)
             info "Installing PostgreSQL via $PKG_MANAGER..."
             sudo $PKG_MANAGER install -y postgresql-server postgresql-contrib
@@ -569,7 +779,7 @@ install_postgresql() {
             sudo systemctl start postgresql
             sudo systemctl enable postgresql
             sleep 3
-            ;;
+        ;;
         pacman)
             info "Installing PostgreSQL via pacman..."
             sudo pacman -S --noconfirm postgresql
@@ -577,22 +787,22 @@ install_postgresql() {
             sudo systemctl start postgresql
             sudo systemctl enable postgresql
             sleep 3
-            ;;
+        ;;
         *)
             error "Cannot auto-install PostgreSQL for your system"
             return 1
-            ;;
+        ;;
     esac
 }
 
 check_postgresql() {
     step "Checking PostgreSQL installation..."
-
+    
     if command -v psql >/dev/null 2>&1; then
         success "PostgreSQL found: $(psql --version)"
         return 0
     fi
-
+    
     error "PostgreSQL not found"
     if prompt_yes_no "Install PostgreSQL automatically?"; then
         if install_postgresql; then
@@ -639,6 +849,62 @@ setup_postgresql() {
         return 0
     fi
     
+    # Check if PostgreSQL service is running
+    info "Checking if PostgreSQL is running..."
+    local pg_running=false
+    
+    if [[ "$OS" == "linux" ]]; then
+        if systemctl is-active --quiet postgresql 2>/dev/null || systemctl is-active --quiet postgresql@*.service 2>/dev/null; then
+            pg_running=true
+        fi
+    elif [[ "$OS" == "macos" ]]; then
+        if brew services list 2>/dev/null | grep -q "postgresql.*started"; then
+            pg_running=true
+        elif pgrep -x postgres >/dev/null 2>&1; then
+            pg_running=true
+        fi
+    fi
+    
+    if [[ "$pg_running" == "false" ]]; then
+        warn "PostgreSQL is installed but not running"
+        if prompt_yes_no "Start PostgreSQL service?"; then
+            if [[ "$OS" == "linux" ]]; then
+                info "Starting PostgreSQL service..."
+                sudo systemctl start postgresql || {
+                    error "Failed to start PostgreSQL"
+                    if ! prompt_yes_no "Continue anyway?"; then
+                        return 1
+                    fi
+                    return 0
+                }
+                sudo systemctl enable postgresql 2>/dev/null || true
+                sleep 2
+                success "PostgreSQL service started"
+            elif [[ "$OS" == "macos" ]]; then
+                info "Starting PostgreSQL service..."
+                if command -v brew >/dev/null 2>&1; then
+                    brew services start postgresql@15 || brew services start postgresql || {
+                        error "Failed to start PostgreSQL"
+                        if ! prompt_yes_no "Continue anyway?"; then
+                            return 1
+                        fi
+                        return 0
+                    }
+                    sleep 2
+                    success "PostgreSQL service started"
+                fi
+            fi
+        else
+            warn "PostgreSQL must be running for database setup"
+            if ! prompt_yes_no "Continue without database setup?"; then
+                return 1
+            fi
+            return 0
+        fi
+    else
+        success "PostgreSQL is running"
+    fi
+    
     # Determine PostgreSQL superuser method
     local PG_SUPER_CMD=""
     if [[ "$OS" == "macos" ]]; then
@@ -675,20 +941,94 @@ END
     
     success "PostgreSQL user configured"
     
+    # Fix collation version mismatch if present
+    info "Checking for collation version mismatches..."
+    
+    # Always attempt to fix collation issues to prevent database creation failures
+    local collation_output
+    collation_output=$(eval $PG_SUPER_CMD -c "SELECT 1" 2>&1 || true)
+    
+    if echo "$collation_output" | grep -q "collation version mismatch"; then
+        warn "Detected collation version mismatch - attempting comprehensive fix"
+        
+        # Fix template0 (need to make it connectable first)
+        info "Fixing template0..."
+        echo "UPDATE pg_database SET datallowconn = TRUE WHERE datname = 'template0';" | eval $PG_SUPER_CMD 2>/dev/null || true
+        echo "ALTER DATABASE template0 REFRESH COLLATION VERSION;" | eval $PG_SUPER_CMD -d template0 2>/dev/null || true
+        echo "UPDATE pg_database SET datallowconn = FALSE WHERE datname = 'template0';" | eval $PG_SUPER_CMD 2>/dev/null || true
+        
+        # Fix template1 (this is critical as it's used for new databases)
+        info "Fixing template1..."
+        echo "ALTER DATABASE template1 REFRESH COLLATION VERSION;" | eval $PG_SUPER_CMD -d template1 2>/dev/null || true
+        
+        # Reindex system catalogs in template1
+        info "Reindexing template1 system catalogs..."
+        echo "REINDEX SYSTEM template1;" | eval $PG_SUPER_CMD -d template1 2>/dev/null || true
+        
+        # Fix postgres database
+        info "Fixing postgres database..."
+        echo "ALTER DATABASE postgres REFRESH COLLATION VERSION;" | eval $PG_SUPER_CMD 2>/dev/null || true
+        
+        success "Collation version fixes applied"
+        
+        # Verify fix worked by checking again
+        if (eval $PG_SUPER_CMD -c "SELECT 1" 2>&1 || true) | grep -q "collation version mismatch"; then
+            warn "Collation warnings persist but continuing - this may not affect functionality"
+        fi
+    else
+        info "No collation version mismatches detected"
+    fi
+    
     # Create or update database
     if echo "SELECT 1" | eval $PG_SUPER_CMD -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
         info "Database '$DB_NAME' already exists"
     else
         info "Creating database: $DB_NAME"
-        if ! echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";" | eval $PG_SUPER_CMD 2>&1; then
-            error "Failed to create database"
-            if prompt_yes_no "Continue anyway?"; then
-                warn "Continuing without database - you'll need to set it up manually"
-                return 0
+        local create_output
+        create_output=$(echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";" | eval $PG_SUPER_CMD 2>&1)
+        local create_status=$?
+        
+        # Check if creation actually failed (ignore warnings)
+        if [[ $create_status -ne 0 ]]; then
+            # Filter out warnings from actual errors
+            local error_lines
+            error_lines=$(echo "$create_output" | grep -i "^ERROR:" || true)
+            
+            if [[ -n "$error_lines" ]]; then
+                error "Failed to create database"
+                error "Details: $error_lines"
+                
+                # Check if it's a collation-related error
+                if echo "$error_lines" | grep -qi "collation"; then
+                    warn "This appears to be a collation-related error"
+                    info "Attempting to create database with explicit template..."
+                    
+                    # Try creating with template0 which has minimal collation dependencies
+                    create_output=$(echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\" TEMPLATE template0;" | eval $PG_SUPER_CMD 2>&1)
+                    if [[ $? -eq 0 ]] && ! echo "$create_output" | grep -qi "^ERROR:"; then
+                        success "Database created using template0"
+                    else
+                        error "Failed even with template0: $create_output"
+                        if prompt_yes_no "Continue anyway?"; then
+                            warn "Continuing without database - you'll need to set it up manually"
+                            return 0
+                        fi
+                        return 1
+                    fi
+                else
+                    if prompt_yes_no "Continue anyway?"; then
+                        warn "Continuing without database - you'll need to set it up manually"
+                        return 0
+                    fi
+                    return 1
+                fi
+            else
+                # No actual ERROR lines, just warnings - consider it success
+                success "Database created (with warnings)"
             fi
-            return 1
+        else
+            success "Database created"
         fi
-        success "Database created"
     fi
     
     # Grant all privileges
@@ -742,50 +1082,9 @@ GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";
     fi
 }
 
-install_dependencies() {
-    step "Installing application dependencies..."
-
-    if ! command -v pnpm >/dev/null 2>&1; then
-        warn "pnpm not available, skipping dependency installation"
-        return 0
-    fi
-
-    if [[ ! -f "$REPO_DIR/package.json" ]]; then
-        error "package.json not found at $REPO_DIR"
-        if prompt_yes_no "Continue anyway?"; then
-            warn "Skipping dependency installation"
-            return 0
-        fi
-        return 1
-    fi
-
-    cd "$REPO_DIR" || {
-        error "Cannot change to repository directory: $REPO_DIR"
-        if prompt_yes_no "Continue anyway?"; then
-            return 0
-        fi
-        return 1
-    }
-
-    info "Running pnpm install in $REPO_DIR..."
-    pnpm install || {
-        error "Failed to install dependencies"
-        error "Current directory: $(pwd)"
-        error "Package.json exists: $(test -f package.json && echo 'yes' || echo 'no')"
-        
-        if prompt_yes_no "Continue anyway?"; then
-            warn "Continuing - you'll need to install dependencies manually with: pnpm install"
-            return 0
-        fi
-        return 1
-    }
-
-    success "Dependencies installed"
-}
-
 create_backend_env() {
     step "Creating backend environment configuration..."
-
+    
     local backend_dir="$REPO_DIR/apps/backend"
     if [[ ! -d "$backend_dir" ]]; then
         error "Backend directory not found: $backend_dir"
@@ -795,10 +1094,10 @@ create_backend_env() {
         fi
         return 1
     fi
-
+    
     local env_file="$backend_dir/.env"
     local database_url="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
-
+    
     cat > "$env_file" <<EOF
 # AntiHunter Command Center - Backend Configuration
 # Generated by local setup script on $(date)
@@ -813,7 +1112,7 @@ SITE_ID=$SITE_ID
 SITE_NAME=$SITE_NAME
 
 EOF
-
+    
     if [[ "$SERIAL_DEVICE" != "skip" ]]; then
         cat >> "$env_file" <<EOF
 SERIAL_DEVICE=$SERIAL_DEVICE
@@ -829,7 +1128,7 @@ SERIAL_RECONNECT_MAX_ATTEMPTS=0
 SERIAL_PROTOCOL=meshtastic-rewrite
 EOF
     fi
-
+    
     cat >> "$env_file" <<EOF
 
 ALLOW_FOREVER=true
@@ -840,7 +1139,7 @@ DRONES_RECORD_INVENTORY=true
 
 CLUSTER_WORKERS=1
 EOF
-
+    
     success "Backend environment configured at $env_file"
 }
 
@@ -878,18 +1177,18 @@ setup_database() {
             return 0
         fi
     fi
-
+    
     if ! command -v pnpm >/dev/null 2>&1; then
         warn "pnpm not available, skipping database setup"
         return 0
     fi
-
+    
     local backend_dir="$REPO_DIR/apps/backend"
     if [[ ! -d "$backend_dir" ]]; then
         warn "Backend directory not found, skipping database setup"
         return 0
     fi
-
+    
     cd "$backend_dir" || {
         error "Cannot change to backend directory"
         if prompt_yes_no "Continue anyway?"; then
@@ -897,7 +1196,7 @@ setup_database() {
         fi
         return 1
     }
-
+    
     info "Generating Prisma client..."
     pnpm prisma:generate || pnpm prisma generate || {
         error "Failed to generate Prisma client"
@@ -907,7 +1206,7 @@ setup_database() {
         fi
         return 1
     }
-
+    
     info "Running database migrations..."
     pnpm prisma migrate deploy || pnpm prisma db push || {
         error "Database migrations failed"
@@ -917,20 +1216,20 @@ setup_database() {
         fi
         return 1
     }
-
+    
     info "Seeding database..."
     export ADMIN_EMAIL="$ADMIN_EMAIL"
     export ADMIN_PASSWORD="$ADMIN_PASSWORD"
     export SITE_ID="$SITE_ID"
     export SITE_NAME="$SITE_NAME"
-
+    
     pnpm prisma db seed || pnpm db:seed || {
         warn "Seeding reported an error, checking if admin user was created..."
         
         if command -v psql >/dev/null 2>&1; then
             local user_count
             user_count=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT COUNT(*) FROM \"User\" WHERE email = '$ADMIN_EMAIL';" 2>/dev/null || echo "0")
-
+            
             if [[ "$user_count" -eq 0 ]]; then
                 error "Database seeding failed"
                 if prompt_yes_no "Continue anyway?"; then
@@ -945,7 +1244,7 @@ setup_database() {
             warn "Cannot verify seeding without psql, assuming success"
         fi
     }
-
+    
     success "Database setup complete"
 }
 
@@ -1018,38 +1317,65 @@ check_build_tools() {
     step "Checking build tools..."
     
     local missing_tools=()
+    local needs_installation=false
     
     # Check essential build tools
     if ! command -v gcc >/dev/null 2>&1; then
         missing_tools+=("gcc")
+        needs_installation=true
+    else
+        # Check GCC version for argon2 requirements (needs GCC >= 5)
+        local gcc_version=$(gcc -dumpversion | cut -d'.' -f1)
+        if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
+            if [[ -n "$gcc_version" ]] && [[ "$gcc_version" -lt 5 ]]; then
+                warn "GCC version $gcc_version detected - argon2 requires GCC >= 5"
+                warn "Native module compilation may fail"
+            fi
+        fi
     fi
     
     if ! command -v g++ >/dev/null 2>&1; then
         missing_tools+=("g++")
+        needs_installation=true
     fi
     
     if ! command -v make >/dev/null 2>&1; then
         missing_tools+=("make")
+        needs_installation=true
     fi
     
     if ! command -v python3 >/dev/null 2>&1; then
         missing_tools+=("python3")
+        needs_installation=true
     fi
     
     # Check for pkg-config
     if ! command -v pkg-config >/dev/null 2>&1; then
         missing_tools+=("pkg-config")
+        needs_installation=true
     fi
     
-    if [[ ${#missing_tools[@]} -eq 0 ]]; then
+    # For ARM systems, check for additional Python development packages
+    if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
+        if [[ "$PKG_MANAGER" == "apt" ]]; then
+            # Check if python3-dev is installed by looking for python3-config or Python.h
+            if ! command -v python3-config >/dev/null 2>&1 && ! dpkg -l | grep -q "python3.*-dev"; then
+                missing_tools+=("python3-dev")
+                needs_installation=true
+            fi
+        fi
+    fi
+    
+    if [[ "$needs_installation" == "false" ]]; then
         success "Build tools are installed"
         return 0
     fi
     
     warn "Missing build tools: ${missing_tools[*]}"
+    info "These are required for native Node.js modules (argon2, serialport, etc.)"
     
     if ! prompt_yes_no "Install build tools automatically?"; then
-        warn "Build tools required for native dependencies (e.g., argon2, serialport)"
+        warn "Build tools required for native dependencies"
         if prompt_yes_no "Continue anyway?"; then
             return 0
         fi
@@ -1059,38 +1385,93 @@ check_build_tools() {
     case "$PKG_MANAGER" in
         apt)
             info "Installing build tools via apt..."
-            sudo apt-get update
-            sudo apt-get install -y build-essential pkg-config libssl-dev \
-            python3 make gcc g++
+            info "Distribution: $DISTRO, Architecture: $ARCH_TYPE"
+            
+            # Update package list
+            sudo apt-get update || warn "apt-get update failed, continuing anyway"
+            
+            # Base packages for all apt-based systems
+            local apt_packages="build-essential pkg-config libssl-dev python3 make gcc g++"
+            
+            # ARM-specific packages for node-gyp native module compilation
+            if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
+                info "Installing ARM-specific build dependencies for node-gyp..."
+                apt_packages="$apt_packages python3-dev python3-pip"
+                
+                # Check if libnode-dev is available (helps with some native modules)
+                if apt-cache show libnode-dev >/dev/null 2>&1; then
+                    apt_packages="$apt_packages libnode-dev"
+                fi
+            fi
+            
+            # Additional useful packages for native module builds
+            apt_packages="$apt_packages libudev-dev"
+            
+            # Install all packages
+            info "Installing: $apt_packages"
+            if sudo apt-get install -y $apt_packages; then
+                success "Build tools installed successfully"
+            else
+                error "Some packages failed to install"
+                warn "Trying again without optional packages..."
+                sudo apt-get install -y build-essential pkg-config libssl-dev python3 make gcc g++ python3-dev || {
+                    error "Failed to install essential build tools"
+                    return 1
+                }
+            fi
         ;;
         yum|dnf)
             info "Installing build tools via $PKG_MANAGER..."
-            sudo $PKG_MANAGER groupinstall -y "Development Tools"
-            sudo $PKG_MANAGER install -y python3 pkg-config openssl-devel
+            sudo $PKG_MANAGER groupinstall -y "Development Tools" || warn "Development Tools group install failed"
+            sudo $PKG_MANAGER install -y python3 python3-devel pkg-config openssl-devel libudev-devel
         ;;
         pacman)
             info "Installing build tools via pacman..."
-            sudo pacman -S --noconfirm base-devel python pkg-config openssl
+            sudo pacman -S --noconfirm base-devel python python-pip pkg-config openssl
         ;;
         brew)
             info "Installing build tools via Homebrew..."
-            brew install pkg-config python3
+            # macOS includes Xcode Command Line Tools which provides gcc, make, etc.
+            if ! xcode-select -p >/dev/null 2>&1; then
+                info "Installing Xcode Command Line Tools..."
+                xcode-select --install || warn "Xcode Command Line Tools installation initiated"
+                warn "You may need to complete the Xcode installation and re-run this script"
+            fi
+            brew install pkg-config python3 || warn "Some Homebrew packages failed to install"
         ;;
         *)
             error "Cannot auto-install build tools for your system"
-            echo "Please install manually:"
-            echo "  - gcc/g++ compiler"
-            echo "  - make"
-            echo "  - python3"
-            echo "  - pkg-config"
-            echo "  - openssl development headers"
+            echo ""
+            echo "Please install manually based on your system:"
+            echo ""
+            echo "For Debian/Ubuntu/Raspbian:"
+            echo "  sudo apt-get install -y build-essential pkg-config libssl-dev python3 python3-dev make gcc g++"
+            echo ""
+            echo "For RedHat/CentOS/Fedora:"
+            echo "  sudo dnf groupinstall -y 'Development Tools'"
+            echo "  sudo dnf install -y python3 python3-devel pkg-config openssl-devel"
+            echo ""
+            echo "For macOS:"
+            echo "  xcode-select --install"
+            echo "  brew install pkg-config python3"
+            echo ""
             return 1
         ;;
     esac
     
     if [[ $? -eq 0 ]]; then
         success "Build tools installed"
-        return 0
+        
+        # Verify key tools are now available
+        hash -r
+        if command -v gcc >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+            success "Build tools verified"
+            return 0
+        else
+            warn "Build tools installed but not immediately available in PATH"
+            warn "You may need to restart your shell or re-run this script"
+            return 0
+        fi
     else
         error "Failed to install build tools"
         return 1
@@ -1098,38 +1479,75 @@ check_build_tools() {
 }
 
 
+print_diagnostic_info() {
+    echo ""
+    echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}  System Diagnostic Information${NC}"
+    echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo "OS: $OS ($DISTRO_NAME ${DISTRO_VERSION:-})"
+    echo "Architecture: $ARCH_TYPE ($ARCH)"
+    echo "Package Manager: $PKG_MANAGER"
+    echo ""
+    echo "Installed Tools:"
+    echo -n "  bash: "
+    bash --version 2>/dev/null | head -1 || echo "not found"
+    echo -n "  node: "
+    node --version 2>/dev/null || echo "not found"
+    echo -n "  npm: "
+    npm --version 2>/dev/null || echo "not found"
+    echo -n "  pnpm: "
+    pnpm --version 2>/dev/null || echo "not found"
+    echo -n "  gcc: "
+    gcc --version 2>/dev/null | head -1 || echo "not found"
+    echo -n "  g++: "
+    g++ --version 2>/dev/null | head -1 || echo "not found"
+    echo -n "  python3: "
+    python3 --version 2>/dev/null || echo "not found"
+    echo -n "  make: "
+    make --version 2>/dev/null | head -1 || echo "not found"
+    echo -n "  pkg-config: "
+    pkg-config --version 2>/dev/null || echo "not found"
+    echo -n "  psql: "
+    psql --version 2>/dev/null || echo "not found"
+    echo ""
+}
+
 main() {
     echo -e "${BLUE}"
     cat <<'EOF'
     ___          __  _ __  __            __
-   /   |  ____  / /_(_) / / /_  ______  / /____  _____
-  / /| | / __ \/ __/ / /_/ / / / / __ \/ __/ _ \/ ___/
- / ___ |/ / / / /_/ / __  / /_/ / / / / /_/  __/ /
+    /   |  ____  / /_(_) / / /_  ______  / /____  _____
+    / /| | / __ \/ __/ / /_/ / / / / __ \/ __/ _ \/ ___/
+/ ___ |/ / / / /_/ / __  / /_/ / / / / /_/  __/ /
 /_/  |_/_/ /_/\__/_/_/ /_/\__,_/_/ /_/\__/\___/_/
 
-         Command & Control Pro - Local Setup
+        Command & Control Pro - Local Setup
 EOF
     echo -e "${NC}"
-
+    
     detect_os
+    print_diagnostic_info
+    
     check_build_tools
     check_git
     clone_repository
     prompt_configuration
-
+    
     echo ""
     log "Starting local setup..."
     echo ""
-
+    
     check_node
     check_pnpm
+    check_node_gyp
     check_postgresql
-
+    
     setup_postgresql
     install_dependencies
     create_backend_env
     setup_database
-
+    
     print_summary
 }
 
