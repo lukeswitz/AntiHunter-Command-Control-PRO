@@ -1324,7 +1324,7 @@ setup_database() {
         info "Initializing database schema with prisma db push..."
         if pnpm prisma db push; then
             success "Database schema initialized with db push"
-            has_migrations_table="t"  # Mark as initialized
+            has_migrations_table="db_push_used"  # Mark that we used db push
         else
             error "Failed to initialize database schema"
             if prompt_yes_no "Continue anyway?"; then
@@ -1347,8 +1347,21 @@ setup_database() {
 
     info "Running database migrations..."
 
+    # For databases initialized with db push, we need to create the migrations table
+    if [[ "$has_migrations_table" == "db_push_used" ]]; then
+        info "Database was initialized with db push - setting up migration tracking..."
+        # Try to create an initial migration to establish proper tracking
+        if pnpm prisma migrate dev --name init --create-only; then
+            if pnpm prisma migrate resolve --applied "init"; then
+                success "Migration tracking established successfully"
+            else
+                warn "Could not mark migration as applied, but schema is synchronized"
+            fi
+        else
+            warn "Could not create initial migration, but schema is synchronized via db push"
+        fi
     # For fresh databases (no migrations table), use migrate dev to create initial migration
-    if [[ "$has_migrations_table" == "f" ]]; then
+    elif [[ "$has_migrations_table" == "f" ]]; then
         info "Fresh database detected - creating initial migration..."
         if pnpm prisma migrate dev --name init; then
             success "Initial migration created and applied successfully"
