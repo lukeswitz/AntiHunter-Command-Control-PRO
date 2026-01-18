@@ -228,15 +228,27 @@ function handleBaselineStart(params: string[]): string[] {
 }
 
 function handleTriangulateStart(params: string[]): string[] {
-  if (params.length !== 2) {
+  if (params.length < 2 || params.length > 3) {
     throw new BadRequestException(
-      'TRIANGULATE_START expects a target reference (MAC or T-identity) and duration in seconds.',
+      'TRIANGULATE_START expects a target reference (MAC or T-identity), duration in seconds, and optional RF environment (0-4).',
     );
   }
   const referenceRaw = params[0].trim();
   const normalizedRef = normalizeTargetReference(referenceRaw);
   const duration = normalizeDuration(params[1]);
-  return [normalizedRef, duration];
+  // Default to Indoor (2) if not specified
+  const rfEnvironment = params.length === 3 ? normalizeRFEnvironment(params[2]) : '2';
+  return [normalizedRef, duration, rfEnvironment];
+}
+
+function normalizeRFEnvironment(value: string): string {
+  const trimmed = value.trim();
+  if (!['0', '1', '2', '3', '4'].includes(trimmed)) {
+    throw new BadRequestException(
+      'RF Environment must be 0 (Open Sky), 1 (Suburban), 2 (Indoor), 3 (Indoor Dense), or 4 (Industrial).',
+    );
+  }
+  return trimmed;
 }
 
 function handleEraseForce(params: string[]): string[] {

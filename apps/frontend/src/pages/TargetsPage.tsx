@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChangeEvent, useMemo, useState, useRef, useEffect } from 'react';
+import { ChangeEvent, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 
 import { apiClient } from '../api/client';
 import type { CommandRequest, InventoryDevice, Target } from '../api/types';
+import { RF_ENVIRONMENT_OPTIONS, DEFAULT_RF_ENVIRONMENT } from '../data/mesh-commands';
 import { useAuthStore } from '../stores/auth-store';
 import { useTargetStore } from '../stores/target-store';
 import { useTrackingBannerStore } from '../stores/tracking-banner-store';
@@ -80,6 +81,14 @@ type TargetSortKey =
 interface TriangulatePayload {
   target: Target;
   duration?: number;
+  rfEnvironment?: string;
+}
+
+interface TriangulationDialogState {
+  open: boolean;
+  target: Target | null;
+  duration: number;
+  rfEnvironment: string;
 }
 
 interface TrackPayload {
@@ -132,6 +141,12 @@ export function TargetsPage() {
   const triangulateGuardRef = useRef<boolean>(false);
   const refinementAttemptsRef = useRef<Record<string, number>>({});
   const startTriangulationCountdown = useTriangulationStore((state) => state.setCountdown);
+  const [triangulationDialog, setTriangulationDialog] = useState<TriangulationDialogState>({
+    open: false,
+    target: null,
+    duration: DEFAULT_TRIANGULATION_DURATION,
+    rfEnvironment: DEFAULT_RF_ENVIRONMENT,
+  });
   const requestTrackingCountdown = useTrackingBannerStore((state) => state.requestCountdown);
   useEffect(() => {
     return () => {
@@ -171,6 +186,7 @@ export function TargetsPage() {
     mutationFn: async ({
       target,
       duration = DEFAULT_TRIANGULATION_DURATION,
+      rfEnvironment = DEFAULT_RF_ENVIRONMENT,
     }: TriangulatePayload) => {
       if (!target.mac) {
         throw new Error('Target MAC unknown');
@@ -182,7 +198,7 @@ export function TargetsPage() {
       await sendCommand({
         target: commandTarget,
         name: 'TRIANGULATE_START',
-        params: [target.mac, String(duration)],
+        params: [target.mac, String(duration), rfEnvironment],
       });
     },
     onSuccess: (_data, variables) => {
@@ -277,6 +293,33 @@ export function TargetsPage() {
     },
   });
 
+  const openTriangulationDialog = useCallback((target: Target) => {
+    setTriangulationDialog({
+      open: true,
+      target,
+      duration: DEFAULT_TRIANGULATION_DURATION,
+      rfEnvironment: DEFAULT_RF_ENVIRONMENT,
+    });
+  }, []);
+
+  const closeTriangulationDialog = useCallback(() => {
+    setTriangulationDialog((prev) => ({ ...prev, open: false, target: null }));
+  }, []);
+
+  const submitTriangulation = useCallback(() => {
+    const { target, duration, rfEnvironment } = triangulationDialog;
+    if (!target) return;
+
+    const clampedDuration = Math.max(20, Math.min(300, Math.round(duration)));
+    beginTriangulateCooldown();
+    closeTriangulationDialog();
+
+    void triangulateMutation.mutateAsync({ target, duration: clampedDuration, rfEnvironment }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
+      window.alert(message);
+    });
+  }, [triangulationDialog, beginTriangulateCooldown, closeTriangulationDialog, triangulateMutation]);
+
   const handleTriangulateRequest = (target: Target) => {
     if (!target.mac) {
       window.alert('Target MAC unknown.');
@@ -286,25 +329,7 @@ export function TargetsPage() {
       window.alert('Triangulation commands are cooling down. Please wait a moment.');
       return;
     }
-    // Set cooldown immediately to prevent multiple rapid clicks
-    beginTriangulateCooldown();
-    const input = window.prompt(
-      'Enter triangulation duration in seconds (20-300)',
-      String(DEFAULT_TRIANGULATION_DURATION),
-    );
-    if (input == null) {
-      return;
-    }
-    const parsed = Number(input);
-    if (!Number.isFinite(parsed)) {
-      window.alert('Invalid duration.');
-      return;
-    }
-    const duration = Math.max(20, Math.min(300, Math.round(parsed)));
-    void triangulateMutation.mutateAsync({ target, duration }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
-      window.alert(message);
-    });
+    openTriangulationDialog(target);
   };
 
   const handleRefineTriangulation = (target: Target) => {
@@ -362,7 +387,9 @@ export function TargetsPage() {
     refinementAttemptsRef.current[target.id] = currentAttempts + 1;
 
     beginTriangulateCooldown();
-    void triangulateMutation.mutateAsync({ target, duration }).catch((error: unknown) => {
+    // Use Indoor Dense for low quality (common cause of poor results), Indoor for medium
+    const rfEnvironment = quality.quality === 'low' ? '3' : DEFAULT_RF_ENVIRONMENT;
+    void triangulateMutation.mutateAsync({ target, duration, rfEnvironment }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to refine triangulation.';
       window.alert(message);
     });
@@ -783,6 +810,83 @@ export function TargetsPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Triangulation Configuration Dialog */}
+      {triangulationDialog.open && triangulationDialog.target && (
+        <div className="modal-overlay" onClick={closeTriangulationDialog}>
+          <div
+            className="modal-content triangulation-dialog"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-labelledby="triangulation-dialog-title"
+            aria-modal="true"
+          >
+            <h3 id="triangulation-dialog-title">Start Triangulation</h3>
+            <p className="triangulation-dialog__target">
+              Target: <strong>{triangulationDialog.target.name ?? triangulationDialog.target.mac}</strong>
+            </p>
+
+            <div className="triangulation-dialog__field">
+              <label htmlFor="triangulation-duration">Duration (seconds)</label>
+              <input
+                id="triangulation-duration"
+                type="number"
+                min={20}
+                max={300}
+                value={triangulationDialog.duration}
+                onChange={(e) =>
+                  setTriangulationDialog((prev) => ({
+                    ...prev,
+                    duration: Number(e.target.value) || DEFAULT_TRIANGULATION_DURATION,
+                  }))
+                }
+              />
+              <small>20-300 seconds</small>
+            </div>
+
+            <div className="triangulation-dialog__field">
+              <label htmlFor="triangulation-rf-env">RF Environment</label>
+              <select
+                id="triangulation-rf-env"
+                value={triangulationDialog.rfEnvironment}
+                onChange={(e) =>
+                  setTriangulationDialog((prev) => ({
+                    ...prev,
+                    rfEnvironment: e.target.value,
+                  }))
+                }
+              >
+                {RF_ENVIRONMENT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <small>
+                {RF_ENVIRONMENT_OPTIONS.find((o) => o.value === triangulationDialog.rfEnvironment)?.description}
+              </small>
+            </div>
+
+            <div className="triangulation-dialog__actions">
+              <button
+                type="button"
+                className="control-chip"
+                onClick={closeTriangulationDialog}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="control-chip control-chip--primary"
+                onClick={submitTriangulation}
+                disabled={triangulateMutation.isPending}
+              >
+                {triangulateMutation.isPending ? 'Starting...' : 'Start Triangulation'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>
