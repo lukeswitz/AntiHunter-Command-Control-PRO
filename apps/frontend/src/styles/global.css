@@ -5539,3 +5539,107 @@ body.theme-dark .strategy-table__row--selected {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* Modal overlay and content - generic reusable styles */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, black 65%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--color-panel);
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-panel-border);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  padding: 1.5rem;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Triangulation Dialog specific styles */
+.triangulation-dialog {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.triangulation-dialog h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.triangulation-dialog__target {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-muted-bg, rgba(255, 255, 255, 0.05));
+  border-radius: 0.375rem;
+  font-size: 0.9rem;
+}
+
+.triangulation-dialog__target strong {
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.triangulation-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.triangulation-dialog__field label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.triangulation-dialog__field input,
+.triangulation-dialog__field select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 0.375rem;
+  background: var(--color-input-bg, var(--color-panel));
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.triangulation-dialog__field input:focus,
+.triangulation-dialog__field select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(var(--color-accent-rgb), 0.2);
+}
+
+.triangulation-dialog__field small {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.triangulation-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-panel-border);
+}
+
+.control-chip--primary {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.control-chip--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 85%, white);
+}
