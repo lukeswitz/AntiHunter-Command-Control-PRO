@@ -896,7 +896,15 @@ export function TargetsPage() {
             <h3 id="triangulation-dialog-title">Start Triangulation</h3>
             <p className="triangulation-dialog__target">
               Target:{' '}
-              <strong>{triangulationDialog.target.name ?? triangulationDialog.target.mac}</strong>
+              <strong>
+                {(() => {
+                  const inv = vendorMap.get(triangulationDialog.target.mac?.toUpperCase() ?? '');
+                  const ssid = inv?.ssid?.trim();
+                  const label = ssid || inv?.vendor || triangulationDialog.target.mac;
+                  const showMac = triangulationDialog.target.mac && (ssid || inv?.vendor);
+                  return showMac ? `${label} (${triangulationDialog.target.mac})` : label;
+                })()}
+              </strong>
             </p>
 
             <div className="triangulation-dialog__field">
