@@ -9,11 +9,41 @@ export type CommandGroup =
 // RF Environment Presets for triangulation path loss calculation
 // Based on RF propagation research for RSSI-based distance estimation
 export const RF_ENVIRONMENTS = {
-  OPEN_SKY: { value: '0', label: 'Open Sky', wifiN: 2.0, bleN: 2.0, description: 'Line-of-sight, minimal obstructions' },
-  SUBURBAN: { value: '1', label: 'Suburban', wifiN: 2.7, bleN: 2.4, description: 'Urban outdoor with some obstructions' },
-  INDOOR: { value: '2', label: 'Indoor', wifiN: 3.0, bleN: 2.5, description: 'Standard indoor office (default)' },
-  INDOOR_DENSE: { value: '3', label: 'Indoor Dense', wifiN: 4.0, bleN: 3.5, description: 'Heavy walls, partitions' },
-  INDUSTRIAL: { value: '4', label: 'Industrial', wifiN: 5.0, bleN: 4.5, description: 'Concrete, metal, heavy obstructions' },
+  OPEN_SKY: {
+    value: '0',
+    label: 'Open Sky',
+    wifiN: 2.0,
+    bleN: 2.0,
+    description: 'Line-of-sight, minimal obstructions',
+  },
+  SUBURBAN: {
+    value: '1',
+    label: 'Suburban',
+    wifiN: 2.7,
+    bleN: 2.4,
+    description: 'Urban outdoor with some obstructions',
+  },
+  INDOOR: {
+    value: '2',
+    label: 'Indoor',
+    wifiN: 3.0,
+    bleN: 2.5,
+    description: 'Standard indoor office (default)',
+  },
+  INDOOR_DENSE: {
+    value: '3',
+    label: 'Indoor Dense',
+    wifiN: 4.0,
+    bleN: 3.5,
+    description: 'Heavy walls, partitions',
+  },
+  INDUSTRIAL: {
+    value: '4',
+    label: 'Industrial',
+    wifiN: 5.0,
+    bleN: 4.5,
+    description: 'Concrete, metal, heavy obstructions',
+  },
 } as const;
 
 export type RFEnvironmentKey = keyof typeof RF_ENVIRONMENTS;

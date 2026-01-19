@@ -240,7 +240,7 @@ export function TargetsPage() {
     }, duration * 1000);
   };
 
-  const beginTriangulateCooldown = () => {
+  const beginTriangulateCooldown = useCallback(() => {
     setTriangulateLocked(true);
     triangulateGuardRef.current = true;
     if (triangulateCooldownRef.current) {
@@ -251,7 +251,7 @@ export function TargetsPage() {
       triangulateGuardRef.current = false;
       triangulateCooldownRef.current = null;
     }, TRIANGULATE_DEBOUNCE_MS);
-  };
+  }, []);
 
   const trackMutation = useMutation({
     mutationFn: async ({ target, duration = DEFAULT_SCAN_DURATION }: TrackPayload) => {
@@ -314,11 +314,18 @@ export function TargetsPage() {
     beginTriangulateCooldown();
     closeTriangulationDialog();
 
-    void triangulateMutation.mutateAsync({ target, duration: clampedDuration, rfEnvironment }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
-      window.alert(message);
-    });
-  }, [triangulationDialog, beginTriangulateCooldown, closeTriangulationDialog, triangulateMutation]);
+    void triangulateMutation
+      .mutateAsync({ target, duration: clampedDuration, rfEnvironment })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Failed to start triangulation.';
+        window.alert(message);
+      });
+  }, [
+    triangulationDialog,
+    beginTriangulateCooldown,
+    closeTriangulationDialog,
+    triangulateMutation,
+  ]);
 
   const handleTriangulateRequest = (target: Target) => {
     if (!target.mac) {
@@ -389,10 +396,12 @@ export function TargetsPage() {
     beginTriangulateCooldown();
     // Use Indoor Dense for low quality (common cause of poor results), Indoor for medium
     const rfEnvironment = quality.quality === 'low' ? '3' : DEFAULT_RF_ENVIRONMENT;
-    void triangulateMutation.mutateAsync({ target, duration, rfEnvironment }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Failed to refine triangulation.';
-      window.alert(message);
-    });
+    void triangulateMutation
+      .mutateAsync({ target, duration, rfEnvironment })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Failed to refine triangulation.';
+        window.alert(message);
+      });
   };
 
   const handleTrackRequest = (target: Target) => {
@@ -815,17 +824,26 @@ export function TargetsPage() {
 
       {/* Triangulation Configuration Dialog */}
       {triangulationDialog.open && triangulationDialog.target && (
-        <div className="modal-overlay" onClick={closeTriangulationDialog}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeTriangulationDialog();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') closeTriangulationDialog();
+          }}
+          role="presentation"
+        >
           <div
             className="modal-content triangulation-dialog"
-            onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-labelledby="triangulation-dialog-title"
             aria-modal="true"
           >
             <h3 id="triangulation-dialog-title">Start Triangulation</h3>
             <p className="triangulation-dialog__target">
-              Target: <strong>{triangulationDialog.target.name ?? triangulationDialog.target.mac}</strong>
+              Target:{' '}
+              <strong>{triangulationDialog.target.name ?? triangulationDialog.target.mac}</strong>
             </p>
 
             <div className="triangulation-dialog__field">
@@ -865,16 +883,15 @@ export function TargetsPage() {
                 ))}
               </select>
               <small>
-                {RF_ENVIRONMENT_OPTIONS.find((o) => o.value === triangulationDialog.rfEnvironment)?.description}
+                {
+                  RF_ENVIRONMENT_OPTIONS.find((o) => o.value === triangulationDialog.rfEnvironment)
+                    ?.description
+                }
               </small>
             </div>
 
             <div className="triangulation-dialog__actions">
-              <button
-                type="button"
-                className="control-chip"
-                onClick={closeTriangulationDialog}
-              >
+              <button type="button" className="control-chip" onClick={closeTriangulationDialog}>
                 Cancel
               </button>
               <button
