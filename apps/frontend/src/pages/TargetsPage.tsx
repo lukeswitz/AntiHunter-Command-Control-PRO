@@ -131,10 +131,7 @@ function isNodeOnline(node: NodeSummary): boolean {
   return Date.now() - parsed <= NODE_ONLINE_THRESHOLD_MS;
 }
 
-function findOnlineNodeForTarget(
-  target: Target,
-  nodes: NodeSummary[],
-): string | null {
+function findOnlineNodeForTarget(target: Target, nodes: NodeSummary[]): string | null {
   // First try the firstNodeId if it's online
   if (target.firstNodeId) {
     const firstNodeNormalized = target.firstNodeId.toUpperCase().replace(/^NODE_/, '');
