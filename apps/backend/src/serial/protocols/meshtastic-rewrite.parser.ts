@@ -61,16 +61,14 @@ const ACK_REGEX =
 const WIPE_TOKEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*WIPE_TOKEN:(?<token>[A-Za-z0-9_:-]+)/i;
 const ERASE_TOKEN_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*ERASE_TOKEN:(?<token>[A-Za-z0-9_:-]+|\w+)(?:\s+Time:(?<time>\d+)s)?/i;
-// TRIANGULATE_ACK format: nodeId: TRIANGULATE_ACK:MAC:duration:originNodeId:rfEnvironment
-// rfEnvironment values: 0=Open Sky, 1=Suburban, 2=Indoor, 3=Indoor Dense, 4=Industrial
-const TRI_ACK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_ACK:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})(?::(?<duration>\d+))?(?::(?<originNode>[A-Za-z0-9_-]+))?(?::(?<rfEnv>[0-4]))?$/i;
-const TRI_ACK_FALLBACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_ACK:(?<target>.+)$/i;
+const TRI_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_ACK:(?<target>.+)$/i;
 const TRI_STOP_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_STOP_ACK/i;
 const BASELINE_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*BASELINE_ACK:(?<status>[A-Z_]+)/i;
 const TRI_RESULTS_START_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_START/i;
 const TRI_RESULTS_END_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_END/i;
 const TRI_RESULTS_NO_DATA_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS:NO_DATA/i;
+// Matches echoed @ALL TRIANGULATE_START commands to ignore them
+const TRI_START_ECHO_REGEX = /^@ALL\s+TRIANGULATE_START:/i;
 const TRI_FINAL_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*T_F:\s*MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)\s+CONF=(?<conf>-?\d+(?:\.\d+)?)\s+UNC=(?<unc>-?\d+(?:\.\d+)?)/i;
 const TRI_COMPLETE_REGEX =
@@ -121,6 +119,11 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       .replace(/\r?\n\s*GPS=/g, ' GPS=');
     const payload = this.stripTrailingHash(normalizedPayloadRaw.replace(/^0m\s*/i, ''));
     const sourceId = this.extractSourceId(sanitized);
+
+    // Ignore echoed TRIANGULATE_START commands (sent by app, echoed back by mesh)
+    if (TRI_START_ECHO_REGEX.test(payload) || TRI_START_ECHO_REGEX.test(sanitized)) {
+      return [];
+    }
 
     const parsed =
       this.parseTarget(payload, sourceId, sanitized) ||
@@ -670,21 +673,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     }
     const triAck = TRI_ACK_REGEX.exec(payload);
     if (triAck?.groups) {
-      const rfEnvLabels: Record<string, string> = {
-        '0': 'Open Sky',
-        '1': 'Suburban',
-        '2': 'Indoor',
-        '3': 'Indoor Dense',
-        '4': 'Industrial',
-      };
       return [
-        {
-          kind: 'command-ack',
-          nodeId: nodeId ?? triAck.groups.id,
-          ackType: 'TRIANGULATE_ACK',
-          status: 'OK',
-          raw,
-        },
         {
           kind: 'alert',
           level: 'NOTICE',
@@ -692,30 +681,6 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
           nodeId: nodeId ?? triAck.groups.id,
           message: payload,
           raw,
-          data: {
-            mac: triAck.groups.mac?.toUpperCase(),
-            duration: triAck.groups.duration ? Number(triAck.groups.duration) : undefined,
-            originNode: triAck.groups.originNode,
-            rfEnvironment: triAck.groups.rfEnv,
-            rfEnvironmentLabel: triAck.groups.rfEnv ? rfEnvLabels[triAck.groups.rfEnv] : undefined,
-          },
-        },
-      ];
-    }
-    // Fallback for older firmware or simpler ACK formats
-    const triAckFallback = TRI_ACK_FALLBACK_REGEX.exec(payload);
-    if (triAckFallback?.groups) {
-      return [
-        {
-          kind: 'alert',
-          level: 'NOTICE',
-          category: 'triangulation',
-          nodeId: nodeId ?? triAckFallback.groups.id,
-          message: payload,
-          raw,
-          data: {
-            target: triAckFallback.groups.target,
-          },
         },
       ];
     }
