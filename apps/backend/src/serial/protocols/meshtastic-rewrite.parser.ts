@@ -71,6 +71,8 @@ const BASELINE_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*BASELINE_ACK:(?<status>[
 const TRI_RESULTS_START_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_START/i;
 const TRI_RESULTS_END_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_END/i;
 const TRI_RESULTS_NO_DATA_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS:NO_DATA/i;
+// Matches echoed @ALL TRIANGULATE_START commands to ignore them
+const TRI_START_ECHO_REGEX = /^@ALL\s+TRIANGULATE_START:/i;
 const TRI_FINAL_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*T_F:\s*MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)\s+CONF=(?<conf>-?\d+(?:\.\d+)?)\s+UNC=(?<unc>-?\d+(?:\.\d+)?)/i;
 const TRI_COMPLETE_REGEX =
@@ -121,6 +123,11 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       .replace(/\r?\n\s*GPS=/g, ' GPS=');
     const payload = this.stripTrailingHash(normalizedPayloadRaw.replace(/^0m\s*/i, ''));
     const sourceId = this.extractSourceId(sanitized);
+
+    // Ignore echoed TRIANGULATE_START commands (sent by app, echoed back by mesh)
+    if (TRI_START_ECHO_REGEX.test(payload) || TRI_START_ECHO_REGEX.test(sanitized)) {
+      return [];
+    }
 
     const parsed =
       this.parseTarget(payload, sourceId, sanitized) ||

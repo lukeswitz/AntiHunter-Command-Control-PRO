@@ -5,12 +5,14 @@ import { apiClient } from '../api/client';
 import type { CommandRequest, InventoryDevice, Target } from '../api/types';
 import { RF_ENVIRONMENT_OPTIONS, DEFAULT_RF_ENVIRONMENT } from '../data/mesh-commands';
 import { useAuthStore } from '../stores/auth-store';
+import { NodeSummary, useNodeStore } from '../stores/node-store';
 import { useTargetStore } from '../stores/target-store';
 import { useTrackingBannerStore } from '../stores/tracking-banner-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
 import { useTriangulationStore } from '../stores/triangulation-store';
 
 const DEFAULT_TRIANGULATION_DURATION = 60;
+const NODE_ONLINE_THRESHOLD_MS = 11 * 60 * 1000; // 11 minutes - matches Nodes page
 const DEFAULT_SCAN_DURATION = 60;
 const TRIANGULATE_DEBOUNCE_MS = 3000;
 const REFINEMENT_DURATION_MULTIPLIER = 1.5;
@@ -117,6 +119,52 @@ async function sendCommand(body: CommandRequest) {
   await apiClient.post('/commands/send', body);
 }
 
+function isNodeOnline(node: NodeSummary): boolean {
+  const lastTimestamp = node.lastSeen ?? node.ts;
+  if (!lastTimestamp) {
+    return false;
+  }
+  const parsed = Date.parse(lastTimestamp);
+  if (Number.isNaN(parsed)) {
+    return false;
+  }
+  return Date.now() - parsed <= NODE_ONLINE_THRESHOLD_MS;
+}
+
+function findOnlineNodeForTarget(target: Target, nodes: NodeSummary[]): string | null {
+  // First try the firstNodeId if it's online
+  if (target.firstNodeId) {
+    const firstNodeNormalized = target.firstNodeId.toUpperCase().replace(/^NODE_/, '');
+    const firstNode = nodes.find(
+      (n) => n.id.toUpperCase().replace(/^NODE_/, '') === firstNodeNormalized,
+    );
+    if (firstNode && isNodeOnline(firstNode)) {
+      return normalizeNodeTarget(target.firstNodeId);
+    }
+  }
+
+  // Otherwise find any online node from the same site
+  const targetSiteId = target.siteId;
+  const onlineNodes = nodes.filter((n) => {
+    if (!isNodeOnline(n)) return false;
+    // If target has a site, prefer nodes from same site
+    if (targetSiteId && n.siteId !== targetSiteId) return false;
+    return true;
+  });
+
+  if (onlineNodes.length > 0) {
+    return normalizeNodeTarget(onlineNodes[0].id);
+  }
+
+  // Fallback: any online node
+  const anyOnline = nodes.find((n) => isNodeOnline(n));
+  if (anyOnline) {
+    return normalizeNodeTarget(anyOnline.id);
+  }
+
+  return null;
+}
+
 export function TargetsPage() {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<TargetSortKey>('updated');
@@ -135,6 +183,9 @@ export function TargetsPage() {
   }));
   const startTrackingSession = useTrackingSessionStore((state) => state.startSession);
   const stopTrackingSession = useTrackingSessionStore((state) => state.stopSession);
+  const availableNodes = useNodeStore((state) =>
+    state.order.map((id) => state.nodes[id]).filter((node): node is NodeSummary => Boolean(node)),
+  );
   const trackingTimeouts = useRef<Record<string, number>>({});
   const [triangulateLocked, setTriangulateLocked] = useState(false);
   const triangulateCooldownRef = useRef<number | null>(null);
@@ -191,9 +242,10 @@ export function TargetsPage() {
       if (!target.mac) {
         throw new Error('Target MAC unknown');
       }
-      const commandTarget = normalizeNodeTarget(target.firstNodeId);
+      // Find an online node - prefer firstNodeId if online, otherwise any online node
+      const commandTarget = findOnlineNodeForTarget(target, availableNodes);
       if (!commandTarget || commandTarget === '@ALL') {
-        throw new Error('First detecting node unknown');
+        throw new Error('No online node available to send triangulation command');
       }
       await sendCommand({
         target: commandTarget,
@@ -258,9 +310,10 @@ export function TargetsPage() {
       if (!target.mac) {
         throw new Error('Target MAC unknown');
       }
-      const commandTarget = normalizeNodeTarget(target.firstNodeId);
+      // Find an online node - prefer firstNodeId if online, otherwise any online node
+      const commandTarget = findOnlineNodeForTarget(target, availableNodes);
       if (!commandTarget || commandTarget === '@ALL') {
-        throw new Error('First detecting node unknown; cannot start remote tracking.');
+        throw new Error('No online node available to start remote tracking.');
       }
       const siteId = target.siteId ?? undefined;
       await sendCommand({
@@ -843,7 +896,15 @@ export function TargetsPage() {
             <h3 id="triangulation-dialog-title">Start Triangulation</h3>
             <p className="triangulation-dialog__target">
               Target:{' '}
-              <strong>{triangulationDialog.target.name ?? triangulationDialog.target.mac}</strong>
+              <strong>
+                {(() => {
+                  const inv = vendorMap.get(triangulationDialog.target.mac?.toUpperCase() ?? '');
+                  const ssid = inv?.ssid?.trim();
+                  const label = ssid || inv?.vendor || triangulationDialog.target.mac;
+                  const showMac = triangulationDialog.target.mac && (ssid || inv?.vendor);
+                  return showMac ? `${label} (${triangulationDialog.target.mac})` : label;
+                })()}
+              </strong>
             </p>
 
             <div className="triangulation-dialog__field">
