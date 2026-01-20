@@ -313,7 +313,7 @@ export class InventoryService {
       lon = lon ?? 0;
     }
 
-    const name = options.name ?? device.vendor ?? normalizedMac;
+    const name = options.name ?? (device.ssid?.trim() || undefined);
     const resolvedSiteId = options.siteId ?? device.siteId ?? existing?.siteId ?? undefined;
     const notes = options.notes;
     const tags = options.tags;
@@ -367,7 +367,7 @@ export class InventoryService {
     }
 
     const createData: Prisma.TargetUncheckedCreateInput = {
-      name,
+      name: name ?? null,
       mac: normalizedMac,
       lat,
       lon,
