@@ -882,12 +882,8 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             temperatureC: batterySaverStatus.groups.tempC
               ? Number(batterySaverStatus.groups.tempC)
               : undefined,
-            lat: batterySaverStatus.groups.lat
-              ? Number(batterySaverStatus.groups.lat)
-              : undefined,
-            lon: batterySaverStatus.groups.lon
-              ? Number(batterySaverStatus.groups.lon)
-              : undefined,
+            lat: batterySaverStatus.groups.lat ? Number(batterySaverStatus.groups.lat) : undefined,
+            lon: batterySaverStatus.groups.lon ? Number(batterySaverStatus.groups.lon) : undefined,
           },
         },
       ];
