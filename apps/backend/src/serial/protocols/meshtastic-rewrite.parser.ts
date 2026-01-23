@@ -55,9 +55,11 @@ const AUTOERASE_STATUS_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*AUTOERASE_STATUS:\s*Enabled:(?<enabled>YES|NO)(?:\s+SetupMode:(?<setupMode>\S+))?(?:\s+TamperActive:(?<tamperActive>YES|NO))?(?:\s+Setup:(?<setup>\d+)s)?(?:\s+Erase:(?<erase>\d+)s)?(?:\s+Vibs:(?<vibs>\d+))?(?:\s+Window:(?<window>\d+)s)?(?:\s+Cooldown:(?<cooldown>\d+)s)?/i;
 const BASELINE_STATUS_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*BASELINE_STATUS:\s*Scanning:(?<scanning>YES|NO)\s+Established:(?<est>YES|NO)\s+Devices:(?<dev>\d+)\s+Anomalies:(?<anom>\d+)\s+Phase1:(?<phase>[A-Z]+)/i;
+const BATTERY_SAVER_STATUS_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*BATTERY_SAVER_STATUS:\s*Enabled:(?<enabled>YES|NO)(?:\s+Temp:(?<tempC>-?\d+(?:\.\d+)?)[cC])?(?:\s+GPS:(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 
 const ACK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<kind>(?:SCAN|DEVICE_SCAN|DRONE|DEAUTH|RANDOMIZATION|BASELINE|CONFIG|TRIANGULATE(?:_STOP)?|STOP|REBOOT)_ACK):(?<status>[A-Z_]+)/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<kind>(?:SCAN|DEVICE_SCAN|DRONE|DEAUTH|RANDOMIZATION|BASELINE|CONFIG|TRIANGULATE(?:_STOP)?|TRI_START|STOP|REBOOT|BATTERY_SAVER(?:_START|_STOP)?)_ACK):?(?<status>[A-Z_]*)/i;
 const WIPE_TOKEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*WIPE_TOKEN:(?<token>[A-Za-z0-9_:-]+)/i;
 const ERASE_TOKEN_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*ERASE_TOKEN:(?<token>[A-Za-z0-9_:-]+|\w+)(?:\s+Time:(?<time>\d+)s)?/i;
@@ -73,15 +75,18 @@ const TRI_RESULTS_END_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_E
 const TRI_RESULTS_NO_DATA_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS:NO_DATA/i;
 // Matches echoed @ALL TRIANGULATE_START commands to ignore them
 const TRI_START_ECHO_REGEX = /^@ALL\s+TRIANGULATE_START:/i;
+// Matches broadcast TRIANGULATE_START messages (without @ prefix): ALL TRIANGULATE_START:MAC:duration:nodeId:rfEnv
+const TRI_START_BROADCAST_REGEX =
+  /^ALL\s+TRIANGULATE_START:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}):(?<duration>\d+):(?<originNode>[A-Za-z0-9_-]+):(?<rfEnv>[0-4])$/i;
 const TRI_FINAL_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*T_F:\s*MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)\s+CONF=(?<conf>-?\d+(?:\.\d+)?)\s+UNC=(?<unc>-?\d+(?:\.\d+)?)/i;
 const TRI_COMPLETE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*T_C:\s*(?:MAC=(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+)?Nodes=(?<nodes>\d+)\s*(?<rest>.+)?$/i;
-const RTC_SYNC_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*RTC_SYNC:(?<source>\S+)/i;
+const RTC_SYNC_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*RTC_SYNC:\s*(?<source>\S+)/i;
 const TIME_SYNC_REQ_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*TIME_SYNC_REQ:(?<time>\d+):(?<window>\d+):(?<seq>\d+):(?<offset>-?\d+)/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*TIME_SYNC_REQ:(?<time>\d+):(?<window>\d+):(?<seq>\d+)(?::(?<offset>-?\d+))?/i;
 const TIME_SYNC_RESP_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*TIME_SYNC_RESP:(?<time>\d+):(?<window>\d+):(?<seq>\d+):(?<offset>-?\d+)/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*TIME_SYNC_RESP:(?<time>\d+):(?<window>\d+):(?<seq>\d+)(?::(?<offset>-?\d+))?/i;
 
 const NODE_ID_FALLBACK = /^([A-Za-z0-9_.:-]+)/;
 
@@ -670,7 +675,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
           kind: 'command-ack',
           nodeId: nodeId ?? ack.groups.id,
           ackType: ack.groups.kind,
-          status: ack.groups.status,
+          status: ack.groups.status || 'OK',
           raw,
         },
       ];
@@ -855,6 +860,38 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
         },
       ];
     }
+    const batterySaverStatus = BATTERY_SAVER_STATUS_REGEX.exec(payload);
+    if (batterySaverStatus?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? batterySaverStatus.groups.id,
+          ackType: 'BATTERY_SAVER_STATUS_ACK',
+          status: 'OK',
+          raw,
+        },
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'battery-saver',
+          nodeId: nodeId ?? batterySaverStatus.groups.id,
+          message: payload,
+          raw,
+          data: {
+            enabled: batterySaverStatus.groups.enabled === 'YES',
+            temperatureC: batterySaverStatus.groups.tempC
+              ? Number(batterySaverStatus.groups.tempC)
+              : undefined,
+            lat: batterySaverStatus.groups.lat
+              ? Number(batterySaverStatus.groups.lat)
+              : undefined,
+            lon: batterySaverStatus.groups.lon
+              ? Number(batterySaverStatus.groups.lon)
+              : undefined,
+          },
+        },
+      ];
+    }
     return null;
   }
 
@@ -864,6 +901,35 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     raw: string,
   ): SerialParseResult[] | null {
     const id = nodeId ?? this.extractNodeId(payload, undefined);
+    // Handle broadcast TRIANGULATE_START messages
+    const broadcast = TRI_START_BROADCAST_REGEX.exec(payload);
+    if (broadcast?.groups) {
+      const rfEnvLabels: Record<string, string> = {
+        '0': 'Open Sky',
+        '1': 'Suburban',
+        '2': 'Indoor',
+        '3': 'Indoor Dense',
+        '4': 'Industrial',
+      };
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'triangulation',
+          nodeId: broadcast.groups.originNode,
+          message: payload,
+          raw,
+          data: {
+            stage: 'broadcast-start',
+            mac: broadcast.groups.mac?.toUpperCase(),
+            duration: Number(broadcast.groups.duration),
+            originNode: broadcast.groups.originNode,
+            rfEnvironment: broadcast.groups.rfEnv,
+            rfEnvironmentLabel: rfEnvLabels[broadcast.groups.rfEnv],
+          },
+        },
+      ];
+    }
     if (TRI_RESULTS_START_REGEX.test(payload)) {
       return [
         {
@@ -987,7 +1053,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             time: Number(req.groups.time),
             window: Number(req.groups.window),
             sequence: Number(req.groups.seq),
-            offset: Number(req.groups.offset),
+            offset: req.groups.offset ? Number(req.groups.offset) : undefined,
           },
         },
       ];
@@ -1007,7 +1073,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             time: Number(resp.groups.time),
             window: Number(resp.groups.window),
             sequence: Number(resp.groups.seq),
-            offset: Number(resp.groups.offset),
+            offset: resp.groups.offset ? Number(resp.groups.offset) : undefined,
           },
         },
       ];

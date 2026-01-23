@@ -45,6 +45,9 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['AUTOERASE_ENABLE', handleAutoEraseEnable],
   ['AUTOERASE_DISABLE', expectNoParams],
   ['AUTOERASE_STATUS', expectNoParams],
+  ['BATTERY_SAVER_START', handleBatterySaverStart],
+  ['BATTERY_SAVER_STOP', expectNoParams],
+  ['BATTERY_SAVER_STATUS', expectNoParams],
 ]);
 
 const SINGLE_NODE_COMMANDS = new Set<string>(['CONFIG_NODEID']);
@@ -377,6 +380,19 @@ function validateChannel(channel: number): void {
   if (channel < 1 || channel > 14) {
     throw new BadRequestException('Channel values must be between 1 and 14.');
   }
+}
+
+function handleBatterySaverStart(params: string[]): string[] {
+  if (params.length !== 1) {
+    throw new BadRequestException(
+      'BATTERY_SAVER_START expects a single interval parameter (minutes).',
+    );
+  }
+  const interval = Number.parseInt(params[0].trim(), 10);
+  if (!Number.isFinite(interval) || interval < 1 || interval > 1440) {
+    throw new BadRequestException('Heartbeat interval must be between 1 and 1440 minutes.');
+  }
+  return [interval.toString()];
 }
 
 function normalizeTargetReference(value: string): string {

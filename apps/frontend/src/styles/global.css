@@ -5643,3 +5643,226 @@ body.theme-dark .strategy-table__row--selected {
 .control-chip--primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-accent) 85%, white);
 }
+
+.control-chip--battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.control-chip--battery svg {
+  flex-shrink: 0;
+}
+
+.node-actions-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.actions-cell--nodes {
+  min-width: 200px;
+}
+
+.battery-saver-dialog {
+  max-width: 440px;
+  width: 100%;
+}
+
+.battery-saver-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.battery-saver-dialog__header-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  color: #f59e0b;
+}
+
+.battery-saver-dialog__header h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.battery-saver-dialog__target {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.battery-saver-dialog__target strong {
+  color: var(--color-text);
+}
+
+.battery-saver-dialog__info {
+  padding: 0.875rem;
+  background: rgba(var(--color-accent-rgb), 0.08);
+  border-radius: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.battery-saver-dialog__info p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.battery-saver-dialog__section {
+  margin-bottom: 1.25rem;
+}
+
+.battery-saver-dialog__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+}
+
+.battery-saver-dialog__interval-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.battery-saver-dialog__slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-panel-border);
+  appearance: none;
+  cursor: pointer;
+}
+
+.battery-saver-dialog__slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: 2px solid var(--color-panel);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.battery-saver-dialog__slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.battery-saver-dialog__slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: 2px solid var(--color-panel);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.battery-saver-dialog__interval-display {
+  min-width: 60px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-align: right;
+}
+
+.battery-saver-dialog__hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.battery-saver-dialog__result {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.battery-saver-dialog__result--success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.battery-saver-dialog__result--error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.battery-saver-dialog__actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.battery-saver-dialog__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.battery-saver-dialog__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.battery-saver-dialog__btn--start {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.battery-saver-dialog__btn--start:hover:not(:disabled) {
+  background: #10b981;
+  color: white;
+}
+
+.battery-saver-dialog__btn--stop {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.battery-saver-dialog__btn--stop:hover:not(:disabled) {
+  background: #ef4444;
+  color: white;
+}
+
+.battery-saver-dialog__btn--status {
+  background: rgba(var(--color-accent-rgb), 0.12);
+  color: var(--color-accent);
+  border-color: rgba(var(--color-accent-rgb), 0.3);
+}
+
+.battery-saver-dialog__btn--status:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: white;
+}
+
+.battery-saver-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-panel-border);
+}

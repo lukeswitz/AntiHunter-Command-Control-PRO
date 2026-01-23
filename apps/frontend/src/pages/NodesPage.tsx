@@ -2,10 +2,272 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiClient } from '../api/client';
+import type { CommandRequest } from '../api/types';
+import { useAuthStore } from '../stores/auth-store';
 import { useMapCommandStore } from '../stores/map-command-store';
 import { useNodeStore } from '../stores/node-store';
 
-const ONLINE_THRESHOLD_MS = 11 * 60 * 1000; // 11 minutes
+const ONLINE_THRESHOLD_MS = 11 * 60 * 1000;
+
+async function sendCommand(body: CommandRequest): Promise<void> {
+  await apiClient.post('/commands/send', body);
+}
+
+function normalizeNodeTarget(nodeId: string): string {
+  const trimmed = nodeId.trim().toUpperCase();
+  if (/^NODE_AH\d+$/.test(trimmed)) {
+    return `@${trimmed.replace(/^NODE_/, '')}`;
+  }
+  if (/^AH\d+$/.test(trimmed)) {
+    return `@${trimmed}`;
+  }
+  return `@${trimmed.replace(/^NODE_/, '').replace(/^@/, '')}`;
+}
+
+function BatteryIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+      <line x1="23" y1="13" x2="23" y2="11" />
+      <line x1="6" y1="10" x2="6" y2="14" />
+      <line x1="10" y1="10" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <polygon points="5,3 19,12 5,21" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  );
+}
+
+interface BatterySaverDialogProps {
+  nodeId: string;
+  nodeName: string;
+  siteId?: string;
+  onClose: () => void;
+}
+
+function BatterySaverDialog({ nodeId, nodeName, siteId, onClose }: BatterySaverDialogProps) {
+  const [interval, setIntervalValue] = useState(5);
+  const [loading, setLoading] = useState<'start' | 'stop' | 'status' | null>(null);
+  const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const target = normalizeNodeTarget(nodeId);
+
+  const handleStart = async () => {
+    setLoading('start');
+    setResult(null);
+    try {
+      await sendCommand({
+        target,
+        name: 'BATTERY_SAVER_START',
+        params: [String(interval)],
+        siteId,
+      });
+      setResult({
+        type: 'success',
+        message: `Battery saver enabled with ${interval} minute heartbeat interval`,
+      });
+    } catch (err) {
+      setResult({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to start battery saver',
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleStop = async () => {
+    setLoading('stop');
+    setResult(null);
+    try {
+      await sendCommand({
+        target,
+        name: 'BATTERY_SAVER_STOP',
+        params: [],
+        siteId,
+      });
+      setResult({
+        type: 'success',
+        message: 'Battery saver disabled - node returning to normal operation',
+      });
+    } catch (err) {
+      setResult({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to stop battery saver',
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleStatus = async () => {
+    setLoading('status');
+    setResult(null);
+    try {
+      await sendCommand({
+        target,
+        name: 'BATTERY_SAVER_STATUS',
+        params: [],
+        siteId,
+      });
+      setResult({
+        type: 'success',
+        message: 'Status request sent - response will appear in terminal',
+      });
+    } catch (err) {
+      setResult({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to request status',
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div
+      className="modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+      role="presentation"
+    >
+      <div
+        className="modal-content battery-saver-dialog"
+        role="dialog"
+        aria-labelledby="battery-saver-dialog-title"
+        aria-modal="true"
+      >
+        <div className="battery-saver-dialog__header">
+          <BatteryIcon className="battery-saver-dialog__header-icon" />
+          <div>
+            <h3 id="battery-saver-dialog-title">Battery Saver Mode</h3>
+            <p className="battery-saver-dialog__target">
+              Node: <strong>{nodeName}</strong> ({target})
+            </p>
+          </div>
+        </div>
+
+        <div className="battery-saver-dialog__info">
+          <p>
+            Battery saver mode reduces power consumption by disabling WiFi/BLE scanning, lowering
+            CPU frequency to 80MHz, and enabling light sleep between heartbeats.
+          </p>
+        </div>
+
+        <div className="battery-saver-dialog__section">
+          <label htmlFor="battery-interval" className="battery-saver-dialog__label">
+            Heartbeat Interval
+          </label>
+          <div className="battery-saver-dialog__interval-row">
+            <input
+              id="battery-interval"
+              type="range"
+              min={1}
+              max={30}
+              value={interval}
+              onChange={(e) => setIntervalValue(Number(e.target.value))}
+              className="battery-saver-dialog__slider"
+            />
+            <span className="battery-saver-dialog__interval-display">{interval} min</span>
+          </div>
+          <small className="battery-saver-dialog__hint">
+            Lower interval = more frequent updates but higher power usage (1-30 minutes)
+          </small>
+        </div>
+
+        {result && (
+          <div
+            className={`battery-saver-dialog__result battery-saver-dialog__result--${result.type}`}
+          >
+            {result.message}
+          </div>
+        )}
+
+        <div className="battery-saver-dialog__actions">
+          <button
+            type="button"
+            className="battery-saver-dialog__btn battery-saver-dialog__btn--start"
+            onClick={handleStart}
+            disabled={loading !== null}
+          >
+            <PlayIcon />
+            {loading === 'start' ? 'Enabling...' : 'Enable'}
+          </button>
+          <button
+            type="button"
+            className="battery-saver-dialog__btn battery-saver-dialog__btn--stop"
+            onClick={handleStop}
+            disabled={loading !== null}
+          >
+            <StopIcon />
+            {loading === 'stop' ? 'Disabling...' : 'Disable'}
+          </button>
+          <button
+            type="button"
+            className="battery-saver-dialog__btn battery-saver-dialog__btn--status"
+            onClick={handleStatus}
+            disabled={loading !== null}
+          >
+            <InfoIcon />
+            {loading === 'status' ? 'Checking...' : 'Check Status'}
+          </button>
+        </div>
+
+        <div className="battery-saver-dialog__footer">
+          <button type="button" className="control-chip" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type NodeSortKey =
   | 'node'
@@ -26,6 +288,13 @@ export function NodesPage() {
   const [sortKey, setSortKey] = useState<NodeSortKey>('lastSeen');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [search, setSearch] = useState('');
+  const [batterySaverDialog, setBatterySaverDialog] = useState<{
+    nodeId: string;
+    nodeName: string;
+    siteId?: string;
+  } | null>(null);
+  const role = useAuthStore((state) => state.user?.role ?? null);
+  const canSendCommands = role === 'ADMIN' || role === 'OPERATOR';
 
   const baseRows = useMemo(() => {
     return order
@@ -119,6 +388,25 @@ export function NodesPage() {
       window.alert('Unable to clear nodes. Check backend logs and try again.');
     }
   }, [clearNodes]);
+
+  const openBatterySaverDialog = useCallback(
+    (row: NodeRow) => {
+      if (!canSendCommands) {
+        window.alert('You need OPERATOR or ADMIN privileges to control battery saver.');
+        return;
+      }
+      if (!row.online) {
+        window.alert('Cannot control battery saver on offline nodes.');
+        return;
+      }
+      setBatterySaverDialog({
+        nodeId: row.nodeId,
+        nodeName: row.displayName,
+        siteId: row.siteId,
+      });
+    },
+    [canSendCommands],
+  );
 
   return (
     <section className="panel">
@@ -252,21 +540,48 @@ export function NodesPage() {
                   <td className="last-message-cell">
                     {row.lastMessage ?? <span className="muted">No messages yet</span>}
                   </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="control-chip"
-                      onClick={() => handleGoto(row)}
-                      disabled={typeof row.lat !== 'number' || typeof row.lon !== 'number'}
-                    >
-                      Go to Map
-                    </button>
+                  <td className="actions-cell actions-cell--nodes">
+                    <div className="node-actions-wrapper">
+                      <button
+                        type="button"
+                        className="control-chip"
+                        onClick={() => handleGoto(row)}
+                        disabled={typeof row.lat !== 'number' || typeof row.lon !== 'number'}
+                      >
+                        Go to Map
+                      </button>
+                      <button
+                        type="button"
+                        className="control-chip control-chip--battery"
+                        onClick={() => openBatterySaverDialog(row)}
+                        disabled={!row.online || !canSendCommands}
+                        title={
+                          !canSendCommands
+                            ? 'Requires OPERATOR or ADMIN role'
+                            : !row.online
+                              ? 'Node offline'
+                              : 'Configure battery saver mode'
+                        }
+                      >
+                        <BatteryIcon />
+                        <span>Battery</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {batterySaverDialog && (
+        <BatterySaverDialog
+          nodeId={batterySaverDialog.nodeId}
+          nodeName={batterySaverDialog.nodeName}
+          siteId={batterySaverDialog.siteId}
+          onClose={() => setBatterySaverDialog(null)}
+        />
       )}
     </section>
   );
