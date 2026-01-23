@@ -4,9 +4,11 @@ import { apiClient } from '../api/client';
 
 export interface UpdateCheckResult {
   updateAvailable: boolean;
+  diverged: boolean;
   localCommit: string;
   remoteCommit: string;
   commitsBehind: number;
+  commitsAhead: number;
   lastChecked: string;
 }
 
@@ -24,9 +26,11 @@ type UpdateStatus = 'idle' | 'checking' | 'updating' | 'success' | 'error';
 interface UpdateState {
   status: UpdateStatus;
   updateAvailable: boolean;
+  diverged: boolean;
   localCommit: string | null;
   remoteCommit: string | null;
   commitsBehind: number;
+  commitsAhead: number;
   lastChecked: string | null;
   error: string | null;
   updateResult: UpdateResult | null;
@@ -40,9 +44,11 @@ interface UpdateState {
 export const useUpdateStore = create<UpdateState>((set, get) => ({
   status: 'idle',
   updateAvailable: false,
+  diverged: false,
   localCommit: null,
   remoteCommit: null,
   commitsBehind: 0,
+  commitsAhead: 0,
   lastChecked: null,
   error: null,
   updateResult: null,
@@ -61,9 +67,11 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       set({
         status: 'idle',
         updateAvailable: result.updateAvailable,
+        diverged: result.diverged,
         localCommit: result.localCommit,
         remoteCommit: result.remoteCommit,
         commitsBehind: result.commitsBehind,
+        commitsAhead: result.commitsAhead,
         lastChecked: result.lastChecked,
         dismissed: false,
       });
@@ -102,9 +110,11 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     set({
       status: 'idle',
       updateAvailable: false,
+      diverged: false,
       localCommit: null,
       remoteCommit: null,
       commitsBehind: 0,
+      commitsAhead: 0,
       lastChecked: null,
       error: null,
       updateResult: null,

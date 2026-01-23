@@ -10,7 +10,9 @@ export function UpdateBanner() {
   const {
     status,
     updateAvailable,
+    diverged,
     commitsBehind,
+    commitsAhead,
     remoteCommit,
     error,
     updateResult,
@@ -117,6 +119,25 @@ export function UpdateBanner() {
           onClick={() => setShowConfirm(false)}
         >
           Cancel
+        </button>
+      </div>
+    );
+  }
+
+  // Show diverged state (can't auto-update)
+  if (diverged) {
+    return (
+      <div className="update-banner update-banner--diverged">
+        <span className="update-banner__text">
+          Branches diverged: {commitsAhead} ahead, {commitsBehind} behind origin/main
+        </span>
+        <button
+          type="button"
+          className="update-banner__dismiss"
+          onClick={dismiss}
+          aria-label="Dismiss"
+        >
+          <MdClose />
         </button>
       </div>
     );

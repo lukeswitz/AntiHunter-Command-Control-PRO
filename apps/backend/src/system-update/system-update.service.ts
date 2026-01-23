@@ -6,9 +6,11 @@ const execAsync = promisify(exec);
 
 export interface UpdateCheckResult {
   updateAvailable: boolean;
+  diverged: boolean;
   localCommit: string;
   remoteCommit: string;
   commitsBehind: number;
+  commitsAhead: number;
   lastChecked: string;
 }
 
@@ -44,26 +46,44 @@ export class SystemUpdateService {
       const localHash = localCommit.trim();
       const remoteHash = remoteCommit.trim();
 
-      // Count commits behind
+      // Count commits behind and ahead
       let commitsBehind = 0;
+      let commitsAhead = 0;
+
       if (localHash !== remoteHash) {
         try {
-          const { stdout: countOutput } = await execAsync(
-            `git rev-list --count HEAD..origin/main`,
+          const { stdout: behindOutput } = await execAsync(
+            'git rev-list --count HEAD..origin/main',
             { cwd: this.repoPath },
           );
-          commitsBehind = parseInt(countOutput.trim(), 10) || 0;
+          commitsBehind = parseInt(behindOutput.trim(), 10) || 0;
         } catch {
-          // If counting fails, at least we know there's a difference
-          commitsBehind = localHash !== remoteHash ? 1 : 0;
+          commitsBehind = 0;
+        }
+
+        try {
+          const { stdout: aheadOutput } = await execAsync(
+            'git rev-list --count origin/main..HEAD',
+            { cwd: this.repoPath },
+          );
+          commitsAhead = parseInt(aheadOutput.trim(), 10) || 0;
+        } catch {
+          commitsAhead = 0;
         }
       }
 
+      // Diverged = both behind AND ahead
+      const diverged = commitsBehind > 0 && commitsAhead > 0;
+      // Update available only if behind and NOT diverged (can fast-forward)
+      const updateAvailable = commitsBehind > 0 && !diverged;
+
       return {
-        updateAvailable: localHash !== remoteHash && commitsBehind > 0,
+        updateAvailable,
+        diverged,
         localCommit: localHash.substring(0, 7),
         remoteCommit: remoteHash.substring(0, 7),
         commitsBehind,
+        commitsAhead,
         lastChecked: new Date().toISOString(),
       };
     } catch (error) {

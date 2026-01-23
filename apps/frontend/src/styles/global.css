@@ -5527,6 +5527,11 @@ body.theme-dark .strategy-table__row--selected {
   box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
 }
 
+.update-banner--diverged {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  box-shadow: 0 4px 16px rgba(75, 85, 99, 0.4);
+}
+
 .update-banner__text {
   flex: 1;
 }
