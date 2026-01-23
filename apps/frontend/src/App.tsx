@@ -10,6 +10,7 @@ import { ChatPopupHub } from './components/chat-popup-hub';
 import { SidebarNav } from './components/sidebar-nav';
 import { SocketBridge } from './components/socket-bridge';
 import { TerminalDrawer } from './components/terminal-drawer';
+import { UpdateBanner } from './components/update-banner';
 import {
   DEFAULT_ALERT_COLORS,
   extractAlertColors,
@@ -152,6 +153,7 @@ export default function App() {
         </div>
       </div>
       <AuthOverlay />
+      <UpdateBanner />
       {chatEnabled ? <ChatPopupHub /> : null}
     </BrowserRouter>
   );

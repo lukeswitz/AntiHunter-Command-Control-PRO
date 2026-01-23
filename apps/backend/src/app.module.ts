@@ -29,6 +29,7 @@ import { OuiModule } from './oui/oui.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SerialModule } from './serial/serial.module';
 import { SitesModule } from './sites/sites.module';
+import { SystemUpdateModule } from './system-update/system-update.module';
 import { TakModule } from './tak/tak.module';
 import { TargetsModule } from './targets/targets.module';
 import { UsersModule } from './users/users.module';
@@ -99,6 +100,7 @@ import { WsModule } from './ws/ws.module';
     UsersModule,
     ExportsModule,
     WebhooksModule,
+    SystemUpdateModule,
   ],
 })
 export class AppModule implements NestModule {
