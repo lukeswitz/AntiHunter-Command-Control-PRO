@@ -89,25 +89,22 @@ export class SystemUpdateService {
         stashed = true;
       }
 
-      // Pull the latest changes - try fast-forward first, then rebase if diverged
-      this.logger.log('Pulling latest changes from origin/main...');
-      try {
-        await execAsync('git pull --ff-only origin main', { cwd: this.repoPath });
-      } catch {
-        // If fast-forward fails (divergent branches), try rebase to preserve local commits
-        this.logger.warn('Fast-forward failed, attempting rebase onto origin/main...');
-        await execAsync('git fetch origin main', { cwd: this.repoPath });
-        try {
-          await execAsync('git rebase origin/main', { cwd: this.repoPath });
-        } catch (rebaseError) {
-          // Rebase failed (conflicts), abort and report
-          await execAsync('git rebase --abort', { cwd: this.repoPath }).catch(() => {});
-          throw new Error(
-            'Update failed due to conflicts. Your local changes conflict with upstream. ' +
-              'Please resolve manually with: git fetch origin main && git rebase origin/main',
-          );
-        }
+      // Fetch and check if we can safely fast-forward
+      this.logger.log('Fetching latest from origin/main...');
+      await execAsync('git fetch origin main', { cwd: this.repoPath });
+
+      // Check if we can fast-forward (no local commits ahead of remote)
+      const canFF = await this.canFastForward();
+      if (!canFF) {
+        throw new Error(
+          'Cannot auto-update: local branch has diverged from origin/main. ' +
+            'You have local commits not in the remote. Please merge manually.',
+        );
       }
+
+      // Safe fast-forward merge
+      this.logger.log('Applying fast-forward update...');
+      await execAsync('git merge --ff-only origin/main', { cwd: this.repoPath });
 
       const newCommit = await this.getCurrentCommit();
 
@@ -167,6 +164,19 @@ export class SystemUpdateService {
       });
       return statusOutput.trim().length > 0;
     } catch {
+      return false;
+    }
+  }
+
+  private async canFastForward(): Promise<boolean> {
+    try {
+      // Check if HEAD is an ancestor of origin/main (can fast-forward)
+      await execAsync('git merge-base --is-ancestor HEAD origin/main', {
+        cwd: this.repoPath,
+      });
+      return true;
+    } catch {
+      // Exit code 1 means HEAD is not an ancestor (branches diverged)
       return false;
     }
   }
