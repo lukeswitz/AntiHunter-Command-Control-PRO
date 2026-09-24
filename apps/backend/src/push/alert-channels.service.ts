@@ -129,7 +129,7 @@ export class AlertChannelsService {
   }
 
   private signalBase(config: RemoteAlertConfig): URL {
-    const url = httpsOrLoopback(config.signalApiUrl || 'http://signal-api:8080');
+    const url = httpsOrLoopback(config.signalApiUrl || 'http://signal-proxy:8080');
     if (!url) {
       throw new BadRequestException('Signal connector URL is not allowed');
     }
