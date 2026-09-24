@@ -193,17 +193,22 @@ The alert is encrypted on the AHCC computer for your phone's key; Apple, Google 
 
 ### Signal (end-to-end encrypted)
 
-AHCC sends through a Signal account you link like Signal Desktop. Use a spare number or your own.
+AHCC links a Signal device (like Signal Desktop) and posts to a private **AntiHunter Alerts** group it creates. A linked device can otherwise act as the whole account, so AHCC boxes it in:
 
-1. Link once. The Signal API has no password, so it only gets a port while you link:
+- The connector (`signal-api`) runs on an internal-only Docker network with no published port.
+- The backend reaches it only through `signal-proxy`, which rejects everything except reading the account, linking, creating a group, and sending to a group. It cannot send to a phone number, read messages, or list your contacts.
+- AHCC's own code only ever sends to its own group, and the config API refuses to change the number, connector URL, or recipients.
 
-       docker compose --profile signal run --rm -p 127.0.0.1:8090:8080 signal-api
+**Hardened out of the box.** Extra steps you take:
 
-   Open http://127.0.0.1:8090/v1/qrcodelink?device_name=ahcc on the AHCC computer. On the phone: Signal → **Settings** → **Linked devices** → **+** → scan. Then press `Ctrl+C`.
-2. `docker compose --profile signal up -d` (no published port; only the backend reaches it).
-3. **Config** → **Remote Access & Alerts** → **Signal**: tick **Send alerts to Signal**, Signal API URL `http://signal-api:8080`, the linked number, recipients one per line (`+15551234567`). **Save**, **Send test**.
+1. **Use a dedicated Signal number**, not your personal one. A linked device is account-wide; keep it on a number that does nothing else.
+2. `docker compose --profile signal up -d` — starts the connector and proxy, neither published.
+3. **Config** → **Remote Access & Alerts** → **Signal** → tick **Send alerts to Signal** → **Link Signal**. On the phone: Signal → **Settings** → **Linked devices** → **+** → scan the QR. Then **Send test**.
+4. Add other people by opening the **AntiHunter Alerts** group in Signal and inviting them. The group is created admin-only (no member can add others, post, or share an invite link), so alerts stay one-way.
 
-**Check:** the recipients get `AntiHunter test`.
+**Check:** the **AntiHunter Alerts** group gets `AntiHunter test`.
+
+**Bare-host installs (no Docker):** run both `signal-cli-rest-api` and the proxy (`docker/signal-proxy/proxy.mjs`, `SIGNAL_UPSTREAM` pointed at the connector) on the AHCC host, bound to loopback, and set `SIGNAL_API_URL` to the proxy. Never expose either port; anything that reaches the connector directly has full account access.
 
 ### ntfy
 

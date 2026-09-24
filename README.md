@@ -405,7 +405,8 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | SMTP relay                   | 587 / 465     | Require STARTTLS/SMTPS with credential auth; scope accounts to command notifications only.           |
 | Tailscale entrance (Docker)  | 8081 (internal) | Allowed Tailscale logins only. Never publish. |
 | Matter device                | 5540 UDP, 5353 | LAN only, off by default. Firewall: allow `ahcc-matter` only. |
-| signal-api (Docker)          | none          | Backend-only network, no published port. |
+| signal-api (Docker)          | none          | Internal network only; reached solely via signal-proxy. |
+| signal-proxy (Docker)        | none          | Allowlist in front of signal-api: group-only sends, no contacts/receive. |
 
 ## Repository Layout
 
