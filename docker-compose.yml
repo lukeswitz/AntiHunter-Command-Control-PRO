@@ -62,6 +62,7 @@ services:
       AHCC_MATTER_STORAGE: /app/data/matter
       AHCC_MATTER_INTERFACE: ${AHCC_MATTER_INTERFACE:-}
       REMOTE_ALERTS_SECRET_KEY: ${REMOTE_ALERTS_SECRET_KEY:-}
+      AHCC_TS_UPSTREAM: ${AHCC_TS_UPSTREAM:-http://cc_frontend:80}
     ports:
       - '127.0.0.1:3000:3000'
     volumes:

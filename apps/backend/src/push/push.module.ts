@@ -7,6 +7,7 @@ import { PushService } from './push.service';
 import { RemoteAlertConfigService } from './remote-alert-config.service';
 import { RemoteAlertsController } from './remote-alerts.controller';
 import { SignalConnectorService } from './signal-connector.service';
+import { TailscaleService } from './tailscale.service';
 import { TwoFactorRequiredGuard } from './two-factor-required.guard';
 import { PrismaModule } from '../prisma/prisma.module';
 
@@ -19,6 +20,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     AlertChannelsService,
     RemoteAlertConfigService,
     SignalConnectorService,
+    TailscaleService,
     TwoFactorRequiredGuard,
   ],
   exports: [PushService, AlertChannelsService],

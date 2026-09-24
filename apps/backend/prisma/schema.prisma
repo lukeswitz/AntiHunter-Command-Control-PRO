@@ -53,6 +53,9 @@ model User {
 
 model RemoteAlertConfig {
   id                  Int      @id @default(1)
+  tailscaleEnabled    Boolean  @default(false)
+  tsAuthKey           String?
+  tsHostname          String?
   tsAllowedLogins     String[] @default([])
   vapidPublicKey      String?
   vapidPrivateKey     String?

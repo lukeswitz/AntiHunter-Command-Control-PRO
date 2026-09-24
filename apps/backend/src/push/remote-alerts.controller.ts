@@ -20,6 +20,7 @@ import { MatterService } from './matter.service';
 import { PushService } from './push.service';
 import { RemoteAlertConfigService, tierFor } from './remote-alert-config.service';
 import { SignalConnectorService } from './signal-connector.service';
+import { TailscaleService } from './tailscale.service';
 import { TwoFactorRequiredGuard } from './two-factor-required.guard';
 import { Roles } from '../auth/auth.decorators';
 import { PrismaService } from '../prisma/prisma.service';
@@ -27,12 +28,13 @@ import { PrismaService } from '../prisma/prisma.service';
 const CHANNELS: AlertChannel[] = ['push', 'ntfy', 'signal', 'matrix', 'matter'];
 
 function view(config: RemoteAlertConfig) {
-  const { vapidPrivateKey, ntfyToken, matrixAccessToken, ...rest } = config;
+  const { vapidPrivateKey, ntfyToken, matrixAccessToken, tsAuthKey, ...rest } = config;
   return {
     ...rest,
     hasVapidPrivateKey: Boolean(vapidPrivateKey),
     hasNtfyToken: Boolean(ntfyToken),
     hasMatrixAccessToken: Boolean(matrixAccessToken),
+    hasTsAuthKey: Boolean(tsAuthKey),
   };
 }
 
@@ -46,6 +48,7 @@ export class RemoteAlertsController {
     private readonly push: PushService,
     private readonly prisma: PrismaService,
     private readonly signal: SignalConnectorService,
+    private readonly tailscale: TailscaleService,
   ) {}
 
   @Get('config')
@@ -121,6 +124,11 @@ export class RemoteAlertsController {
   @Get('signal/setup')
   signalSetup() {
     return this.signal.setupHint();
+  }
+
+  @Get('tailscale/status')
+  tailscaleStatus() {
+    return this.tailscale.status();
   }
 
   @Get('signal/link-qr')

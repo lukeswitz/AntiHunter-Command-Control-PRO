@@ -5,14 +5,14 @@ import { AlertTier, defaultTier, SOURCE_KEY } from './alert-sources';
 import { SecretBox } from './secret-box';
 import { PrismaService } from '../prisma/prisma.service';
 
-const SEALED_FIELDS = ['vapidPrivateKey', 'ntfyToken', 'matrixAccessToken'] as const;
+const SEALED_FIELDS = ['vapidPrivateKey', 'ntfyToken', 'matrixAccessToken', 'tsAuthKey'] as const;
 const PLAIN_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', 'signal-api', 'signal-proxy']);
 
 export type RemoteAlertConfigUpdate = Partial<
   Omit<RemoteAlertConfig, 'id' | 'updatedAt' | 'vapidPublicKey' | 'vapidPrivateKey'>
 >;
 
-const SECRET_FIELDS = ['ntfyToken', 'matrixAccessToken'] as const;
+const SECRET_FIELDS = ['ntfyToken', 'matrixAccessToken', 'tsAuthKey'] as const;
 const URL_FIELDS = ['ntfyUrl', 'signalApiUrl', 'matrixHomeserverUrl'] as const;
 
 function env(name: string): string | null {
@@ -134,6 +134,9 @@ export class RemoteAlertConfigService {
       (await this.prisma.remoteAlertConfig.create({
         data: this.seal({
           id: 1,
+          tailscaleEnabled: Boolean(env('TS_AUTHKEY')),
+          tsAuthKey: env('TS_AUTHKEY'),
+          tsHostname: env('TS_HOSTNAME'),
           tsAllowedLogins: list(env('TS_ALLOWED_LOGINS')).map((login) => login.toLowerCase()),
           vapidPublicKey: env('VAPID_PUBLIC_KEY'),
           vapidPrivateKey: env('VAPID_PRIVATE_KEY'),

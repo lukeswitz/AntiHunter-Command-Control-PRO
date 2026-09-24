@@ -15,6 +15,7 @@ import {
   getSignalSetup,
   getSignalStatus,
   getSignalUpdate,
+  getTailscaleStatus,
   listAlertSources,
   listPushSubscriptions,
   RemoteAlertConfig,
@@ -27,6 +28,9 @@ import {
 import { useAuthStore } from '../stores/auth-store';
 
 interface FormState {
+  tailscaleEnabled: boolean;
+  tsAuthKey: string;
+  tsHostname: string;
   tsAllowedLogins: string;
   vapidSubject: string;
   ntfyEnabled: boolean;
@@ -46,6 +50,9 @@ interface FormState {
 
 function toForm(config: RemoteAlertConfig): FormState {
   return {
+    tailscaleEnabled: config.tailscaleEnabled,
+    tsAuthKey: '',
+    tsHostname: config.tsHostname ?? '',
     tsAllowedLogins: config.tsAllowedLogins.join('\n'),
     vapidSubject: config.vapidSubject ?? '',
     ntfyEnabled: config.ntfyEnabled,
@@ -357,12 +364,8 @@ function AdminCards() {
 
       <MatterCard
         enabled={form.matterEnabled}
-        layout={form.matterLayout}
         onEnabled={(value) => set('matterEnabled', value)}
-        onLayout={(value) => set('matterLayout', value)}
-        onSave={() =>
-          save('matter', { matterEnabled: form.matterEnabled, matterLayout: form.matterLayout })
-        }
+        onSave={() => save('matter', { matterEnabled: form.matterEnabled })}
         onTest={() => testMutation.mutate('matter')}
         busy={busy}
         notice={notice.matter}
@@ -370,12 +373,50 @@ function AdminCards() {
 
       <ChannelRow
         title="Remote access (Tailscale)"
-        on={config.tsAllowedLogins.length > 0}
-        hint="Reach AHCC over your private tailnet. Only the listed Tailscale logins get in."
-        status={
-          config.tsAllowedLogins.length ? `${config.tsAllowedLogins.length} allowed` : 'Nobody'
-        }
+        on={config.tailscaleEnabled}
+        hint="Reach AHCC over your private tailnet — built in, no separate client. AHCC joins the tailnet itself and only the listed logins get in."
+        status={config.tailscaleEnabled ? 'On' : 'Off'}
       >
+        <label className="control-checkbox">
+          <input
+            type="checkbox"
+            checked={form.tailscaleEnabled}
+            onChange={(event) => set('tailscaleEnabled', event.target.checked)}
+          />
+          <span>Enable remote access</span>
+        </label>
+        <TailscaleStatus enabled={config.tailscaleEnabled} />
+        <label className="form-field">
+          <span>Tailscale auth key</span>
+          <input
+            className="control-input"
+            type="password"
+            autoComplete="off"
+            value={form.tsAuthKey}
+            placeholder={config.hasTsAuthKey ? 'Saved (leave blank to keep)' : 'tskey-auth-…'}
+            onChange={(event) => set('tsAuthKey', event.target.value)}
+          />
+        </label>
+        <p className="config-hint">
+          Get a key at{' '}
+          <a
+            href="https://login.tailscale.com/admin/settings/keys"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Tailscale → Settings → Keys
+          </a>{' '}
+          — click “Generate auth key”, turn on <strong>Tags</strong> and pick <code>tag:ahcc</code>.
+        </p>
+        <label className="form-field">
+          <span>Hostname on the tailnet</span>
+          <input
+            className="control-input"
+            value={form.tsHostname}
+            placeholder="ahcc"
+            onChange={(event) => set('tsHostname', event.target.value)}
+          />
+        </label>
         <label className="form-field">
           <span>Allowed Tailscale logins</span>
           <textarea
@@ -386,12 +427,24 @@ function AdminCards() {
             onChange={(event) => set('tsAllowedLogins', event.target.value)}
           />
         </label>
+        <p className="config-hint config-hint--warn">
+          Empty allowed-logins = nobody gets in. Your tailnet needs HTTPS/MagicDNS enabled and
+          tag:ahcc allowed in its ACLs.
+        </p>
         <div className="controls-row">
           <button
             type="button"
             className="control-chip"
             disabled={busy}
-            onClick={() => save('tailscale', { tsAllowedLogins: lines(form.tsAllowedLogins) })}
+            onClick={() => {
+              save('tailscale', {
+                tailscaleEnabled: form.tailscaleEnabled,
+                tsAuthKey: form.tsAuthKey,
+                tsHostname: form.tsHostname,
+                tsAllowedLogins: lines(form.tsAllowedLogins),
+              });
+              set('tsAuthKey', '');
+            }}
           >
             Save
           </button>
@@ -418,6 +471,39 @@ function ChannelRow(props: {
       {props.hint && <p className="field-hint">{props.hint}</p>}
       {props.children}
     </section>
+  );
+}
+
+function TailscaleStatus({ enabled }: { enabled: boolean }) {
+  const query = useQuery({
+    queryKey: ['tailscale-status'],
+    queryFn: getTailscaleStatus,
+    enabled,
+    refetchInterval: enabled ? 4_000 : false,
+  });
+  if (!enabled) {
+    return null;
+  }
+  const s = query.data;
+  if (!s) {
+    return <p className="config-hint">Checking…</p>;
+  }
+  if (s.running) {
+    return (
+      <p className="config-hint">
+        Connected as {s.dnsName ?? 'this node'}
+        {s.tailnet ? ` (${s.tailnet})` : ''}.
+      </p>
+    );
+  }
+  if (s.lastError) {
+    return <p className="config-hint config-hint--warn">{s.lastError}</p>;
+  }
+  if (s.connecting) {
+    return <p className="config-hint">Joining the tailnet…</p>;
+  }
+  return (
+    <p className="config-hint">Not running{s.lastExit ? ` — last exit: ${s.lastExit}` : ''}.</p>
   );
 }
 
@@ -769,9 +855,7 @@ function PushAdminCard(props: {
 
 function MatterCard(props: {
   enabled: boolean;
-  layout: 'bridge' | 'flat';
   onEnabled: (value: boolean) => void;
-  onLayout: (value: 'bridge' | 'flat') => void;
   onSave: () => void;
   onTest: () => void;
   busy: boolean;
@@ -835,17 +919,6 @@ function MatterCard(props: {
             onChange={(event) => props.onEnabled(event.target.checked)}
           />
           <span>On</span>
-        </label>
-        <label className="form-field">
-          <span>How it appears in Apple/Google Home</span>
-          <select
-            className="control-input"
-            value={props.layout}
-            onChange={(event) => props.onLayout(event.target.value as 'bridge' | 'flat')}
-          >
-            <option value="bridge">One device: Alert + Critical sensors</option>
-            <option value="flat">Two plain sensors (older pairings)</option>
-          </select>
         </label>
         {props.enabled && state === 'stopped' && (
           <p className="config-hint">

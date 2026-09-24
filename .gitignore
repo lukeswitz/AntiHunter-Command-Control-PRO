@@ -57,6 +57,7 @@ apps/backend/backups/
 apps/backend/bin/
 apps/backend/.matter/
 apps/backend/.signal-cli/
+apps/backend/.tailscale/
 **/.secrets/
 
 *.tsbuildinfo

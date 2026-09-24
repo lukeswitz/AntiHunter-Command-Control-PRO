@@ -11,6 +11,20 @@ import {
 
 export class UpdateRemoteAlertConfigDto {
   @IsOptional()
+  @IsBoolean()
+  tailscaleEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  tsAuthKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(63)
+  tsHostname?: string;
+
+  @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)
   @IsString({ each: true })
