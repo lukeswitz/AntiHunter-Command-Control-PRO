@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { AlarmLevel, RemoteAlertConfig } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
+import { toBuffer as qrToBuffer } from 'qrcode';
 
 import { MatterService } from './matter.service';
 import { PushService } from './push.service';
@@ -131,10 +132,7 @@ export class AlertChannelsService {
   }
 
   private signalBase(config: RemoteAlertConfig): URL {
-    const fallback = this.connector.isManaged()
-      ? SignalConnectorService.managedUrl()
-      : 'http://signal-proxy:8080';
-    const url = httpsOrLoopback(config.signalApiUrl || fallback);
+    const url = httpsOrLoopback(config.signalApiUrl || 'http://127.0.0.1:8079');
     if (!url) {
       throw new BadRequestException('Signal connector URL is not allowed');
     }
@@ -145,30 +143,43 @@ export class AlertChannelsService {
     reachable: boolean;
     linkedNumber: string | null;
     managed: boolean;
+    supported: boolean;
   }> {
     const config = await this.config.get();
-    const managed = this.connector.isManaged();
+    if (this.connector.usesNativeCli(config)) {
+      const linkedNumber = await this.connector.linkedNumber();
+      if (linkedNumber && linkedNumber !== config.signalNumber) {
+        await this.config.update({ signalNumber: linkedNumber });
+      }
+      return { reachable: true, linkedNumber, managed: true, supported: true };
+    }
+    const managed = false;
+    const supported = this.connector.isSupported();
     try {
       const response = await fetch(new URL('/v1/accounts', this.signalBase(config)), {
         redirect: 'error',
         signal: AbortSignal.timeout(5_000),
       });
       if (!response.ok) {
-        return { reachable: false, linkedNumber: null, managed };
+        return { reachable: false, linkedNumber: null, managed, supported };
       }
       const accounts = (await response.json()) as unknown;
       const first = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
       if (first && first !== config.signalNumber) {
         await this.config.update({ signalNumber: first });
       }
-      return { reachable: true, linkedNumber: first, managed };
+      return { reachable: true, linkedNumber: first, managed, supported };
     } catch {
-      return { reachable: false, linkedNumber: null, managed };
+      return { reachable: false, linkedNumber: null, managed, supported };
     }
   }
 
   async signalLinkQr(): Promise<Buffer> {
     const config = await this.config.get();
+    if (this.connector.usesNativeCli(config)) {
+      const uri = await this.connector.linkUri();
+      return qrToBuffer(uri, { margin: 1, width: 256 });
+    }
     const response = await fetch(
       new URL('/v1/qrcodelink?device_name=AntiHunter', this.signalBase(config)),
       { redirect: 'error', signal: AbortSignal.timeout(60_000) },
@@ -189,6 +200,11 @@ export class AlertChannelsService {
       return existing;
     }
     this.signalGroupCreation ??= (async () => {
+      if (this.connector.usesNativeCli(config)) {
+        const id = await this.connector.createGroup();
+        await this.config.update({ signalRecipients: [id] });
+        return id;
+      }
       const response = await fetch(
         new URL(`/v1/groups/${encodeURIComponent(config.signalNumber!)}`, this.signalBase(config)),
         {
@@ -225,6 +241,10 @@ export class AlertChannelsService {
       return this.missing(strict, 'Signal (link a device first)');
     }
     const groupId = await this.ensureSignalGroup(config);
+    if (this.connector.usesNativeCli(config)) {
+      await this.connector.send(groupId, message);
+      return;
+    }
     await this.post(new URL('/v2/send', this.signalBase(config)), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

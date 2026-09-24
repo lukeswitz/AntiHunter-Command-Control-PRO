@@ -12,7 +12,9 @@ import {
   getMatterStatus,
   fetchSignalLinkQr,
   getRemoteAlertConfig,
+  getSignalSetup,
   getSignalStatus,
+  getSignalUpdate,
   listAlertSources,
   listPushSubscriptions,
   RemoteAlertConfig,
@@ -440,16 +442,16 @@ function SignalLink() {
     return <p className="config-hint">Checking Signal…</p>;
   }
   if (!status.reachable) {
-    return (
-      <p className="config-hint">
-        {status.managed
-          ? 'Starting the Signal connector… reload in a moment.'
-          : 'Signal needs signal-cli-rest-api installed on the AHCC host. Once it is on PATH, AHCC starts it for you.'}
-      </p>
-    );
+    return <SignalSetup />;
   }
   if (status.linkedNumber) {
-    return <p className="config-hint">Linked. Alerts go to the “AntiHunter Alerts” group.</p>;
+    return (
+      <div className="form-field">
+        <p className="config-hint">Linked. Alerts go to the “AntiHunter Alerts” group.</p>
+        {status.managed && <SignalUpdateCheck />}
+        <SignalConnectorControls />
+      </div>
+    );
   }
   return (
     <div className="form-field">
@@ -477,6 +479,90 @@ function SignalLink() {
         </button>
       )}
       {error && <p className="config-hint">{error}</p>}
+      <SignalConnectorControls />
+    </div>
+  );
+}
+
+function SignalConnectorControls() {
+  const query = useQuery({ queryKey: ['signal-setup'], queryFn: getSignalSetup });
+  const [copied, setCopied] = useState<string | null>(null);
+  const controls = query.data?.controls;
+  if (!controls) {
+    return null;
+  }
+  const copy = (label: string, cmd: string) => {
+    void navigator.clipboard?.writeText(cmd);
+    setCopied(label);
+    window.setTimeout(() => setCopied((current) => (current === label ? null : current)), 1500);
+  };
+  return (
+    <div className="form-field">
+      <p className="config-hint">Connector (Docker) — copy a command to run on the AHCC host:</p>
+      <div className="controls-row">
+        {(['start', 'stop', 'restart'] as const).map((action) => (
+          <button
+            key={action}
+            type="button"
+            className="control-chip control-chip--ghost"
+            onClick={() => copy(action, controls[action])}
+          >
+            {copied === action ? 'Copied' : `Copy ${action}`}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SignalSetup() {
+  const query = useQuery({ queryKey: ['signal-setup'], queryFn: getSignalSetup });
+  if (!query.data) {
+    return <p className="config-hint">Checking this host…</p>;
+  }
+  const { platform, arch, supported, steps } = query.data;
+  return (
+    <div className="form-field">
+      <p className="config-hint">
+        {supported
+          ? 'Getting signal-cli ready…'
+          : `This host (${platform}/${arch}) can't self-run signal-cli. Start the connector in Docker — AHCC finds it automatically:`}
+      </p>
+      <ol className="config-steps">
+        {steps.map((step, index) => (
+          <li key={index}>
+            {step.text}
+            {step.cmd && <code>{step.cmd}</code>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function SignalUpdateCheck() {
+  const [info, setInfo] = useState<string | null>(null);
+  const mutation = useMutation({
+    mutationFn: getSignalUpdate,
+    onSuccess: (data) =>
+      setInfo(
+        data.updateAvailable && data.latest
+          ? `signal-cli ${data.current} installed; ${data.latest} available (applied on the next AHCC update)`
+          : `signal-cli ${data.current} — up to date`,
+      ),
+    onError: () => setInfo('Could not check for updates'),
+  });
+  return (
+    <div className="form-field">
+      <button
+        type="button"
+        className="control-chip control-chip--ghost"
+        disabled={mutation.isPending}
+        onClick={() => mutation.mutate()}
+      >
+        Check for updates
+      </button>
+      {info && <p className="config-hint">{info}</p>}
     </div>
   );
 }
@@ -744,16 +830,29 @@ function MatterCard(props: {
           <span>On</span>
         </label>
         <label className="form-field">
-          <span>Layout</span>
+          <span>How it appears in Apple/Google Home</span>
           <select
             className="control-input"
             value={props.layout}
             onChange={(event) => props.onLayout(event.target.value as 'bridge' | 'flat')}
           >
-            <option value="bridge">Named sensors</option>
-            <option value="flat">Unnamed sensors (older pairings)</option>
+            <option value="bridge">One device: Alert + Critical sensors</option>
+            <option value="flat">Two plain sensors (older pairings)</option>
           </select>
         </label>
+        {props.enabled && state === 'stopped' && (
+          <p className="config-hint">
+            Matter isn’t running. On a server install it starts on its own when enabled; pairing
+            needs a home hub (Apple TV, HomePod, Nest, or Echo). If it keeps stopping, check the
+            backend logs.
+          </p>
+        )}
+        {state === 'starting' && <p className="config-hint">Starting the Matter service…</p>}
+        {state === 'paired' && (
+          <p className="config-hint">
+            Paired. AntiHunter shows as occupancy sensors in your Home app.
+          </p>
+        )}
         {status?.running && status.commissioned === false && qrDataUrl && (
           <div className="form-field">
             <img src={qrDataUrl} alt="Matter pairing QR code" width={200} height={200} />
@@ -772,7 +871,9 @@ function MatterCard(props: {
             </label>
           </div>
         )}
-        {status?.lastExit && <p className="config-hint">Last exit: {status.lastExit}</p>}
+        {status?.lastExit && state === 'stopped' && (
+          <p className="config-hint">Last stop: {status.lastExit}</p>
+        )}
         <div className="controls-row">
           <button
             type="button"

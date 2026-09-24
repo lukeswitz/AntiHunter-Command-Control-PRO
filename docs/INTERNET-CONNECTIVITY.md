@@ -202,13 +202,15 @@ AHCC links a Signal device (like Signal Desktop) and posts to a private **AntiHu
 **Hardened out of the box.** Extra steps you take:
 
 1. **Use a dedicated Signal number**, not your personal one. A linked device is account-wide; keep it on a number that does nothing else.
-2. `docker compose --profile signal up -d` — starts the connector and proxy, neither published.
+2. Start the connector for your install:
+   - **Docker:** `docker compose --profile signal up -d` — runs the connector and proxy, neither published.
+   - **Host (no Docker):** nothing to start. On an x86_64 Linux host AHCC downloads signal-cli, verifies it against a pinned checksum, and runs it itself the first time you link. It stays under `<backend cwd>/.signal-cli` (`AHCC_SIGNAL_HOME` to change).
 3. **Config** → **Remote Access & Alerts** → **Signal** → tick **Send alerts to Signal** → **Link Signal**. On the phone: Signal → **Settings** → **Linked devices** → **+** → scan the QR. Then **Send test**.
 4. Add other people by opening the **AntiHunter Alerts** group in Signal and inviting them. The group is created admin-only (no member can add others, post, or share an invite link), so alerts stay one-way.
 
 **Check:** the **AntiHunter Alerts** group gets `AntiHunter test`.
 
-**Bare-host installs (no Docker):** run both `signal-cli-rest-api` and the proxy (`docker/signal-proxy/proxy.mjs`, `SIGNAL_UPSTREAM` pointed at the connector) on the AHCC host, bound to loopback, and set `SIGNAL_API_URL` to the proxy. Never expose either port; anything that reaches the connector directly has full account access.
+**Host mode (no Docker)** drives signal-cli directly — no proxy, because AHCC is the only caller and only ever runs send-to-group. The binary and account data stay under `AHCC_SIGNAL_HOME` at `0700`; nothing listens on the network. Auto-acquire is x86_64 Linux only; on any other host use the Docker profile. **Check for updates** on the Signal card compares the installed signal-cli against the latest release.
 
 ### ntfy
 

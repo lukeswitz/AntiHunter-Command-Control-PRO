@@ -93,9 +93,26 @@ export interface AlertSourceRow {
 }
 
 export const getSignalStatus = () =>
-  apiClient.get<{ reachable: boolean; linkedNumber: string | null; managed: boolean }>(
-    '/remote-alerts/signal/status',
+  apiClient.get<{
+    reachable: boolean;
+    linkedNumber: string | null;
+    managed: boolean;
+    supported: boolean;
+  }>('/remote-alerts/signal/status');
+
+export const getSignalUpdate = () =>
+  apiClient.get<{ current: string; latest: string | null; updateAvailable: boolean }>(
+    '/remote-alerts/signal/update',
   );
+
+export const getSignalSetup = () =>
+  apiClient.get<{
+    platform: string;
+    arch: string;
+    supported: boolean;
+    steps: { text: string; cmd?: string }[];
+    controls: { start: string; stop: string; restart: string } | null;
+  }>('/remote-alerts/signal/setup');
 
 export async function fetchSignalLinkQr(): Promise<Blob> {
   const token = getAuthToken();

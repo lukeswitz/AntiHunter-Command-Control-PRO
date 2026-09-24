@@ -1,4 +1,4 @@
-import { Endpoint, Environment, ServerNode, VendorId } from '@matter/main';
+import { Endpoint, Environment, Logger, LogLevel, ServerNode, VendorId } from '@matter/main';
 import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/bridged-device-basic-information';
 import { OccupancySensingServer } from '@matter/main/behaviors/occupancy-sensing';
 import { OccupancySensorDevice } from '@matter/main/devices/occupancy-sensor';
@@ -8,6 +8,8 @@ import { chmodSync, mkdirSync, readdirSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+
+Logger.level = LogLevel.INFO;
 
 const SENSORS = [
   { id: 'any-alert', name: 'AntiHunter Alert', levels: null },

@@ -19,6 +19,7 @@ import { UpdateRemoteAlertConfigDto } from './dto/update-remote-alert-config.dto
 import { MatterService } from './matter.service';
 import { PushService } from './push.service';
 import { RemoteAlertConfigService, tierFor } from './remote-alert-config.service';
+import { SignalConnectorService } from './signal-connector.service';
 import { TwoFactorRequiredGuard } from './two-factor-required.guard';
 import { Roles } from '../auth/auth.decorators';
 import { PrismaService } from '../prisma/prisma.service';
@@ -44,6 +45,7 @@ export class RemoteAlertsController {
     private readonly matter: MatterService,
     private readonly push: PushService,
     private readonly prisma: PrismaService,
+    private readonly signal: SignalConnectorService,
   ) {}
 
   @Get('config')
@@ -109,6 +111,16 @@ export class RemoteAlertsController {
   @Get('signal/status')
   signalStatus() {
     return this.channels.signalStatus();
+  }
+
+  @Get('signal/update')
+  signalUpdate() {
+    return this.signal.checkUpdate();
+  }
+
+  @Get('signal/setup')
+  signalSetup() {
+    return this.signal.setupHint();
   }
 
   @Get('signal/link-qr')
