@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toDataURL } from 'qrcode';
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 
-import { PushNotificationsCard } from './WebhooksSection';
+import { PushNotificationsCard, WebhooksSection } from './WebhooksSection';
 import {
   AlertChannel,
   AlertTier,
@@ -145,36 +145,6 @@ function AdminCards() {
 
   return (
     <>
-      <article className="config-card">
-        <header>
-          <h3>Remote access (Tailscale)</h3>
-          <p>Who can connect over Tailscale.</p>
-        </header>
-        <div className="config-card__body">
-          <label className="form-field">
-            <span>Allowed Tailscale logins (one per line)</span>
-            <textarea
-              className="control-input"
-              rows={4}
-              value={form.tsAllowedLogins}
-              placeholder="you@example.com"
-              onChange={(event) => set('tsAllowedLogins', event.target.value)}
-            />
-          </label>
-          <div className="controls-row">
-            <button
-              type="button"
-              className="control-chip"
-              disabled={busy}
-              onClick={() => save('tailscale', { tsAllowedLogins: lines(form.tsAllowedLogins) })}
-            >
-              Save
-            </button>
-          </div>
-          {noticeFor('tailscale')}
-        </div>
-      </article>
-
       <AlertLevelsCard
         tiers={config.alertTiers ?? {}}
         busy={busy}
@@ -192,200 +162,198 @@ function AdminCards() {
         notice={notice.push}
       />
 
-      <article className="config-card">
-        <header>
-          <h3>Signal</h3>
-          <p>End-to-end encrypted.</p>
-        </header>
-        <div className="config-card__body">
-          <label className="control-checkbox">
-            <input
-              type="checkbox"
-              checked={form.signalEnabled}
-              onChange={(event) => set('signalEnabled', event.target.checked)}
-            />
-            <span>Send alerts to Signal</span>
-          </label>
-          <SignalLink />
-          <div className="controls-row">
-            <button
-              type="button"
-              className="control-chip"
-              disabled={busy}
-              onClick={() => save('signal', { signalEnabled: form.signalEnabled })}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="control-chip control-chip--ghost"
-              disabled={busy}
-              onClick={() => testMutation.mutate('signal')}
-            >
-              Send test
-            </button>
-          </div>
-          {noticeFor('signal')}
+      <ChannelRow
+        title="Signal"
+        on={config.signalEnabled && Boolean(config.signalNumber)}
+        status={config.signalEnabled ? (config.signalNumber ? 'On' : 'Not linked') : 'Off'}
+      >
+        <label className="control-checkbox">
+          <input
+            type="checkbox"
+            checked={form.signalEnabled}
+            onChange={(event) => set('signalEnabled', event.target.checked)}
+          />
+          <span>Send alerts to Signal</span>
+        </label>
+        <SignalLink />
+        <div className="controls-row">
+          <button
+            type="button"
+            className="control-chip"
+            disabled={busy}
+            onClick={() => save('signal', { signalEnabled: form.signalEnabled })}
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            className="control-chip control-chip--ghost"
+            disabled={busy}
+            onClick={() => testMutation.mutate('signal')}
+          >
+            Send test
+          </button>
         </div>
-      </article>
+        {noticeFor('signal')}
+      </ChannelRow>
 
-      <article className="config-card">
-        <header>
-          <h3>ntfy</h3>
-          <p>The ntfy server can read every alert. Use your own server and an access token.</p>
-        </header>
-        <div className="config-card__body">
-          <label className="control-checkbox">
+      <ChannelRow
+        title="ntfy"
+        on={config.ntfyEnabled && Boolean(config.ntfyUrl)}
+        status={config.ntfyEnabled ? 'On' : 'Off'}
+      >
+        <label className="control-checkbox">
+          <input
+            type="checkbox"
+            checked={form.ntfyEnabled}
+            onChange={(event) => set('ntfyEnabled', event.target.checked)}
+          />
+          <span>Send alerts to ntfy</span>
+        </label>
+        <div className="form-grid">
+          <label>
+            <span>Topic URL</span>
             <input
-              type="checkbox"
-              checked={form.ntfyEnabled}
-              onChange={(event) => set('ntfyEnabled', event.target.checked)}
+              className="control-input"
+              value={form.ntfyUrl}
+              placeholder="https://ntfy.example.com/ahcc-alerts"
+              onChange={(event) => set('ntfyUrl', event.target.value)}
             />
-            <span>Send alerts to ntfy</span>
           </label>
-          <div className="form-grid">
-            <label>
-              <span>Topic URL</span>
-              <input
-                className="control-input"
-                value={form.ntfyUrl}
-                placeholder="https://ntfy.example.com/ahcc-alerts"
-                onChange={(event) => set('ntfyUrl', event.target.value)}
-              />
-            </label>
-            <label>
-              <span>Access token</span>
-              <input
-                className="control-input"
-                type="password"
-                autoComplete="off"
-                value={form.ntfyToken}
-                placeholder={config.hasNtfyToken ? 'Saved (leave blank to keep)' : 'tk_...'}
-                onChange={(event) => set('ntfyToken', event.target.value)}
-              />
-            </label>
-          </div>
-          <div className="controls-row">
-            <button
-              type="button"
-              className="control-chip"
-              disabled={busy}
-              onClick={() => {
-                save('ntfy', {
-                  ntfyEnabled: form.ntfyEnabled,
-                  ntfyUrl: form.ntfyUrl,
-                  ntfyToken: form.ntfyToken,
-                });
-                set('ntfyToken', '');
-              }}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="control-chip control-chip--ghost"
-              disabled={busy}
-              onClick={() => testMutation.mutate('ntfy')}
-            >
-              Send test
-            </button>
-            {config.hasNtfyToken && (
-              <button
-                type="button"
-                className="control-chip control-chip--danger"
-                onClick={() => clearSecretMutation.mutate('ntfyToken')}
-              >
-                Remove token
-              </button>
-            )}
-          </div>
-          {noticeFor('ntfy')}
-        </div>
-      </article>
-
-      <article className="config-card">
-        <header>
-          <h3>Matrix</h3>
-          <p>Messages are not end-to-end encrypted. Use your own homeserver.</p>
-        </header>
-        <div className="config-card__body">
-          <label className="control-checkbox">
-            <input
-              type="checkbox"
-              checked={form.matrixEnabled}
-              onChange={(event) => set('matrixEnabled', event.target.checked)}
-            />
-            <span>Send alerts to Matrix</span>
-          </label>
-          <div className="form-grid">
-            <label>
-              <span>Homeserver URL</span>
-              <input
-                className="control-input"
-                value={form.matrixHomeserverUrl}
-                placeholder="https://matrix.example.com"
-                onChange={(event) => set('matrixHomeserverUrl', event.target.value)}
-              />
-            </label>
-            <label>
-              <span>Room ID</span>
-              <input
-                className="control-input"
-                value={form.matrixRoomId}
-                placeholder="!abc123:example.com"
-                onChange={(event) => set('matrixRoomId', event.target.value)}
-              />
-            </label>
-          </div>
-          <label className="form-field">
-            <span>Bot access token</span>
+          <label>
+            <span>Access token</span>
             <input
               className="control-input"
               type="password"
               autoComplete="off"
-              value={form.matrixAccessToken}
-              placeholder={config.hasMatrixAccessToken ? 'Saved (leave blank to keep)' : ''}
-              onChange={(event) => set('matrixAccessToken', event.target.value)}
+              value={form.ntfyToken}
+              placeholder={config.hasNtfyToken ? 'Saved (leave blank to keep)' : 'tk_...'}
+              onChange={(event) => set('ntfyToken', event.target.value)}
             />
           </label>
-          <div className="controls-row">
-            <button
-              type="button"
-              className="control-chip"
-              disabled={busy}
-              onClick={() => {
-                save('matrix', {
-                  matrixEnabled: form.matrixEnabled,
-                  matrixHomeserverUrl: form.matrixHomeserverUrl,
-                  matrixRoomId: form.matrixRoomId,
-                  matrixAccessToken: form.matrixAccessToken,
-                });
-                set('matrixAccessToken', '');
-              }}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="control-chip control-chip--ghost"
-              disabled={busy}
-              onClick={() => testMutation.mutate('matrix')}
-            >
-              Send test
-            </button>
-            {config.hasMatrixAccessToken && (
-              <button
-                type="button"
-                className="control-chip control-chip--danger"
-                onClick={() => clearSecretMutation.mutate('matrixAccessToken')}
-              >
-                Remove token
-              </button>
-            )}
-          </div>
-          {noticeFor('matrix')}
         </div>
-      </article>
+        <div className="controls-row">
+          <button
+            type="button"
+            className="control-chip"
+            disabled={busy}
+            onClick={() => {
+              save('ntfy', {
+                ntfyEnabled: form.ntfyEnabled,
+                ntfyUrl: form.ntfyUrl,
+                ntfyToken: form.ntfyToken,
+              });
+              set('ntfyToken', '');
+            }}
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            className="control-chip control-chip--ghost"
+            disabled={busy}
+            onClick={() => testMutation.mutate('ntfy')}
+          >
+            Send test
+          </button>
+          {config.hasNtfyToken && (
+            <button
+              type="button"
+              className="control-chip control-chip--danger"
+              onClick={() => clearSecretMutation.mutate('ntfyToken')}
+            >
+              Remove token
+            </button>
+          )}
+        </div>
+        {noticeFor('ntfy')}
+      </ChannelRow>
+
+      <ChannelRow
+        title="Matrix"
+        on={config.matrixEnabled && config.hasMatrixAccessToken}
+        status={config.matrixEnabled ? 'On' : 'Off'}
+      >
+        <label className="control-checkbox">
+          <input
+            type="checkbox"
+            checked={form.matrixEnabled}
+            onChange={(event) => set('matrixEnabled', event.target.checked)}
+          />
+          <span>Send alerts to Matrix</span>
+        </label>
+        <div className="form-grid">
+          <label>
+            <span>Homeserver URL</span>
+            <input
+              className="control-input"
+              value={form.matrixHomeserverUrl}
+              placeholder="https://matrix.example.com"
+              onChange={(event) => set('matrixHomeserverUrl', event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Room ID</span>
+            <input
+              className="control-input"
+              value={form.matrixRoomId}
+              placeholder="!abc123:example.com"
+              onChange={(event) => set('matrixRoomId', event.target.value)}
+            />
+          </label>
+        </div>
+        <label className="form-field">
+          <span>Bot access token</span>
+          <input
+            className="control-input"
+            type="password"
+            autoComplete="off"
+            value={form.matrixAccessToken}
+            placeholder={config.hasMatrixAccessToken ? 'Saved (leave blank to keep)' : ''}
+            onChange={(event) => set('matrixAccessToken', event.target.value)}
+          />
+        </label>
+        <div className="controls-row">
+          <button
+            type="button"
+            className="control-chip"
+            disabled={busy}
+            onClick={() => {
+              save('matrix', {
+                matrixEnabled: form.matrixEnabled,
+                matrixHomeserverUrl: form.matrixHomeserverUrl,
+                matrixRoomId: form.matrixRoomId,
+                matrixAccessToken: form.matrixAccessToken,
+              });
+              set('matrixAccessToken', '');
+            }}
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            className="control-chip control-chip--ghost"
+            disabled={busy}
+            onClick={() => testMutation.mutate('matrix')}
+          >
+            Send test
+          </button>
+          {config.hasMatrixAccessToken && (
+            <button
+              type="button"
+              className="control-chip control-chip--danger"
+              onClick={() => clearSecretMutation.mutate('matrixAccessToken')}
+            >
+              Remove token
+            </button>
+          )}
+        </div>
+        {noticeFor('matrix')}
+      </ChannelRow>
+
+      <ChannelRow title="Webhooks" on={false} status="Discord, Slack, Home Assistant">
+        <WebhooksSection />
+      </ChannelRow>
 
       <MatterCard
         enabled={form.matterEnabled}
@@ -399,7 +367,49 @@ function AdminCards() {
         busy={busy}
         notice={notice.matter}
       />
+
+      <ChannelRow
+        title="Remote access (Tailscale)"
+        on={config.tsAllowedLogins.length > 0}
+        status={
+          config.tsAllowedLogins.length ? `${config.tsAllowedLogins.length} allowed` : 'Nobody'
+        }
+      >
+        <label className="form-field">
+          <span>Allowed Tailscale logins</span>
+          <textarea
+            className="control-input"
+            rows={3}
+            value={form.tsAllowedLogins}
+            placeholder="you@example.com"
+            onChange={(event) => set('tsAllowedLogins', event.target.value)}
+          />
+        </label>
+        <div className="controls-row">
+          <button
+            type="button"
+            className="control-chip"
+            disabled={busy}
+            onClick={() => save('tailscale', { tsAllowedLogins: lines(form.tsAllowedLogins) })}
+          >
+            Save
+          </button>
+        </div>
+        {noticeFor('tailscale')}
+      </ChannelRow>
     </>
+  );
+}
+
+function ChannelRow(props: { title: string; status: string; on: boolean; children: ReactNode }) {
+  return (
+    <details className="config-card channel-row">
+      <summary>
+        <span className="channel-row__title">{props.title}</span>
+        <span className={props.on ? 'badge badge--active' : 'badge'}>{props.status}</span>
+      </summary>
+      <div className="config-card__body">{props.children}</div>
+    </details>
   );
 }
 
@@ -474,21 +484,15 @@ function AlertLevelsCard(props: {
     setDraft(next);
   }, [sourcesQuery.data]);
 
-  const sources = (sourcesQuery.data ?? []).map((source) => ({
-    key: source.key,
-    label: `${source.group}: ${source.label}`,
-  }));
+  const rows = sourcesQuery.data ?? [];
+  const groups = [...new Set(rows.map((row) => row.group))];
+  const setTier = (key: string, tier: AlertTier) => setDraft((prev) => ({ ...prev, [key]: tier }));
 
   return (
     <article className="config-card">
       <header>
-        <h3>What counts as Alert or Critical</h3>
-        <p>
-          Choose how each detection source reaches your phone and Home. <strong>Alert</strong> sends
-          the message and turns on the AntiHunter Alert sensor. <strong>Critical</strong> also turns
-          on the AntiHunter Critical sensor and marks the message critical. <strong>Off</strong>{' '}
-          sends nothing (webhooks and email are unchanged). Nothing is Critical until you choose it.
-        </p>
+        <h3>Alert sources</h3>
+        <p>Notify: phone, Signal, ntfy, Matrix, Home Alert sensor. Critical: adds Home Critical.</p>
       </header>
       <div className="config-card__body">
         <div className="table-scroll">
@@ -496,32 +500,48 @@ function AlertLevelsCard(props: {
             <thead>
               <tr>
                 <th>Source</th>
-                <th>Level</th>
+                <th>Notify</th>
+                <th>Critical</th>
               </tr>
             </thead>
-            <tbody>
-              {sources.map((source) => (
-                <tr key={source.key}>
-                  <td>{source.label}</td>
-                  <td>
-                    <select
-                      className="control-input"
-                      value={draft[source.key] ?? 'off'}
-                      onChange={(event) =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          [source.key]: event.target.value as AlertTier,
-                        }))
-                      }
-                    >
-                      <option value="off">Off</option>
-                      <option value="alert">Alert</option>
-                      <option value="critical">Critical</option>
-                    </select>
-                  </td>
+            {groups.map((group) => (
+              <tbody key={group}>
+                <tr>
+                  <th colSpan={3}>{group}</th>
                 </tr>
-              ))}
-            </tbody>
+                {rows
+                  .filter((row) => row.group === group)
+                  .map((row) => {
+                    const tier = draft[row.key] ?? 'off';
+                    return (
+                      <tr key={row.key}>
+                        <td>{row.label}</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Notify: ${row.label}`}
+                            checked={tier !== 'off'}
+                            onChange={(event) =>
+                              setTier(row.key, event.target.checked ? 'alert' : 'off')
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Critical: ${row.label}`}
+                            checked={tier === 'critical'}
+                            disabled={tier === 'off'}
+                            onChange={(event) =>
+                              setTier(row.key, event.target.checked ? 'critical' : 'alert')
+                            }
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            ))}
           </table>
         </div>
         <div className="controls-row">
@@ -568,33 +588,13 @@ function PushAdminCard(props: {
   const configured = Boolean(props.config.vapidPublicKey && props.config.hasVapidPrivateKey);
 
   return (
-    <article className="config-card">
-      <header>
-        <h3>Phone push notifications</h3>
-        <p>
-          End-to-end encrypted to each phone or browser. Status:{' '}
-          <strong>{configured ? 'configured' : 'not configured'}</strong>
-        </p>
-      </header>
-      <div className="config-card__body">
+    <ChannelRow
+      title="Phone push"
+      on={Boolean(subsQuery.data?.length)}
+      status={subsQuery.data?.length ? `${subsQuery.data.length} device(s)` : 'No devices'}
+    >
+      <div>
         <div className="controls-row">
-          <button
-            type="button"
-            className={configured ? 'control-chip control-chip--danger' : 'control-chip'}
-            disabled={generateMutation.isPending}
-            onClick={() => {
-              if (
-                !configured ||
-                window.confirm(
-                  'New keys sign out every subscribed device; each one must press Enable again. Continue?',
-                )
-              ) {
-                generateMutation.mutate();
-              }
-            }}
-          >
-            {configured ? 'Replace keys' : 'Generate keys'}
-          </button>
           <button
             type="button"
             className="control-chip control-chip--ghost"
@@ -603,12 +603,26 @@ function PushAdminCard(props: {
           >
             Send test to all devices
           </button>
+          {configured && (
+            <button
+              type="button"
+              className="control-chip control-chip--danger"
+              disabled={generateMutation.isPending}
+              onClick={() => {
+                if (window.confirm('Sign out all devices from push?')) {
+                  generateMutation.mutate();
+                }
+              }}
+            >
+              Reset keys
+            </button>
+          )}
         </div>
         {generateMutation.error && (
           <p className="config-hint">{errorText(generateMutation.error)}</p>
         )}
         <label className="form-field">
-          <span>Contact (sent to push services with each message)</span>
+          <span>Contact email</span>
           <input
             className="control-input"
             value={props.subject}
@@ -623,12 +637,11 @@ function PushAdminCard(props: {
             disabled={props.busy}
             onClick={props.onSaveSubject}
           >
-            Save contact
+            Save
           </button>
         </div>
         {props.notice && <p className="config-hint">{props.notice}</p>}
-        <h4>Subscribed devices</h4>
-        {subsQuery.data && subsQuery.data.length > 0 ? (
+        {subsQuery.data && subsQuery.data.length > 0 && (
           <div className="table-scroll">
             <table className="table">
               <thead>
@@ -659,11 +672,9 @@ function PushAdminCard(props: {
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="empty-state">No devices subscribed.</p>
         )}
       </div>
-    </article>
+    </ChannelRow>
   );
 }
 
@@ -720,22 +731,15 @@ function MatterCard(props: {
           : 'starting';
 
   return (
-    <article className="config-card">
-      <header>
-        <h3>Apple Home / Google Home (Matter)</h3>
-        <p>
-          AntiHunter appears as occupancy sensors: one for any alert, one for critical alerts. Needs
-          a home hub (HomePod, Apple TV or Nest). State: <strong>{state}</strong>
-        </p>
-      </header>
-      <div className="config-card__body">
+    <ChannelRow title="Apple Home / Google Home" on={state === 'paired'} status={state}>
+      <div>
         <label className="control-checkbox">
           <input
             type="checkbox"
             checked={props.enabled}
             onChange={(event) => props.onEnabled(event.target.checked)}
           />
-          <span>Run the Matter device</span>
+          <span>On</span>
         </label>
         <label className="form-field">
           <span>Layout</span>
@@ -744,21 +748,14 @@ function MatterCard(props: {
             value={props.layout}
             onChange={(event) => props.onLayout(event.target.value as 'bridge' | 'flat')}
           >
-            <option value="bridge">Bridge with named sensors (new pairings)</option>
-            <option value="flat">Two unnamed sensors (pairings made before the bridge)</option>
+            <option value="bridge">Named sensors</option>
+            <option value="flat">Unnamed sensors (older pairings)</option>
           </select>
         </label>
-        <p className="config-hint">
-          Changing the layout changes how Home sees the device. Remove AntiHunter from Home and pair
-          again after switching.
-        </p>
         {status?.running && status.commissioned === false && qrDataUrl && (
           <div className="form-field">
             <img src={qrDataUrl} alt="Matter pairing QR code" width={200} height={200} />
-            <p className="config-hint">
-              iPhone: Home app → + → Add Accessory, point the camera here. Android: Google Home →
-              Devices → Add → Matter-enabled device, scan. Or type the setup code below.
-            </p>
+            <p className="config-hint">Home app → + → Add Accessory → scan.</p>
           </div>
         )}
         {status?.running && status.commissioned === false && (
@@ -768,16 +765,12 @@ function MatterCard(props: {
               <input className="control-input" readOnly value={status.manualPairingCode ?? ''} />
             </label>
             <label>
-              <span>8-digit passcode</span>
+              <span>Passcode</span>
               <input className="control-input" readOnly value={status.passcode ?? ''} />
             </label>
           </div>
         )}
-        <p className="config-hint">
-          Runs as {status?.runtime ?? '...'}. On macOS, allow only the signed ahcc-matter app in the
-          firewall, never node.
-          {status?.lastExit ? ` Last exit: ${status.lastExit}.` : ''}
-        </p>
+        {status?.lastExit && <p className="config-hint">Last exit: {status.lastExit}</p>}
         <div className="controls-row">
           <button
             type="button"
@@ -793,7 +786,7 @@ function MatterCard(props: {
             disabled={!status?.running || props.busy}
             onClick={props.onTest}
           >
-            Test (both sensors on)
+            Test
           </button>
           <button
             type="button"
@@ -808,11 +801,7 @@ function MatterCard(props: {
             className="control-chip control-chip--danger"
             disabled={!status?.running || eraseMutation.isPending}
             onClick={() => {
-              if (
-                window.confirm(
-                  'Reset pairing removes AntiHunter from every connected home and shows a new setup code. Continue?',
-                )
-              ) {
+              if (window.confirm('Unpair from all homes?')) {
                 eraseMutation.mutate();
               }
             }}
@@ -822,6 +811,6 @@ function MatterCard(props: {
         </div>
         {props.notice && <p className="config-hint">{props.notice}</p>}
       </div>
-    </article>
+    </ChannelRow>
   );
 }
