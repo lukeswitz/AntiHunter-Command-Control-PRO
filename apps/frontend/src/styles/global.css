@@ -3495,6 +3495,17 @@ body.theme-dark .control-chip[disabled] {
   font-size: 0.95rem;
   color: #334155;
 }
+.auth-overlay__form label.auth-overlay__remember {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.auth-overlay__remember input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+}
 .auth-overlay__form input[type='email'],
 .auth-overlay__form input[type='password'],
 .auth-overlay__form input[type='text'],
@@ -6125,9 +6136,57 @@ body.theme-dark .strategy-table__row--selected {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.35rem;
 }
 .channel-row__head h3 {
   margin: 0;
   font-size: 0.95rem;
+}
+.remote-subsection > * + * {
+  margin-top: 0.85rem;
+}
+.remote-subsection .field-hint {
+  margin-top: 0.25rem;
+}
+.remote-subsection .control-checkbox,
+.remote-subsection .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.remote-subsection .controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.remote-subsection .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+.remote-subsection .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.alert-sources-table th:not(:first-child),
+.alert-sources-table td:not(:first-child) {
+  width: 5.5rem;
+  text-align: center;
+}
+.alert-sources-table tbody tr:nth-child(even) td {
+  background: rgba(148, 163, 184, 0.06);
+}
+.alert-sources-table .alert-group-row td {
+  background: rgba(var(--color-accent-rgb), 0.1);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: 0.4rem 0.75rem;
+}
+.alert-sources-table input[type='checkbox'] {
+  cursor: pointer;
 }
