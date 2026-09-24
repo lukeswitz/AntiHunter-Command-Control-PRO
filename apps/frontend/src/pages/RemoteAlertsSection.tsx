@@ -531,7 +531,13 @@ function SignalSetup() {
       <ol className="config-steps">
         {steps.map((step, index) => (
           <li key={index}>
-            {step.text}
+            {step.url ? (
+              <a href={step.url} target="_blank" rel="noreferrer">
+                {step.text}
+              </a>
+            ) : (
+              step.text
+            )}
             {step.cmd && <code>{step.cmd}</code>}
           </li>
         ))}

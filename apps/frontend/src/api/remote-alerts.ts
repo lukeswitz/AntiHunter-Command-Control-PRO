@@ -110,7 +110,7 @@ export const getSignalSetup = () =>
     platform: string;
     arch: string;
     supported: boolean;
-    steps: { text: string; cmd?: string }[];
+    steps: { text: string; cmd?: string; url?: string }[];
     controls: { start: string; stop: string; restart: string } | null;
   }>('/remote-alerts/signal/setup');
 
