@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import { RemoteAlertConfig, Role } from '@prisma/client';
 
@@ -15,6 +16,7 @@ import { UpdateRemoteAlertConfigDto } from './dto/update-remote-alert-config.dto
 import { MatterService } from './matter.service';
 import { PushService } from './push.service';
 import { RemoteAlertConfigService } from './remote-alert-config.service';
+import { TwoFactorRequiredGuard } from './two-factor-required.guard';
 import { Roles } from '../auth/auth.decorators';
 
 const CHANNELS: AlertChannel[] = ['push', 'ntfy', 'signal', 'matrix', 'matter'];
@@ -45,11 +47,13 @@ export class RemoteAlertsController {
   }
 
   @Put('config')
+  @UseGuards(TwoFactorRequiredGuard)
   async updateConfig(@Body() dto: UpdateRemoteAlertConfigDto) {
     return view(await this.config.update(dto));
   }
 
   @Delete('config/secret/:field')
+  @UseGuards(TwoFactorRequiredGuard)
   async clearSecret(@Param('field') field: string) {
     if (field !== 'ntfyToken' && field !== 'matrixAccessToken') {
       throw new BadRequestException('Unknown secret');
@@ -58,6 +62,7 @@ export class RemoteAlertsController {
   }
 
   @Post('vapid/generate')
+  @UseGuards(TwoFactorRequiredGuard)
   async generateVapid() {
     return { publicKey: await this.push.generateKeys() };
   }
@@ -68,6 +73,7 @@ export class RemoteAlertsController {
   }
 
   @Delete('push/subscriptions')
+  @UseGuards(TwoFactorRequiredGuard)
   async removeSubscription(@Body() body: { endpoint?: string }) {
     if (typeof body?.endpoint !== 'string') {
       throw new BadRequestException('endpoint is required');
@@ -77,6 +83,7 @@ export class RemoteAlertsController {
   }
 
   @Post('test/:channel')
+  @UseGuards(TwoFactorRequiredGuard)
   async test(@Param('channel') channel: string) {
     if (!CHANNELS.includes(channel as AlertChannel)) {
       throw new BadRequestException('Unknown channel');
@@ -100,12 +107,14 @@ export class RemoteAlertsController {
   }
 
   @Post('matter/restart')
+  @UseGuards(TwoFactorRequiredGuard)
   async matterRestart() {
     await this.matter.restart();
     return this.matter.status();
   }
 
   @Post('matter/erase')
+  @UseGuards(TwoFactorRequiredGuard)
   async matterErase() {
     await this.matter.erase();
     return this.matter.status();
