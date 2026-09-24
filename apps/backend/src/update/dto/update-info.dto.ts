@@ -20,6 +20,9 @@ export class UpdateInfoDto {
   canUpdate!: boolean;
   blockers?: string[];
   warning?: string;
+  deployment?: 'container' | 'systemd' | 'pm2' | 'host';
+  canSelfUpdate?: boolean;
+  containerUpdateCommand?: string;
 }
 
 export class GitRemoteDto {

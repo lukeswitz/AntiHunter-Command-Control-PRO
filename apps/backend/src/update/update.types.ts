@@ -44,6 +44,9 @@ export interface UpdateInfo {
   lastCheckAt: string;
   error?: string;
   warning?: string;
+  deployment?: 'container' | 'systemd' | 'pm2' | 'host';
+  canSelfUpdate?: boolean;
+  containerUpdateCommand?: string;
 }
 
 export type DatabaseSchemaState = 'up-to-date' | 'pending' | 'failed' | 'unreachable' | 'unknown';

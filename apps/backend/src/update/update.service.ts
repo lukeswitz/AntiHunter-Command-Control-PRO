@@ -110,6 +110,26 @@ export class UpdateService implements OnModuleInit {
     return enabled && (isProduction || allowInDev);
   }
 
+  private detectDeployment(): 'container' | 'systemd' | 'pm2' | 'host' {
+    if (existsSync('/.dockerenv') || process.env.KUBERNETES_SERVICE_HOST) {
+      return 'container';
+    }
+    if (process.env.pm_id !== undefined || process.env.PM2_HOME) {
+      return 'pm2';
+    }
+    if (process.env.INVOCATION_ID || process.env.JOURNAL_STREAM) {
+      return 'systemd';
+    }
+    return 'host';
+  }
+
+  private canSelfRelaunch(deployment = this.detectDeployment()): boolean {
+    return deployment === 'systemd' || deployment === 'pm2';
+  }
+
+  private readonly containerUpdateCommand =
+    'git pull && docker compose up -d --build   # (or let Watchtower pull new images)';
+
   /**
    * List configured git remotes, flagging the one used by default
    */
@@ -236,6 +256,7 @@ export class UpdateService implements OnModuleInit {
       }
 
       const { remote, branch, currentBranch } = await this.resolveSource(overrides);
+      const deployment = this.detectDeployment();
 
       this.logger.log(`Comparing HEAD (${currentBranch}) against ${remote}/${branch}`);
 
@@ -270,6 +291,10 @@ export class UpdateService implements OnModuleInit {
         remoteCommitAuthor: remoteCommitDetails?.author,
         lastCheckAt: new Date().toISOString(),
         warning,
+        deployment,
+        canSelfUpdate: deployment !== 'container',
+        containerUpdateCommand:
+          deployment === 'container' ? this.containerUpdateCommand : undefined,
       };
 
       // Cache the result
@@ -418,6 +443,13 @@ export class UpdateService implements OnModuleInit {
       throw new Error('Auto-update is disabled');
     }
 
+    const deployment = this.detectDeployment();
+    if (deployment === 'container') {
+      throw new Error(
+        `In-app update is not available for container deployments — a container cannot rebuild its own image. Update from the host: ${this.containerUpdateCommand}`,
+      );
+    }
+
     const source = await this.resolveSource({ remote: options.remote, branch: options.branch });
     const remote = source.remote;
     const branch = source.branch;
@@ -562,20 +594,24 @@ export class UpdateService implements OnModuleInit {
       this.logger.log(`Update completed successfully in ${durationSeconds} seconds`);
       this.logger.warn('Service restart required to apply changes');
 
-      // Auto-restart only in production (don't exit dev server)
-      const isProduction = process.env.NODE_ENV === 'production';
+      // Restart to load the new code: only exit when a supervisor will relaunch us
       const autoRestart = process.env.AUTO_RESTART_AFTER_UPDATE !== 'false';
+      const isDev = process.env.NODE_ENV !== 'production';
 
-      if (isProduction && autoRestart) {
-        this.logger.warn('Auto-restart enabled. Exiting process in 3 seconds...');
+      if (isDev) {
+        this.logger.warn('Development mode — code updated; ts-node-dev/Vite reloads automatically');
+      } else if (autoRestart && this.canSelfRelaunch(deployment)) {
+        this.logger.warn(
+          `Auto-restart (${deployment}) — exiting in 3 seconds for the supervisor to relaunch...`,
+        );
         setTimeout(() => {
           this.logger.log('Initiating auto-restart...');
-          process.exit(0); // Clean exit - process manager will restart
+          process.exit(0);
         }, 3000);
-      } else if (!isProduction) {
-        this.logger.warn('Development mode - manual restart required to apply changes');
       } else {
-        this.logger.warn('Auto-restart disabled. Manual restart required.');
+        this.logger.warn(
+          'Build complete — restart the backend to apply (no supervisor detected to auto-relaunch)',
+        );
       }
     } catch (error: unknown) {
       const err = error as Error;
