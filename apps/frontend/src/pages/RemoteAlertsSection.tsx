@@ -441,6 +441,10 @@ function SignalLink() {
   }
   return (
     <div className="form-field">
+      <p className="config-hint config-hint--warn">
+        Linking adds AHCC as a Signal device on this account. Use a dedicated Signal number, not
+        your personal one. Keep the connector on the AHCC host only.
+      </p>
       {qrUrl ? (
         <>
           <img src={qrUrl} alt="Signal link QR code" width={200} height={200} />
@@ -492,7 +496,6 @@ function AlertLevelsCard(props: {
     <article className="config-card">
       <header>
         <h3>Alert sources</h3>
-        <p>Notify: phone, Signal, ntfy, Matrix, Home Alert sensor. Critical: adds Home Critical.</p>
       </header>
       <div className="config-card__body">
         <div className="table-scroll">
