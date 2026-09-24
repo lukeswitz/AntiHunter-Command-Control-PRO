@@ -108,7 +108,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Alert Event Log**: the Alerts nav rail contains an Event Log page that mirrors Config’s layout—dark rail on the left, stacked cards on the right—so you can filter, search, and acknowledge past alert hits without leaving the module.
 - **Webhook engine**: alert matches, inventory updates, node telemetry, and raw serial traffic can fan out to HTTPS endpoints with optional mutual TLS (CA bundle + client cert/key) and HMAC signatures. Hooks are configured under **Config → Webhooks** with inline testing, per-event subscription toggles, and automatic delivery logging.
 - **Secure runtime**: webhook dispatchers let you disable TLS validation for lab setups or enforce full-chain verification in production. Client certificates and private keys are stored encrypted in the database, and Prisma migrations now cover inventory update events plus serial/raw tap targets.
-- **Remote access & phone alerts**: **Config → Remote Access & Alerts** controls a built-in Tailscale entrance with a login allowlist, end-to-end encrypted phone push (installable web app, iOS 16.4+ from the Home Screen), Signal, ntfy and Matrix alerts, and a Matter device that shows up in Apple Home and Google Home as occupancy sensors. Alerts carry rule, severity, device MAC, SSID, RSSI, channel, node, location and time. Step-by-step setup: [Remote Connections](docs/INTERNET-CONNECTIVITY.md).
+- **Remote access & phone alerts**: Tailscale access, encrypted phone push, Signal, ntfy, Matrix, and Apple/Google Home sensors, set in **Config → Remote Access & Alerts**. Setup: [Remote Connections](docs/INTERNET-CONNECTIVITY.md).
 - **Operator UX**: the Alerts, Config, and Addons pages now share the same shell (sidebar buttons outside the card, stacked sections within) so the experience is consistent no matter which subsystem you configure.
 
 ### Sentinel Command Console & Attack Telemetry
@@ -363,12 +363,10 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | `LISTEN_HOST`                                                                  | `127.0.0.1` | Address the backend binds to. `0.0.0.0` exposes it to the network; Docker sets it inside the container only. |
 | `TRUST_PROXY`                                                                  | `loopback` | Express `trust proxy`: which hops may set `X-Forwarded-For`. Addresses/CIDRs, or a hop count (Docker uses `1` for nginx). |
 | `AHCC_ALLOWED_HOSTS`                                                           | _(unset)_ | `apps/frontend/.env`: extra hostnames the Vite dev server accepts, comma-separated (e.g. your `*.ts.net` name). |
-| `TS_AUTHKEY`, `TS_HOSTNAME`                                                    | _(unset)_, `ahcc` | Docker `remote` profile: tagged Tailscale auth key and machine name for the built-in Tailscale container. |
-| `VAPID_*`, `TS_ALLOWED_LOGINS`, `NTFY_*`, `SIGNAL_*`, `MATRIX_*`, `AHCC_MATTER_ENABLED`, `AHCC_MATTER_LAYOUT` | _(unset)_ | Read once, on first start, into **Config → Remote Access & Alerts**. After that the database holds them; change them in the UI. |
-| `AHCC_MATTER_BIN`                                                              | _(unset)_ | Path to the signed `ahcc-matter` executable (`apps/backend/tools/matter/build.sh`). Unset runs the Matter device on node. |
-| `AHCC_MATTER_STORAGE`, `AHCC_MATTER_PORT`, `AHCC_MATTER_PASSCODE`              | `./.matter`, `5540`, random | Matter pairing state (kept `0700`), UDP port, and a fixed 8-digit setup passcode. |
-| `AHCC_MATTER_INTERFACE`                                                        | _(unset)_ | Network interface the Matter device listens and announces on (e.g. `en0`). Unset uses all interfaces. |
-| `REMOTE_ALERTS_SECRET_KEY` / `REMOTE_ALERTS_KEY_FILE`                          | _(unset)_ / `./.secrets/remote-alerts.key` | Key that encrypts alert tokens and the push signing key in the database. Unset generates a random key file (`0600`) on first start; back it up with the database. |
+| `TS_AUTHKEY`, `TS_HOSTNAME`                                                    | _(unset)_, `ahcc` | Tailscale container (Docker `remote` profile). |
+| `VAPID_*`, `TS_ALLOWED_LOGINS`, `NTFY_*`, `SIGNAL_*`, `MATRIX_*`               | _(unset)_ | First-start defaults for **Config → Remote Access & Alerts**; edit there after. |
+| `AHCC_MATTER_BIN`, `AHCC_MATTER_INTERFACE`                                     | _(unset)_ | Signed Matter app path; network interface to bind (e.g. `en0`). |
+| `REMOTE_ALERTS_SECRET_KEY`                                                     | key file  | Encrypts alert secrets. Unset: random key in `.secrets/`; back it up. |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS.        |
 | `SITE_ID`                                                                      | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing.    |
 
@@ -405,9 +403,9 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | TAK/CoT bridge               | 8087 / 8089   | Use TLS profiles when possible; generate per-client API keys; segregate on dedicated security group. |
 | Prometheus / Metrics scrape  | 9100+         | Keep behind VPN and IP allowlists; disable if metrics are collected by sidecars.                     |
 | SMTP relay                   | 587 / 465     | Require STARTTLS/SMTPS with credential auth; scope accounts to command notifications only.           |
-| Tailscale entrance (Docker)  | 8081 (internal) | nginx block reached only by the Tailscale container; every request checked against the allowed Tailscale logins. Never publish it. |
-| Matter device                | 5540 UDP + mDNS 5353 | LAN only, off by default. On macOS allow only the signed `ahcc-matter` app in the firewall, never `node`. |
-| signal-api (Docker)          | none          | No published port; only the backend reaches it on the `signal` network. Its API has no password. |
+| Tailscale entrance (Docker)  | 8081 (internal) | Allowed Tailscale logins only. Never publish. |
+| Matter device                | 5540 UDP, 5353 | LAN only, off by default. Firewall: allow `ahcc-matter` only. |
+| signal-api (Docker)          | none          | Backend-only network, no published port. |
 
 ## Repository Layout
 
