@@ -204,13 +204,14 @@ AHCC links a Signal device (like Signal Desktop) and posts to a private **AntiHu
 1. **Use a dedicated Signal number**, not your personal one. A linked device is account-wide; keep it on a number that does nothing else.
 2. Start the connector for your install:
    - **Docker:** `docker compose --profile signal up -d` — runs the connector and proxy, neither published.
-   - **Host (no Docker):** nothing to start. On an x86_64 Linux host AHCC downloads signal-cli, verifies it against a pinned checksum, and runs it itself the first time you link. It stays under `<backend cwd>/.signal-cli` (`AHCC_SIGNAL_HOME` to change).
+   - **Host, x86_64 Linux:** nothing to start. AHCC downloads signal-cli, verifies it against a pinned checksum, and runs it itself the first time you link (stored under `<backend cwd>/.signal-cli`, `AHCC_SIGNAL_HOME` to change).
+   - **Host, macOS / arm:** signal-cli has no native build there, so run the connector container yourself. The in-app **Signal** card detects Docker/Colima and prints the exact command (container `cc_signal` on `127.0.0.1:8079`) plus start/stop/restart and a Docker install link. AHCC auto-detects the connector on that loopback port — no `SIGNAL_API_URL` to set.
 3. **Config** → **Remote Access & Alerts** → **Signal** → tick **Send alerts to Signal** → **Link Signal**. On the phone: Signal → **Settings** → **Linked devices** → **+** → scan the QR. Then **Send test**.
 4. Add other people by opening the **AntiHunter Alerts** group in Signal and inviting them. The group is created admin-only (no member can add others, post, or share an invite link), so alerts stay one-way.
 
 **Check:** the **AntiHunter Alerts** group gets `AntiHunter test`.
 
-**Host mode (no Docker)** drives signal-cli directly — no proxy, because AHCC is the only caller and only ever runs send-to-group. The binary and account data stay under `AHCC_SIGNAL_HOME` at `0700`; nothing listens on the network. Auto-acquire is x86_64 Linux only; on any other host use the Docker profile. **Check for updates** on the Signal card compares the installed signal-cli against the latest release.
+**Host mode, Linux** calls signal-cli directly — no proxy, because AHCC is the only caller and only ever runs send-to-group. The binary and account data stay under `AHCC_SIGNAL_HOME` at `0700`. Auto-acquire is x86_64 Linux only; elsewhere the in-app card walks you through the loopback Docker connector (`127.0.0.1:8079`). **Check for updates** on the Signal card compares the installed signal-cli against the latest release.
 
 ### ntfy
 

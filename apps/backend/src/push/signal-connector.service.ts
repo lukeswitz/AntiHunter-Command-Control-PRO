@@ -90,7 +90,7 @@ export class SignalConnectorService implements OnModuleDestroy {
     platform: string;
     arch: string;
     supported: boolean;
-    steps: Array<{ text: string; cmd?: string }>;
+    steps: Array<{ text: string; cmd?: string; url?: string }>;
     controls: { start: string; stop: string; restart: string } | null;
   }> {
     const platform = process.platform;
@@ -109,9 +109,9 @@ export class SignalConnectorService implements OnModuleDestroy {
       this.which('docker'),
       this.which('colima'),
     ]);
-    const steps: Array<{ text: string; cmd?: string }> = [];
+    const steps: Array<{ text: string; cmd?: string; url?: string }> = [];
     if (!dockerFound) {
-      steps.push({ text: 'Install Docker from https://docs.docker.com/get-docker/' });
+      steps.push({ text: 'Install Docker', url: 'https://docs.docker.com/get-docker/' });
     } else if (colimaFound) {
       steps.push({ text: 'Start the Docker VM', cmd: 'colima start' });
     }
