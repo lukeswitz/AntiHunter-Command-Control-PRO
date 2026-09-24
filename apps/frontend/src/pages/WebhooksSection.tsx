@@ -127,7 +127,8 @@ export function PushNotificationsCard() {
         <h3>Alerts on this device</h3>
       </div>
       <p className="field-hint">
-        End-to-end encrypted push to this browser. iPhone: add to Home Screen first.
+        End-to-end encrypted push to this browser. Works in-browser on Android and desktop; on
+        iPhone, add to Home Screen first.
       </p>
       <div>
         {!supported ? (

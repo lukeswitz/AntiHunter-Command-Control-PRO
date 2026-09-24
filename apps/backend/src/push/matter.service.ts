@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { AlarmLevel } from '@prisma/client';
 import { ChildProcess, spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -109,9 +110,23 @@ export class MatterService implements OnModuleInit, OnModuleDestroy {
     }
     const binary = process.env.AHCC_MATTER_BIN?.trim();
     const stdio: ['pipe', 'pipe', 'inherit'] = ['pipe', 'pipe', 'inherit'];
-    const helper = binary
-      ? spawn(binary, [], { env, stdio })
-      : spawn(process.execPath, [join(__dirname, 'matter-helper.js')], { env, stdio });
+    const jsHelper = join(__dirname, 'matter-helper.js');
+    let helper: ChildProcess;
+    if (binary) {
+      helper = spawn(binary, [], { env, stdio });
+    } else if (existsSync(jsHelper)) {
+      helper = spawn(process.execPath, [jsHelper], { env, stdio });
+    } else {
+      helper = spawn(
+        process.execPath,
+        ['-r', 'ts-node/register/transpile-only', join(__dirname, 'matter-helper.ts')],
+        {
+          env: { ...env, PATH: process.env.PATH, TS_NODE_TRANSPILE_ONLY: 'true' },
+          stdio,
+          cwd: join(__dirname, '..', '..'),
+        },
+      );
+    }
     this.helper = helper;
     this.helperStatus = null;
     this.stopping = false;

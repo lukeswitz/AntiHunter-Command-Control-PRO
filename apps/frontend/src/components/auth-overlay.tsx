@@ -29,7 +29,7 @@ export function AuthOverlay() {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [honeypotValue, setHoneypotValue] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const [preferredPreset, setPreferredPreset] = useState<ThemePresetId>('classic');
+  const [preferredPreset, setPreferredPreset] = useState<ThemePresetId>('tactical_ops');
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const formStartRef = useRef<number>(Date.now());
