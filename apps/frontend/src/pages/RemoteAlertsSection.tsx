@@ -508,7 +508,7 @@ function AlertLevelsCard(props: {
       </p>
       <div>
         <div className="table-scroll">
-          <table className="table">
+          <table className="data-table alert-sources-table">
             <thead>
               <tr>
                 <th>Source</th>
@@ -518,8 +518,8 @@ function AlertLevelsCard(props: {
             </thead>
             {groups.map((group) => (
               <tbody key={group}>
-                <tr>
-                  <th colSpan={3}>{group}</th>
+                <tr className="alert-group-row">
+                  <td colSpan={3}>{group}</td>
                 </tr>
                 {rows
                   .filter((row) => row.group === group)
