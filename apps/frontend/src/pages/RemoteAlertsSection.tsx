@@ -794,6 +794,7 @@ function MatterCard(props: {
   const status = statusQuery.data;
   const qrPayload = status?.qrPairingCode ?? null;
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [showPairing, setShowPairing] = useState(false);
   useEffect(() => {
     if (!qrPayload) {
       setQrDataUrl(null);
@@ -859,22 +860,33 @@ function MatterCard(props: {
             Paired. AntiHunter shows as occupancy sensors in your Home app.
           </p>
         )}
-        {status?.running && status.commissioned === false && qrDataUrl && (
-          <div className="form-field">
-            <img src={qrDataUrl} alt="Matter pairing QR code" width={200} height={200} />
-            <p className="config-hint">Home app → + → Add Accessory → scan.</p>
-          </div>
+        {status?.running && status.commissioned === false && !showPairing && (
+          <button
+            type="button"
+            className="control-chip control-chip--ghost"
+            onClick={() => setShowPairing(true)}
+          >
+            Show pairing code
+          </button>
         )}
-        {status?.running && status.commissioned === false && (
-          <div className="form-grid">
-            <label>
-              <span>Setup code</span>
-              <input className="control-input" readOnly value={status.manualPairingCode ?? ''} />
-            </label>
-            <label>
-              <span>Passcode</span>
-              <input className="control-input" readOnly value={status.passcode ?? ''} />
-            </label>
+        {status?.running && status.commissioned === false && showPairing && (
+          <div className="form-field">
+            {qrDataUrl && (
+              <>
+                <img src={qrDataUrl} alt="Matter pairing QR code" width={200} height={200} />
+                <p className="config-hint">Home app → + → Add Accessory → scan.</p>
+              </>
+            )}
+            <div className="form-grid">
+              <label>
+                <span>Setup code</span>
+                <input className="control-input" readOnly value={status.manualPairingCode ?? ''} />
+              </label>
+              <label>
+                <span>Passcode</span>
+                <input className="control-input" readOnly value={status.passcode ?? ''} />
+              </label>
+            </div>
           </div>
         )}
         {status?.lastExit && state === 'stopped' && (
