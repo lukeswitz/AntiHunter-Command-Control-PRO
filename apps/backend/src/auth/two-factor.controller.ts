@@ -86,7 +86,9 @@ export class TwoFactorController {
       if (ip) {
         await this.firewallService.registerAuthSuccess(ip, { path, userAgent });
       }
-      const token = this.authService.createToken(userId, email, role, true);
+      const token = this.authService.createToken(userId, email, role, true, {
+        rememberMe: req.auth?.rememberMe ?? false,
+      });
       const user = await this.authService.getUserById(userId);
       return {
         token,

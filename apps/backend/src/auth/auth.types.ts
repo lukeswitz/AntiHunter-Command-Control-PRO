@@ -6,6 +6,7 @@ export interface AuthTokenPayload {
   role: Role;
   legalAccepted: boolean;
   twoFactorPending?: boolean;
+  rememberMe?: boolean;
   iat: number;
   exp: number;
   tokenVersion?: number;

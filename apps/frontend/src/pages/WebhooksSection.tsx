@@ -122,12 +122,14 @@ export function PushNotificationsCard() {
   };
 
   return (
-    <article className="config-card">
-      <header>
+    <section className="remote-subsection">
+      <div className="channel-row__head">
         <h3>Alerts on this device</h3>
-        <p>iPhone: add to Home Screen first.</p>
-      </header>
-      <div className="config-card__body">
+      </div>
+      <p className="field-hint">
+        End-to-end encrypted push to this browser. iPhone: add to Home Screen first.
+      </p>
+      <div>
         {!supported ? (
           <p className="empty-state">Not supported here. Needs HTTPS.</p>
         ) : (
@@ -165,7 +167,7 @@ export function PushNotificationsCard() {
         )}
         {status && <p className="config-hint">{status}</p>}
       </div>
-    </article>
+    </section>
   );
 }
 
@@ -384,7 +386,7 @@ export function WebhooksSection() {
             </div>
           ) : (
             <p className="empty-state">
-              No webhooks configured yet. Use the form on the right to create one.
+              No webhooks configured yet. Use the form below to create one.
             </p>
           )}
         </div>

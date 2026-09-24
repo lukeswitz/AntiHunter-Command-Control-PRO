@@ -73,16 +73,12 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 export function RemoteAlertsSection() {
   const isAdmin = useAuthStore((state) => state.user?.role === 'ADMIN');
   return (
-    <div className="config-grid webhooks-stack">
+    <div className="config-card__body remote-alerts">
       <PushNotificationsCard />
       {isAdmin ? (
         <AdminCards />
       ) : (
-        <article className="config-card">
-          <div className="config-card__body">
-            <p className="empty-state">Only administrators can change remote access and alerts.</p>
-          </div>
-        </article>
+        <p className="empty-state">Only administrators can change remote access and alerts.</p>
       )}
     </div>
   );
@@ -124,13 +120,9 @@ function AdminCards() {
 
   if (configQuery.isLoading || !form || !configQuery.data) {
     return (
-      <article className="config-card">
-        <div className="config-card__body">
-          <p className="empty-state">
-            {configQuery.error ? errorText(configQuery.error) : 'Loading settings...'}
-          </p>
-        </div>
-      </article>
+      <p className="empty-state">
+        {configQuery.error ? errorText(configQuery.error) : 'Loading settings...'}
+      </p>
     );
   }
 
@@ -154,9 +146,6 @@ function AdminCards() {
 
       <PushAdminCard
         config={config}
-        subject={form.vapidSubject}
-        onSubject={(value) => set('vapidSubject', value)}
-        onSaveSubject={() => save('push', { vapidSubject: form.vapidSubject })}
         onTest={() => testMutation.mutate('push')}
         busy={busy}
         notice={notice.push}
@@ -166,6 +155,7 @@ function AdminCards() {
         title="Signal"
         on={config.signalEnabled && Boolean(config.signalNumber)}
         status={config.signalEnabled ? (config.signalNumber ? 'On' : 'Not linked') : 'Off'}
+        hint="End-to-end encrypted. Link a dedicated Signal number; alerts go to a private AntiHunter group."
       >
         <label className="control-checkbox">
           <input
@@ -201,6 +191,7 @@ function AdminCards() {
         title="ntfy"
         on={config.ntfyEnabled && Boolean(config.ntfyUrl)}
         status={config.ntfyEnabled ? 'On' : 'Off'}
+        hint="Your ntfy server can read alerts. Paste a topic URL and access token."
       >
         <label className="control-checkbox">
           <input
@@ -273,6 +264,7 @@ function AdminCards() {
         title="Matrix"
         on={config.matrixEnabled && config.hasMatrixAccessToken}
         status={config.matrixEnabled ? 'On' : 'Off'}
+        hint="Your own homeserver, not end-to-end encrypted. Enter homeserver, room and a bot token."
       >
         <label className="control-checkbox">
           <input
@@ -351,9 +343,15 @@ function AdminCards() {
         {noticeFor('matrix')}
       </ChannelRow>
 
-      <ChannelRow title="Webhooks" on={false} status="Discord, Slack, Home Assistant">
+      <section className="remote-subsection">
+        <div className="channel-row__head">
+          <h3>Webhooks</h3>
+        </div>
+        <p className="field-hint">
+          Discord, Slack, IFTTT or Home Assistant. Pick a preset and paste the URL.
+        </p>
         <WebhooksSection />
-      </ChannelRow>
+      </section>
 
       <MatterCard
         enabled={form.matterEnabled}
@@ -371,6 +369,7 @@ function AdminCards() {
       <ChannelRow
         title="Remote access (Tailscale)"
         on={config.tsAllowedLogins.length > 0}
+        hint="Reach AHCC over your private tailnet. Only the listed Tailscale logins get in."
         status={
           config.tsAllowedLogins.length ? `${config.tsAllowedLogins.length} allowed` : 'Nobody'
         }
@@ -401,15 +400,22 @@ function AdminCards() {
   );
 }
 
-function ChannelRow(props: { title: string; status: string; on: boolean; children: ReactNode }) {
+function ChannelRow(props: {
+  title: string;
+  status: string;
+  on: boolean;
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
-    <details className="config-card channel-row">
-      <summary>
-        <span className="channel-row__title">{props.title}</span>
+    <section className="remote-subsection">
+      <div className="channel-row__head">
+        <h3>{props.title}</h3>
         <span className={props.on ? 'badge badge--active' : 'badge'}>{props.status}</span>
-      </summary>
-      <div className="config-card__body">{props.children}</div>
-    </details>
+      </div>
+      {props.hint && <p className="field-hint">{props.hint}</p>}
+      {props.children}
+    </section>
   );
 }
 
@@ -493,11 +499,14 @@ function AlertLevelsCard(props: {
   const setTier = (key: string, tier: AlertTier) => setDraft((prev) => ({ ...prev, [key]: tier }));
 
   return (
-    <article className="config-card">
-      <header>
+    <section className="remote-subsection">
+      <div className="channel-row__head">
         <h3>Alert sources</h3>
-      </header>
-      <div className="config-card__body">
+      </div>
+      <p className="field-hint">
+        Notify sends to your channels. Critical also lights the Home critical sensor.
+      </p>
+      <div>
         <div className="table-scroll">
           <table className="table">
             <thead>
@@ -559,15 +568,12 @@ function AlertLevelsCard(props: {
         </div>
         {props.notice && <p className="config-hint">{props.notice}</p>}
       </div>
-    </article>
+    </section>
   );
 }
 
 function PushAdminCard(props: {
   config: RemoteAlertConfig;
-  subject: string;
-  onSubject: (value: string) => void;
-  onSaveSubject: () => void;
   onTest: () => void;
   busy: boolean;
   notice?: string;
@@ -595,6 +601,7 @@ function PushAdminCard(props: {
       title="Phone push"
       on={Boolean(subsQuery.data?.length)}
       status={subsQuery.data?.length ? `${subsQuery.data.length} device(s)` : 'No devices'}
+      hint="Each user enables push on their own device above. Manage keys and devices here."
     >
       <div>
         <div className="controls-row">
@@ -624,25 +631,6 @@ function PushAdminCard(props: {
         {generateMutation.error && (
           <p className="config-hint">{errorText(generateMutation.error)}</p>
         )}
-        <label className="form-field">
-          <span>Contact email</span>
-          <input
-            className="control-input"
-            value={props.subject}
-            placeholder="mailto:admin@example.com"
-            onChange={(event) => props.onSubject(event.target.value)}
-          />
-        </label>
-        <div className="controls-row">
-          <button
-            type="button"
-            className="control-chip"
-            disabled={props.busy}
-            onClick={props.onSaveSubject}
-          >
-            Save
-          </button>
-        </div>
         {props.notice && <p className="config-hint">{props.notice}</p>}
         {subsQuery.data && subsQuery.data.length > 0 && (
           <div className="table-scroll">
@@ -734,7 +722,12 @@ function MatterCard(props: {
           : 'starting';
 
   return (
-    <ChannelRow title="Apple Home / Google Home" on={state === 'paired'} status={state}>
+    <ChannelRow
+      title="Apple Home / Google Home"
+      on={state === 'paired'}
+      status={state}
+      hint="Shows AntiHunter as occupancy sensors in Apple/Google Home. Needs a home hub; scan the code to pair."
+    >
       <div>
         <label className="control-checkbox">
           <input

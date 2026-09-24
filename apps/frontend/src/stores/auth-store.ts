@@ -21,6 +21,7 @@ type AuthStatus = 'checking' | 'login' | 'legal' | 'twoFactor' | 'authenticated'
 type LoginMeta = {
   submittedAt?: number;
   honeypot?: string;
+  rememberMe?: boolean;
 };
 
 interface AuthState {
@@ -121,6 +122,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       if (typeof meta?.submittedAt === 'number') {
         payload.submittedAt = meta.submittedAt;
+      }
+      if (meta?.rememberMe) {
+        payload.rememberMe = true;
       }
 
       const response = await apiClient.post<LoginResponse>('/auth/login', payload, {

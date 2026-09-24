@@ -28,6 +28,7 @@ export function AuthOverlay() {
   const [ackChecked, setAckChecked] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [honeypotValue, setHoneypotValue] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [preferredPreset, setPreferredPreset] = useState<ThemePresetId>('classic');
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -88,6 +89,7 @@ export function AuthOverlay() {
     void login(email, password, {
       submittedAt: formStartRef.current,
       honeypot: honeypotValue,
+      rememberMe,
     });
     formStartRef.current = Date.now();
   };
@@ -226,6 +228,14 @@ export function AuthOverlay() {
                 autoComplete="current-password"
                 onChange={(event) => setPassword(event.target.value)}
               />
+            </label>
+            <label className="checkbox-label auth-overlay__remember">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+              />
+              Keep me signed in for 10 days
             </label>
             <button type="submit" className="submit-button" disabled={isSubmitting}>
               {isSubmitting ? 'Signing in.' : 'Sign In'}
