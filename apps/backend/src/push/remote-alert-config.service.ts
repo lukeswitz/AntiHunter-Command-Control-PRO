@@ -6,7 +6,7 @@ import { SecretBox } from './secret-box';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SEALED_FIELDS = ['vapidPrivateKey', 'ntfyToken', 'matrixAccessToken'] as const;
-const PLAIN_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', 'signal-api']);
+const PLAIN_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', 'signal-api', 'signal-proxy']);
 
 export type RemoteAlertConfigUpdate = Partial<
   Omit<RemoteAlertConfig, 'id' | 'updatedAt' | 'vapidPublicKey' | 'vapidPrivateKey'>

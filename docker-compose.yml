@@ -124,12 +124,30 @@ services:
     environment:
       MODE: native
     networks:
-      - signal
+      - signal-internal
     volumes:
       - signal-state:/home/.local/share/signal-cli
 
+  signal-proxy:
+    image: node:20-bookworm-slim
+    container_name: cc_signal_proxy
+    profiles: ['signal']
+    restart: unless-stopped
+    command: ['node', '/app/proxy.mjs']
+    environment:
+      SIGNAL_UPSTREAM: http://signal-api:8080
+      PORT: '8080'
+    volumes:
+      - ./docker/signal-proxy/proxy.mjs:/app/proxy.mjs:ro
+    networks:
+      - signal
+      - signal-internal
+    depends_on:
+      - signal-api
+
 networks:
   signal: {}
+  signal-internal: {}
 
 volumes:
   postgres-data:
