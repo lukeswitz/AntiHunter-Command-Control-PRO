@@ -101,7 +101,7 @@ function AdminCards() {
 
   useEffect(() => {
     if (configQuery.data) {
-      setForm(toForm(configQuery.data));
+      setForm((prev) => prev ?? toForm(configQuery.data));
     }
   }, [configQuery.data]);
 
@@ -427,10 +427,6 @@ function AdminCards() {
             onChange={(event) => set('tsAllowedLogins', event.target.value)}
           />
         </label>
-        <p className="config-hint config-hint--warn">
-          Empty allowed-logins = nobody gets in. Your tailnet needs HTTPS/MagicDNS enabled and
-          tag:ahcc allowed in its ACLs.
-        </p>
         <div className="controls-row">
           <button
             type="button"
