@@ -67,9 +67,9 @@ const BASE_LAYERS = [
   },
   {
     key: 'dark',
-    name: 'Dark (Carto)',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    name: 'Dark (Esri)',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
   },
 ];
 const SLIDE_RANGE_METERS = 200;
@@ -1719,7 +1719,11 @@ ${nodesKml}
                     checked={layer.key === activeMapStyle}
                     name={layer.name}
                   >
-                    <TileLayer attribution={layer.attribution} url={layer.url} />
+                    <TileLayer
+                      attribution={layer.attribution}
+                      url={layer.url}
+                      maxNativeZoom={layer.key === 'dark' ? 16 : undefined}
+                    />
                   </LayersControl.BaseLayer>
                 ))}
               </LayersControl>
