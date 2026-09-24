@@ -163,7 +163,7 @@ Security: the tunnel dials out from the AHCC computer, so no port opens on your 
 3. Alerts to your phone: push, Signal, ntfy, Matrix, Discord, IFTTT, Home Assistant
 --------------------------------------------------------------------------------
 
-No remote access needed. AHCC dials out to the service when an alert rule fires, when an alert arrives over MQTT, and when a node reports an alert (attack, anomaly). Each message carries the rule and severity, the alert text, and the device MAC, SSID, RSSI, channel, node, location and time when the alert has them.
+No remote access needed. AHCC dials out to the service when an alert rule fires, when an alert arrives over MQTT, and when a node reports an ALERT-level event (attack, tamper, erase, ALERT-level vibration). Node heartbeats and other INFO/NOTICE messages are not sent. Each message carries the rule and severity, the alert text, and the device MAC, SSID, RSSI, channel, node, location and time when the alert has them.
 
 Set push, Signal, ntfy, Matrix and Matter in **Config** → **Remote Access & Alerts**. Only admins see these settings, and only admins with two-factor authentication turned on can change them or send tests ([step 0](#prep)). Each card has **Send test**.
 
@@ -259,7 +259,15 @@ Alert text from nodes can contain names chosen by whoever owns the detected devi
 3a. Apple Home and Google Home (Matter)
 --------------------------------------------------------------------------------
 
-AHCC can run a Matter device that Apple Home and Google Home add like any smart-home sensor. It shows two occupancy sensors, **AntiHunter Alert** (any alert) and **AntiHunter Critical** (critical alerts). Each turns on when an alert fires and turns off after 60 seconds. Home then sends its own notifications and can run automations (turn on lights, sound a HomePod). No alert text is sent, only on/off.
+AHCC can run a Matter device that Apple Home and Google Home add like any smart-home sensor. It shows two occupancy sensors:
+
+| Sensor | Turns on for |
+| ------ | ------------ |
+| **AntiHunter Alert** | every alert rule match (any severity), every alert from a federated MQTT site, and node alerts at ALERT level: deauth/disassoc attacks, tamper, erase, ALERT-level vibration |
+| **AntiHunter Critical** | alert rules you set to **CRITICAL** severity, and CRITICAL alerts from federated sites. Nodes never send CRITICAL on their own |
+
+Node heartbeats, GPS fixes, startup, baseline and new-device notices (INFO and NOTICE) do not trip either sensor or send phone alerts; they stay in the AHCC console. To get a phone alert or the Critical sensor for a specific device, create an alert rule for it and pick the severity.
+ Each turns on when an alert fires and turns off after 60 seconds. Home then sends its own notifications and can run automations (turn on lights, sound a HomePod). No alert text is sent, only on/off.
 
 Needs a home hub: HomePod, HomePod mini, Apple TV or iPad for Apple Home; a Nest speaker/display, Google TV Streamer or Nest Wifi Pro for Google Home. The phone and the AHCC computer must be on the same network while pairing.
 

@@ -246,20 +246,22 @@ export class WebhookDispatcherService {
     const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined);
     const num = (value: unknown) =>
       typeof value === 'number' && Number.isFinite(value) ? value : null;
-    this.pushAlert({
-      event: 'node.alert',
-      eventType: WebhookEventType.NODE_ALERT,
-      timestamp,
-      nodeId: event.nodeId ?? null,
-      severity: event.level as AlarmLevel,
-      message: options.message ?? event.message,
-      mac: text(data.mac) ?? text(data.src),
-      ssid: text(data.ssid) ?? text(data.name) ?? null,
-      rssi: num(data.rssi),
-      channel: num(data.channel),
-      lat: options.lat ?? null,
-      lon: options.lon ?? null,
-    });
+    if (event.level === 'ALERT' || event.level === 'CRITICAL') {
+      this.pushAlert({
+        event: 'node.alert',
+        eventType: WebhookEventType.NODE_ALERT,
+        timestamp,
+        nodeId: event.nodeId ?? null,
+        severity: event.level as AlarmLevel,
+        message: options.message ?? event.message,
+        mac: text(data.mac) ?? text(data.src),
+        ssid: text(data.ssid) ?? text(data.name) ?? null,
+        rssi: num(data.rssi),
+        channel: num(data.channel),
+        lat: options.lat ?? null,
+        lon: options.lon ?? null,
+      });
+    }
     await this.dispatchToSubscribers(WebhookEventType.NODE_ALERT, {
       event: 'node.alert',
       eventType: WebhookEventType.NODE_ALERT,
