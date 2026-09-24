@@ -440,7 +440,12 @@ function SignalLink() {
     return <p className="config-hint">Checking Signal…</p>;
   }
   if (!status.reachable) {
-    return <p className="config-hint">Signal connector not running.</p>;
+    return (
+      <p className="config-hint">
+        Signal connector not reachable. Start the signal-cli connector on the AHCC host (see the
+        Signal setup docs), then reload.
+      </p>
+    );
   }
   if (status.linkedNumber) {
     return <p className="config-hint">Linked. Alerts go to the “AntiHunter Alerts” group.</p>;

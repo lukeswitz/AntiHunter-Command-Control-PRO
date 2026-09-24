@@ -6122,14 +6122,14 @@ body.theme-dark .strategy-table__row--selected {
   margin-top: 0.6rem;
 }
 .remote-subsection {
-  padding-top: 1.25rem;
-  margin-top: 1.25rem;
-  border-top: 1px solid rgba(var(--color-accent-rgb), 0.12);
+  padding: 1.1rem 1.25rem;
+  margin-top: 1rem;
+  border: 1px solid rgba(var(--color-accent-rgb), 0.16);
+  border-radius: 0.75rem;
+  background: rgba(148, 163, 184, 0.05);
 }
 .remote-subsection:first-child {
-  padding-top: 0;
   margin-top: 0;
-  border-top: none;
 }
 .channel-row__head {
   display: flex;
@@ -6142,7 +6142,11 @@ body.theme-dark .strategy-table__row--selected {
   margin: 0;
   font-size: 0.95rem;
 }
-.remote-subsection > * + * {
+.remote-subsection > * + *,
+.remote-subsection > div > * + * {
+  margin-top: 0.85rem;
+}
+.remote-subsection label + label {
   margin-top: 0.85rem;
 }
 .remote-subsection .field-hint {
