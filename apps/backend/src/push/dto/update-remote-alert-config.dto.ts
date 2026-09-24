@@ -40,22 +40,7 @@ export class UpdateRemoteAlertConfigDto {
   @IsBoolean()
   signalEnabled?: boolean;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(2048)
-  signalApiUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(32)
-  signalNumber?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(50)
-  @IsString({ each: true })
-  @MaxLength(64, { each: true })
-  signalRecipients?: string[];
+  // clients cannot redirect Signal: number, apiUrl and recipients are set server-side only
 
   @IsOptional()
   @IsBoolean()

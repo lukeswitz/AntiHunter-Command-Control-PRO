@@ -184,7 +184,16 @@ export class AlertChannelsService {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: 'AntiHunter Alerts', members: [config.signalNumber] }),
+          body: JSON.stringify({
+            name: 'AntiHunter Alerts',
+            members: [config.signalNumber],
+            permissions: {
+              add_members: 'only-admins',
+              edit_group: 'only-admins',
+              send_messages: 'only-admins',
+            },
+            group_link: 'disabled',
+          }),
           redirect: 'error',
           signal: AbortSignal.timeout(30_000),
         },
