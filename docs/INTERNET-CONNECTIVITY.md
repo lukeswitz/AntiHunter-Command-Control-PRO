@@ -263,10 +263,12 @@ AHCC can run a Matter device that Apple Home and Google Home add like any smart-
 
 | Sensor | Turns on for |
 | ------ | ------------ |
-| **AntiHunter Alert** | every alert rule match (any severity), every alert from a federated MQTT site, and node alerts at ALERT level: deauth/disassoc attacks, tamper, erase, ALERT-level vibration |
-| **AntiHunter Critical** | alert rules you set to **CRITICAL** severity, and CRITICAL alerts from federated sites. Nodes never send CRITICAL on their own |
+| **AntiHunter Alert** | every source set to Alert or Critical |
+| **AntiHunter Critical** | only the sources you set to Critical |
 
-Node heartbeats, GPS fixes, startup, baseline and new-device notices (INFO and NOTICE) do not trip either sensor or send phone alerts; they stay in the AHCC console. To get a phone alert or the Critical sensor for a specific device, create an alert rule for it and pick the severity.
+You pick the level per source in **Config** → **Remote Access & Alerts** → **What counts as Alert or Critical**: each alert rule by name, each node event type (deauth/disassoc attack, tamper, erase, vibration, mesh guard, other ALERT-level events) and alerts from linked MQTT sites. Each source is **Off**, **Alert** or **Critical**. Everything starts as Alert and nothing is Critical until you choose it. The same levels apply to phone push, Signal, ntfy and Matrix: Critical messages start with `CRITICAL:` and use ntfy priority 5; Off sends nothing to those channels (webhooks and email are unchanged).
+
+Node heartbeats, GPS fixes, startup, baseline and new-device notices (INFO and NOTICE) never reach these channels; they stay in the AHCC console. To alert on a specific device, create an alert rule for it and set its level here.
  Each turns on when an alert fires and turns off after 60 seconds. Home then sends its own notifications and can run automations (turn on lights, sound a HomePod). No alert text is sent, only on/off.
 
 Needs a home hub: HomePod, HomePod mini, Apple TV or iPad for Apple Home; a Nest speaker/display, Google TV Streamer or Nest Wifi Pro for Google Home. The phone and the AHCC computer must be on the same network while pairing.

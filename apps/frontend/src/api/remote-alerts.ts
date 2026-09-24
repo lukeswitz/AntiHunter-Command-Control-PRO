@@ -18,8 +18,11 @@ export interface RemoteAlertConfig {
   matrixRoomId: string | null;
   matterEnabled: boolean;
   matterLayout: 'bridge' | 'flat';
+  alertTiers: Record<string, AlertTier>;
   updatedAt: string;
 }
+
+export type AlertTier = 'off' | 'alert' | 'critical';
 
 export type RemoteAlertConfigUpdate = Partial<{
   tsAllowedLogins: string[];
@@ -37,6 +40,7 @@ export type RemoteAlertConfigUpdate = Partial<{
   matrixRoomId: string;
   matterEnabled: boolean;
   matterLayout: 'bridge' | 'flat';
+  alertTiers: Record<string, AlertTier>;
 }>;
 
 export interface MatterStatus {

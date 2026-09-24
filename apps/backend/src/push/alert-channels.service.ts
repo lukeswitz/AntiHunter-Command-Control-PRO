@@ -4,7 +4,11 @@ import { randomUUID } from 'node:crypto';
 
 import { MatterService } from './matter.service';
 import { PushService } from './push.service';
-import { isAllowedChannelUrl, RemoteAlertConfigService } from './remote-alert-config.service';
+import {
+  isAllowedChannelUrl,
+  RemoteAlertConfigService,
+  tierFor,
+} from './remote-alert-config.service';
 
 const NTFY_PRIORITY: Record<AlarmLevel, string> = {
   INFO: '2',
@@ -29,9 +33,24 @@ export class AlertChannelsService {
     private readonly config: RemoteAlertConfigService,
   ) {}
 
-  async alert(title: string, body: string, severity?: AlarmLevel | null): Promise<void> {
+  async alert(
+    title: string,
+    body: string,
+    severity: AlarmLevel | null | undefined,
+    source: string,
+  ): Promise<void> {
     const config = await this.config.get();
-    this.matter.trigger(severity ?? null);
+    const tier = tierFor(config, source);
+    if (tier === 'off') {
+      return;
+    }
+    if (tier === 'critical') {
+      title = `CRITICAL: ${title}`;
+      severity = 'CRITICAL';
+    } else if (severity === 'CRITICAL') {
+      severity = 'ALERT';
+    }
+    this.matter.trigger(tier === 'critical' ? 'CRITICAL' : 'ALERT');
     await Promise.all([
       this.run('push', () => this.push.notify(title, body)),
       config.ntfyEnabled

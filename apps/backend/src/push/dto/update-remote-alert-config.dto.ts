@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -82,4 +83,8 @@ export class UpdateRemoteAlertConfigDto {
   @IsOptional()
   @IsIn(['bridge', 'flat'])
   matterLayout?: string;
+
+  @IsOptional()
+  @IsObject()
+  alertTiers?: Record<string, string>;
 }
