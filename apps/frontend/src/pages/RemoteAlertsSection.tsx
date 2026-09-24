@@ -207,27 +207,12 @@ function AdminCards() {
             <span>Send alerts to Signal</span>
           </label>
           <SignalLink />
-          <label className="form-field">
-            <span>Also send to (optional, one number per line)</span>
-            <textarea
-              className="control-input"
-              rows={2}
-              value={form.signalRecipients}
-              placeholder="+15551234567"
-              onChange={(event) => set('signalRecipients', event.target.value)}
-            />
-          </label>
           <div className="controls-row">
             <button
               type="button"
               className="control-chip"
               disabled={busy}
-              onClick={() =>
-                save('signal', {
-                  signalEnabled: form.signalEnabled,
-                  signalRecipients: lines(form.signalRecipients),
-                })
-              }
+              onClick={() => save('signal', { signalEnabled: form.signalEnabled })}
             >
               Save
             </button>
@@ -442,7 +427,7 @@ function SignalLink() {
     return <p className="config-hint">Signal connector not running.</p>;
   }
   if (status.linkedNumber) {
-    return <p className="config-hint">Linked: {status.linkedNumber}. Alerts go to Note to Self.</p>;
+    return <p className="config-hint">Linked. Alerts go to the “AntiHunter Alerts” group.</p>;
   }
   return (
     <div className="form-field">

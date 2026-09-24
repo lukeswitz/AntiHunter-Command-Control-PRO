@@ -171,17 +171,45 @@ export class AlertChannelsService {
     return Buffer.from(await response.arrayBuffer());
   }
 
+  private signalGroupCreation: Promise<string> | null = null;
+
+  private async ensureSignalGroup(config: RemoteAlertConfig): Promise<string> {
+    const existing = config.signalRecipients.find((value) => value.startsWith('group.'));
+    if (existing) {
+      return existing;
+    }
+    this.signalGroupCreation ??= (async () => {
+      const response = await fetch(
+        new URL(`/v1/groups/${encodeURIComponent(config.signalNumber!)}`, this.signalBase(config)),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'AntiHunter Alerts', members: [config.signalNumber] }),
+          redirect: 'error',
+          signal: AbortSignal.timeout(30_000),
+        },
+      );
+      const body = (await response.json().catch(() => ({}))) as { id?: unknown };
+      if (!response.ok || typeof body.id !== 'string') {
+        throw new Error(`Could not create the AntiHunter Alerts group (${response.status})`);
+      }
+      await this.config.update({ signalRecipients: [body.id] });
+      return body.id;
+    })().finally(() => {
+      this.signalGroupCreation = null;
+    });
+    return this.signalGroupCreation;
+  }
+
   private async sendSignal(config: RemoteAlertConfig, message: string, strict = false) {
     if (!config.signalNumber) {
       return this.missing(strict, 'Signal (link a device first)');
     }
-    const recipients = config.signalRecipients.length
-      ? config.signalRecipients
-      : [config.signalNumber];
+    const groupId = await this.ensureSignalGroup(config);
     await this.post(new URL('/v2/send', this.signalBase(config)), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, number: config.signalNumber, recipients }),
+      body: JSON.stringify({ message, number: config.signalNumber, recipients: [groupId] }),
     });
   }
 
