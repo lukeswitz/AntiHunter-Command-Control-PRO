@@ -96,7 +96,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         disclaimer: DEFAULT_DISCLAIMER,
         isSubmitting: false,
       });
-    } catch {
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      if (status !== 401 && status !== 403) {
+        setTimeout(() => void get().initialize(), 2_000);
+        return;
+      }
       storeAuthToken(null);
       set({
         status: 'login',
