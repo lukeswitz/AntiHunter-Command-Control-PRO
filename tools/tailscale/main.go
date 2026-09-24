@@ -106,11 +106,37 @@ func main() {
 		proxy.ServeHTTP(w, r)
 	})
 
-	ln, err := srv.ListenTLS("tcp", ":443")
+	running := func(https bool) {
+		fields := map[string]any{"allowed": len(allowed), "https": https}
+		if ip4, _ := srv.TailscaleIPs(); ip4.IsValid() {
+			fields["ip"] = ip4.String()
+		}
+		if st, serr := lc.StatusWithoutPeers(context.Background()); serr == nil && st.Self != nil {
+			fields["dnsName"] = strings.TrimSuffix(st.Self.DNSName, ".")
+			fields["tailnet"] = st.CurrentTailnet.Name
+		}
+		status("running", fields)
+	}
+
+	plain, err := srv.Listen("tcp", ":80")
 	if err != nil {
-		status("error", map[string]any{"message": "listen 443 (enable HTTPS/MagicDNS on the tailnet): " + err.Error()})
+		status("error", map[string]any{"message": "listen 80: " + err.Error()})
 		os.Exit(1)
 	}
+	go func() {
+		if err := http.Serve(plain, handler); err != nil {
+			status("error", map[string]any{"message": "serve: " + err.Error()})
+			os.Exit(1)
+		}
+	}()
+
+	ln, err := srv.ListenTLS("tcp", ":443")
+	for err != nil {
+		running(false)
+		time.Sleep(15 * time.Second)
+		ln, err = srv.ListenTLS("tcp", ":443")
+	}
+	running(true)
 	defer ln.Close()
 
 	if err := http.Serve(ln, handler); err != nil {
