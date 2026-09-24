@@ -86,6 +86,8 @@ function alertBody(context: WebhookDispatchContext): string {
   ].join('\n');
 }
 
+const NODE_ALERT_CATEGORIES = new Set(['attack', 'erase', 'mesh-guard', 'tamper', 'vibration']);
+
 function discordEscape(value: string): string {
   return value.replace(/[\\*_~`|>[\]()<@]/g, '\\$&');
 }
@@ -115,16 +117,17 @@ export class WebhookDispatcherService {
     private readonly channels: AlertChannelsService,
   ) {}
 
-  private pushAlert(context: WebhookDispatchContext): void {
+  private pushAlert(context: WebhookDispatchContext, source: string): void {
     void this.channels
-      .alert(alertTitle(context), alertBody(context), context.severity)
+      .alert(alertTitle(context), alertBody(context), context.severity, source)
       .catch((error) => {
         this.logger.warn(`Push notify failed: ${error instanceof Error ? error.message : error}`);
       });
   }
 
   async dispatchAlert(links: RuleWebhookLink[], context: WebhookDispatchContext): Promise<void> {
-    this.pushAlert(context);
+    const ruleId = context.ruleId ?? links?.[0]?.ruleId;
+    this.pushAlert(context, ruleId ? `rule:${ruleId}` : 'rule:unknown');
     if (!links?.length) {
       return;
     }
@@ -140,7 +143,7 @@ export class WebhookDispatcherService {
   }
 
   async dispatchExternalAlert(context: WebhookDispatchContext): Promise<void> {
-    this.pushAlert(context);
+    this.pushAlert(context, 'mqtt');
     await this.dispatchToSubscribers(WebhookEventType.ALERT_TRIGGERED, context);
   }
 
@@ -247,20 +250,23 @@ export class WebhookDispatcherService {
     const num = (value: unknown) =>
       typeof value === 'number' && Number.isFinite(value) ? value : null;
     if (event.level === 'ALERT' || event.level === 'CRITICAL') {
-      this.pushAlert({
-        event: 'node.alert',
-        eventType: WebhookEventType.NODE_ALERT,
-        timestamp,
-        nodeId: event.nodeId ?? null,
-        severity: event.level as AlarmLevel,
-        message: options.message ?? event.message,
-        mac: text(data.mac) ?? text(data.src),
-        ssid: text(data.ssid) ?? text(data.name) ?? null,
-        rssi: num(data.rssi),
-        channel: num(data.channel),
-        lat: options.lat ?? null,
-        lon: options.lon ?? null,
-      });
+      this.pushAlert(
+        {
+          event: 'node.alert',
+          eventType: WebhookEventType.NODE_ALERT,
+          timestamp,
+          nodeId: event.nodeId ?? null,
+          severity: event.level as AlarmLevel,
+          message: options.message ?? event.message,
+          mac: text(data.mac) ?? text(data.src),
+          ssid: text(data.ssid) ?? text(data.name) ?? null,
+          rssi: num(data.rssi),
+          channel: num(data.channel),
+          lat: options.lat ?? null,
+          lon: options.lon ?? null,
+        },
+        `node:${NODE_ALERT_CATEGORIES.has(event.category ?? '') ? event.category : 'other'}`,
+      );
     }
     await this.dispatchToSubscribers(WebhookEventType.NODE_ALERT, {
       event: 'node.alert',

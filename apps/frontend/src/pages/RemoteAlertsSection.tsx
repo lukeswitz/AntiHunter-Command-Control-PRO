@@ -3,8 +3,10 @@ import { toDataURL } from 'qrcode';
 import { useEffect, useState } from 'react';
 
 import { PushNotificationsCard } from './WebhooksSection';
+import { listAlertRules } from '../api/alert-rules';
 import {
   AlertChannel,
+  AlertTier,
   clearRemoteAlertSecret,
   eraseMatter,
   generateVapidKeys,
@@ -177,6 +179,13 @@ function AdminCards() {
           {noticeFor('tailscale')}
         </div>
       </article>
+
+      <AlertLevelsCard
+        tiers={config.alertTiers ?? {}}
+        busy={busy}
+        onSave={(alertTiers) => save('levels', { alertTiers })}
+        notice={notice.levels}
+      />
 
       <PushAdminCard
         config={config}
@@ -439,6 +448,98 @@ function AdminCards() {
         notice={notice.matter}
       />
     </>
+  );
+}
+
+const NODE_SOURCES: Array<{ key: string; label: string }> = [
+  { key: 'node:attack', label: 'Node: deauth / disassoc attack' },
+  { key: 'node:tamper', label: 'Node: tamper' },
+  { key: 'node:erase', label: 'Node: erase' },
+  { key: 'node:vibration', label: 'Node: vibration' },
+  { key: 'node:mesh-guard', label: 'Node: mesh guard' },
+  { key: 'node:other', label: 'Node: other ALERT-level events' },
+  { key: 'mqtt', label: 'Alerts from linked MQTT sites' },
+];
+
+function AlertLevelsCard(props: {
+  tiers: Record<string, AlertTier>;
+  busy: boolean;
+  onSave: (tiers: Record<string, AlertTier>) => void;
+  notice?: string;
+}) {
+  const rulesQuery = useQuery({
+    queryKey: ['alert-rules', 'all'],
+    queryFn: () => listAlertRules({ includeAll: true, includeInactive: true }),
+  });
+  const [draft, setDraft] = useState<Record<string, AlertTier>>(props.tiers);
+  useEffect(() => setDraft(props.tiers), [props.tiers]);
+
+  const sources = [
+    ...(rulesQuery.data ?? []).map((rule) => ({
+      key: `rule:${rule.id}`,
+      label: `Rule: ${rule.name}${rule.isActive ? '' : ' (inactive)'}`,
+    })),
+    ...NODE_SOURCES,
+  ];
+
+  return (
+    <article className="config-card">
+      <header>
+        <h3>What counts as Alert or Critical</h3>
+        <p>
+          Choose how each detection source reaches your phone and Home. <strong>Alert</strong> sends
+          the message and turns on the AntiHunter Alert sensor. <strong>Critical</strong> also turns
+          on the AntiHunter Critical sensor and marks the message critical. <strong>Off</strong>{' '}
+          sends nothing (webhooks and email are unchanged). New sources start as Alert.
+        </p>
+      </header>
+      <div className="config-card__body">
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Level</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.map((source) => (
+                <tr key={source.key}>
+                  <td>{source.label}</td>
+                  <td>
+                    <select
+                      className="control-input"
+                      value={draft[source.key] ?? 'alert'}
+                      onChange={(event) =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          [source.key]: event.target.value as AlertTier,
+                        }))
+                      }
+                    >
+                      <option value="off">Off</option>
+                      <option value="alert">Alert</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="controls-row">
+          <button
+            type="button"
+            className="control-chip"
+            disabled={props.busy}
+            onClick={() => props.onSave(draft)}
+          >
+            Save levels
+          </button>
+        </div>
+        {props.notice && <p className="config-hint">{props.notice}</p>}
+      </div>
+    </article>
   );
 }
 

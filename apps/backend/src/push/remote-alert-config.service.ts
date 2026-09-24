@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { RemoteAlertConfig } from '@prisma/client';
+import { Prisma, RemoteAlertConfig } from '@prisma/client';
 
 import { SecretBox } from './secret-box';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +16,36 @@ const URL_FIELDS = ['ntfyUrl', 'signalApiUrl', 'matrixHomeserverUrl'] as const;
 
 function env(name: string): string | null {
   return process.env[name]?.trim() || null;
+}
+
+export type AlertTier = 'off' | 'alert' | 'critical';
+
+const TIER_KEY =
+  /^(rule:[A-Za-z0-9_-]{1,64}|mqtt|node:(attack|erase|mesh-guard|tamper|vibration|other))$/;
+
+function validateTiers(raw: unknown): Record<string, AlertTier> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new BadRequestException('alertTiers must be an object');
+  }
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (entries.length > 500) {
+    throw new BadRequestException('alertTiers has too many entries');
+  }
+  const out: Record<string, AlertTier> = {};
+  for (const [key, value] of entries) {
+    if (!TIER_KEY.test(key) || (value !== 'off' && value !== 'alert' && value !== 'critical')) {
+      throw new BadRequestException(`Invalid alert tier ${key}`);
+    }
+    if (value !== 'alert') {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+export function tierFor(config: RemoteAlertConfig, source: string): AlertTier {
+  const tiers = (config.alertTiers ?? {}) as Record<string, AlertTier>;
+  return tiers[source] ?? 'alert';
 }
 
 function envUrl(name: string): string | null {
@@ -165,6 +195,9 @@ export class RemoteAlertConfigService {
     if (data.matterLayout && !['bridge', 'flat'].includes(data.matterLayout)) {
       throw new BadRequestException('matterLayout must be bridge or flat');
     }
+    if (data.alertTiers !== undefined) {
+      data.alertTiers = validateTiers(data.alertTiers);
+    }
     await this.get();
     return this.save(data);
   }
@@ -182,7 +215,7 @@ export class RemoteAlertConfigService {
   private async save(data: Partial<RemoteAlertConfig>): Promise<RemoteAlertConfig> {
     const row = await this.prisma.remoteAlertConfig.update({
       where: { id: 1 },
-      data: this.seal(data),
+      data: this.seal(data) as Prisma.RemoteAlertConfigUncheckedUpdateInput,
     });
     this.cached = this.open(row).config;
     for (const listener of this.listeners) {

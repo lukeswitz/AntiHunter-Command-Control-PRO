@@ -70,6 +70,7 @@ model RemoteAlertConfig {
   matrixRoomId        String?
   matterEnabled       Boolean  @default(false)
   matterLayout        String   @default("bridge")
+  alertTiers          Json     @default("{}")
   updatedAt           DateTime @updatedAt
 }
 
