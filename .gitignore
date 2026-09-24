@@ -56,6 +56,7 @@ apps/backend/data/acars/config.json
 apps/backend/backups/
 apps/backend/bin/
 apps/backend/.matter/
+apps/backend/.signal-cli/
 **/.secrets/
 
 *.tsbuildinfo

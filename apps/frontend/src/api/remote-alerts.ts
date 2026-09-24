@@ -93,7 +93,7 @@ export interface AlertSourceRow {
 }
 
 export const getSignalStatus = () =>
-  apiClient.get<{ reachable: boolean; linkedNumber: string | null }>(
+  apiClient.get<{ reachable: boolean; linkedNumber: string | null; managed: boolean }>(
     '/remote-alerts/signal/status',
   );
 

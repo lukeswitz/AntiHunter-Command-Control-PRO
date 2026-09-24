@@ -442,8 +442,9 @@ function SignalLink() {
   if (!status.reachable) {
     return (
       <p className="config-hint">
-        Signal connector not reachable. Start the signal-cli connector on the AHCC host (see the
-        Signal setup docs), then reload.
+        {status.managed
+          ? 'Starting the Signal connector… reload in a moment.'
+          : 'Signal needs signal-cli-rest-api installed on the AHCC host. Once it is on PATH, AHCC starts it for you.'}
       </p>
     );
   }
