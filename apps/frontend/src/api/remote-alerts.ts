@@ -2,6 +2,9 @@ import { apiClient } from './client';
 import { getAuthToken } from '../auth/session';
 
 export interface RemoteAlertConfig {
+  tailscaleEnabled: boolean;
+  hasTsAuthKey: boolean;
+  tsHostname: string | null;
   tsAllowedLogins: string[];
   vapidPublicKey: string | null;
   vapidSubject: string | null;
@@ -26,6 +29,9 @@ export interface RemoteAlertConfig {
 export type AlertTier = 'off' | 'alert' | 'critical';
 
 export type RemoteAlertConfigUpdate = Partial<{
+  tailscaleEnabled: boolean;
+  tsAuthKey: string;
+  tsHostname: string;
   tsAllowedLogins: string[];
   vapidSubject: string;
   ntfyEnabled: boolean;
@@ -91,6 +97,16 @@ export interface AlertSourceRow {
   defaultTier: AlertTier;
   tier: AlertTier;
 }
+
+export const getTailscaleStatus = () =>
+  apiClient.get<{
+    running: boolean;
+    connecting: boolean;
+    dnsName: string | null;
+    tailnet: string | null;
+    lastError: string | null;
+    lastExit: string | null;
+  }>('/remote-alerts/tailscale/status');
 
 export const getSignalStatus = () =>
   apiClient.get<{

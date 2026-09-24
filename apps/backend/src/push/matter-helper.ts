@@ -9,7 +9,7 @@ import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-Logger.level = LogLevel.INFO;
+Logger.level = LogLevel.WARN;
 
 const SENSORS = [
   { id: 'any-alert', name: 'AntiHunter Alert', levels: null },
@@ -211,8 +211,7 @@ async function main() {
   await server.start();
 
   if (!server.lifecycle.isCommissioned) {
-    const { manualPairingCode, qrPairingCode } = server.state.commissioning.pairingCodes;
-    log(`ready to pair. Manual code: ${manualPairingCode}  QR payload: ${qrPairingCode}`);
+    log('ready to pair — open the Matter card in AHCC and click Show pairing code');
   } else {
     log('online (already paired)');
   }
