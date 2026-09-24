@@ -483,8 +483,8 @@ export function WebhooksSection() {
               </label>
             )}
           </div>
-          <div className="webhook-security">
-            <h4>HTTPS security</h4>
+          <details className="webhook-security webhook-advanced">
+            <summary>Advanced (TLS &amp; client certificates)</summary>
             <label className="control-checkbox">
               <input
                 type="checkbox"
@@ -542,7 +542,7 @@ export function WebhooksSection() {
             <p className="config-hint">
               Leave certificate fields empty to use the system trust store without mutual TLS.
             </p>
-          </div>
+          </details>
           <div className="webhook-event-picker">
             <span>Deliver these events</span>
             <div className="webhook-event-picker__list">
