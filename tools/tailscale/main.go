@@ -98,7 +98,7 @@ func main() {
 			return
 		}
 		login := strings.ToLower(who.UserProfile.LoginName)
-		if len(allowed) > 0 && !allowed[login] {
+		if len(allowed) == 0 || !allowed[login] {
 			http.Error(w, "not authorized for AHCC", http.StatusForbidden)
 			return
 		}
