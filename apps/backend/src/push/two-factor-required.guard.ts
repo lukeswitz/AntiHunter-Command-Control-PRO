@@ -18,9 +18,7 @@ export class TwoFactorRequiredGuard implements CanActivate {
       select: { twoFactorEnabled: true, isActive: true },
     });
     if (!user?.isActive || !user.twoFactorEnabled) {
-      throw new ForbiddenException(
-        'Turn on two-factor authentication (Account > Security) to change remote access and alerts',
-      );
+      throw new ForbiddenException('Turn on two-factor authentication first (Account > Security).');
     }
     return true;
   }

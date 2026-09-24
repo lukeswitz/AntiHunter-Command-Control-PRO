@@ -7,17 +7,21 @@ import {
   Param,
   Post,
   Put,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { RemoteAlertConfig, Role } from '@prisma/client';
+import type { Response } from 'express';
 
 import { AlertChannel, AlertChannelsService } from './alert-channels.service';
+import { DEVICE_SOURCES } from './alert-sources';
 import { UpdateRemoteAlertConfigDto } from './dto/update-remote-alert-config.dto';
 import { MatterService } from './matter.service';
 import { PushService } from './push.service';
-import { RemoteAlertConfigService } from './remote-alert-config.service';
+import { RemoteAlertConfigService, tierFor } from './remote-alert-config.service';
 import { TwoFactorRequiredGuard } from './two-factor-required.guard';
 import { Roles } from '../auth/auth.decorators';
+import { PrismaService } from '../prisma/prisma.service';
 
 const CHANNELS: AlertChannel[] = ['push', 'ntfy', 'signal', 'matrix', 'matter'];
 
@@ -39,6 +43,7 @@ export class RemoteAlertsController {
     private readonly channels: AlertChannelsService,
     private readonly matter: MatterService,
     private readonly push: PushService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get('config')
@@ -99,6 +104,39 @@ export class RemoteAlertsController {
       );
     }
     return { ok: true };
+  }
+
+  @Get('signal/status')
+  signalStatus() {
+    return this.channels.signalStatus();
+  }
+
+  @Get('signal/link-qr')
+  @UseGuards(TwoFactorRequiredGuard)
+  async signalLinkQr(@Res() res: Response) {
+    const png = await this.channels.signalLinkQr();
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(png);
+  }
+
+  @Get('sources')
+  async sources() {
+    const config = await this.config.get();
+    const rules = await this.prisma.alertRule.findMany({
+      select: { id: true, name: true, isActive: true },
+      orderBy: { name: 'asc' },
+    });
+    const all = [
+      ...rules.map((rule) => ({
+        key: `rule:${rule.id}`,
+        label: `${rule.name}${rule.isActive ? '' : ' (inactive)'}`,
+        group: 'Alert rules',
+        defaultTier: 'alert' as const,
+      })),
+      ...DEVICE_SOURCES,
+    ];
+    return all.map((source) => ({ ...source, tier: tierFor(config, source.key) }));
   }
 
   @Get('matter/status')

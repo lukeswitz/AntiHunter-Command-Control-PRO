@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { getAuthToken } from '../auth/session';
 
 export interface RemoteAlertConfig {
   tsAllowedLogins: string[];
@@ -82,6 +83,41 @@ export const removePushSubscription = (endpoint: string) =>
 
 export const testAlertChannel = (channel: AlertChannel) =>
   apiClient.post(`/remote-alerts/test/${channel}`);
+
+export interface AlertSourceRow {
+  key: string;
+  label: string;
+  group: string;
+  defaultTier: AlertTier;
+  tier: AlertTier;
+}
+
+export const getSignalStatus = () =>
+  apiClient.get<{ reachable: boolean; linkedNumber: string | null }>(
+    '/remote-alerts/signal/status',
+  );
+
+export async function fetchSignalLinkQr(): Promise<Blob> {
+  const token = getAuthToken();
+  const response = await fetch('/api/remote-alerts/signal/link-qr', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    let message = `Could not get a Signal QR code (${response.status})`;
+    try {
+      const body = (await response.json()) as { message?: string };
+      if (body.message) {
+        message = body.message;
+      }
+    } catch {
+      message = `Could not get a Signal QR code (${response.status})`;
+    }
+    throw new Error(message);
+  }
+  return response.blob();
+}
+
+export const listAlertSources = () => apiClient.get<AlertSourceRow[]>('/remote-alerts/sources');
 
 export const getMatterStatus = () => apiClient.get<MatterStatus>('/remote-alerts/matter/status');
 

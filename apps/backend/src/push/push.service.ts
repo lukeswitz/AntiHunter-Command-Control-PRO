@@ -31,8 +31,21 @@ export class PushService {
     private readonly config: RemoteAlertConfigService,
   ) {}
 
+  private creating: Promise<unknown> | null = null;
+
   private async vapid() {
-    const config = await this.config.get();
+    let config = await this.config.get();
+    if (!config.vapidPublicKey || !config.vapidPrivateKey) {
+      this.creating ??= (async () => {
+        const keys = generateVAPIDKeys();
+        await this.config.setVapidKeys(keys.publicKey, keys.privateKey);
+        this.logger.log('Generated push notification keys');
+      })().finally(() => {
+        this.creating = null;
+      });
+      await this.creating;
+      config = await this.config.get();
+    }
     if (!config.vapidPublicKey || !config.vapidPrivateKey) {
       return null;
     }

@@ -280,6 +280,12 @@ Needs a home hub: HomePod, HomePod mini, Apple TV or iPad for Apple Home; a Nest
 
 This builds `apps/backend/bin/matter/ahcc-matter` with Bun, signs it with your Developer ID and hardened runtime, and notarizes it. Set `AHCC_MATTER_BIN` to that path in `apps/backend/.env` and restart AHCC. When macOS asks whether **ahcc-matter** may accept incoming connections, click **Allow**. The backend talks to it over a pipe, and it only gets its own settings, not the database password or API keys. Linux and Docker skip this step.
 
+**Google Home only: register the device once.** AHCC uses Matter's test vendor ID, and Google Home only pairs test devices listed in a Google Home Developer Console project that your Google account belongs to. The project is free.
+
+1. Open https://console.home.google.com, create a project, and add a **Matter** integration.
+2. Enter Vendor ID `0xFFF1` and Product ID `0x8000`.
+3. Pair with the same Google account that owns the project (or add other people as project members).
+
 **Pair it.**
 
 1. **Config** → **Remote Access & Alerts** → **Apple Home / Google Home (Matter)** → tick **Run the Matter device**, Layout **Bridge with named sensors**, **Save**. State changes to `waiting to pair` and the card shows a QR code, a **Setup code** and an **8-digit passcode**.

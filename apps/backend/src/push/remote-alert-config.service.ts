@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Prisma, RemoteAlertConfig } from '@prisma/client';
 
+import { AlertTier, defaultTier, SOURCE_KEY } from './alert-sources';
 import { SecretBox } from './secret-box';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -18,11 +19,6 @@ function env(name: string): string | null {
   return process.env[name]?.trim() || null;
 }
 
-export type AlertTier = 'off' | 'alert' | 'critical';
-
-const TIER_KEY =
-  /^(rule:[A-Za-z0-9_-]{1,64}|mqtt|node:(attack|erase|mesh-guard|tamper|vibration|other))$/;
-
 function validateTiers(raw: unknown): Record<string, AlertTier> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new BadRequestException('alertTiers must be an object');
@@ -33,10 +29,10 @@ function validateTiers(raw: unknown): Record<string, AlertTier> {
   }
   const out: Record<string, AlertTier> = {};
   for (const [key, value] of entries) {
-    if (!TIER_KEY.test(key) || (value !== 'off' && value !== 'alert' && value !== 'critical')) {
+    if (!SOURCE_KEY.test(key) || (value !== 'off' && value !== 'alert' && value !== 'critical')) {
       throw new BadRequestException(`Invalid alert tier ${key}`);
     }
-    if (value !== 'alert') {
+    if (value !== defaultTier(key)) {
       out[key] = value;
     }
   }
@@ -45,7 +41,7 @@ function validateTiers(raw: unknown): Record<string, AlertTier> {
 
 export function tierFor(config: RemoteAlertConfig, source: string): AlertTier {
   const tiers = (config.alertTiers ?? {}) as Record<string, AlertTier>;
-  return tiers[source] ?? 'alert';
+  return tiers[source] ?? defaultTier(source);
 }
 
 function envUrl(name: string): string | null {
