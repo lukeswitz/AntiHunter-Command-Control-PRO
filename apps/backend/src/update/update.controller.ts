@@ -50,6 +50,11 @@ export class UpdateController {
       if (this.updateService.isUpdateInProgress()) {
         blockers.push('An update is in progress');
       }
+      if (updateInfo.deployment === 'container') {
+        blockers.push(
+          `Container deployment — update from the host: ${updateInfo.containerUpdateCommand}`,
+        );
+      }
 
       return {
         available: updateInfo.available,
@@ -73,6 +78,9 @@ export class UpdateController {
         canUpdate: updateInfo.available && blockers.length === 0,
         blockers: blockers.length > 0 ? blockers : undefined,
         warning: updateInfo.warning,
+        deployment: updateInfo.deployment,
+        canSelfUpdate: updateInfo.canSelfUpdate,
+        containerUpdateCommand: updateInfo.containerUpdateCommand,
       };
     } catch (error: unknown) {
       const err = error as Error;
