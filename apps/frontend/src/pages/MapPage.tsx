@@ -404,7 +404,7 @@ export function MapPage() {
       views?: SavedMapView[];
       lastView?: MapViewSnapshot | null;
     } = {}) => {
-      if (!currentUser) {
+      if (!currentUser || !isAuthenticated) {
         return;
       }
       const nextViews = views ?? useMapViewsStore.getState().views;
@@ -433,7 +433,7 @@ export function MapPage() {
         window.alert('Unable to save map view. Check your connection and try again.');
       }
     },
-    [currentUser, setAuthUser],
+    [currentUser, isAuthenticated, setAuthUser],
   );
 
   const handleSaveView = () => {
