@@ -19,6 +19,7 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
+import { Role } from '@prisma/client';
 import { Subscription } from 'rxjs';
 import { Server, Socket } from 'socket.io';
 
@@ -91,7 +92,11 @@ export class CommandCenterGateway
       if (!payload.legalAccepted) {
         throw new UnauthorizedException('Legal acknowledgement required');
       }
+      if (payload.twoFactorPending) {
+        throw new UnauthorizedException('Two-factor authentication required');
+      }
       client.data.userId = payload.sub;
+      client.data.role = payload.role;
     } catch (error) {
       client.emit('error', 'unauthorized');
       client.disconnect(true);
@@ -171,6 +176,9 @@ export class CommandCenterGateway
   @SubscribeMessage('sendCommand')
   @UsePipes(new ValidationPipe({ transform: true }))
   async handleSendCommand(@ConnectedSocket() client: Socket, @MessageBody() dto: SendCommandDto) {
+    if (client.data?.role !== Role.ADMIN && client.data?.role !== Role.OPERATOR) {
+      throw new WsException('INSUFFICIENT_ROLE');
+    }
     try {
       const meta = {
         ip: (client.handshake.address as string | undefined) ?? null,
