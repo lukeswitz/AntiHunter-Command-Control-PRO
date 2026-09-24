@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.10.2",
+    "@matter/main": "^0.17.9",
     "@meshtastic/protobufs": "^2.7.8",
     "@nestjs/common": "^10.3.8",
     "@nestjs/config": "^3.2.2",
@@ -36,7 +37,7 @@
     "@serialport/parser-readline": "^13.0.0",
     "@serialport/stream": "^13.0.0",
     "@types/mqtt": "^2.5.0",
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "argon2": "^0.44.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
@@ -59,6 +60,7 @@
     "sanitize-html": "^2.12.1",
     "socket.io": "^4.8.3",
     "undici": "^6.24.0",
+    "web-push": "^3.6.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -72,6 +74,7 @@
     "@types/node": "^20.14.10",
     "@types/nodemailer": "^8.0.1",
     "@types/sanitize-html": "^2.11.3",
+    "@types/web-push": "^3.6.4",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.0",

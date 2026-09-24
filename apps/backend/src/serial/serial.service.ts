@@ -34,7 +34,9 @@ const dynamicImport = new Function('specifier', 'return import(specifier);') as 
   specifier: string,
 ) => Promise<TModule>;
 
-type MeshProtoModule = typeof import('@meshtastic/protobufs');
+type MeshProtoModule = typeof import('@meshtastic/protobufs', {
+  with: { 'resolution-mode': 'import' },
+});
 let meshProtoModulePromise: Promise<MeshProtoModule> | null = null;
 
 function resolveBinding(): AutoDetectTypes {

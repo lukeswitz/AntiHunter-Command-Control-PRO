@@ -54,5 +54,7 @@ apps/backend/data/adsb/adsb-alert-rules.json
 # Local ACARS configuration (user-modifiable at runtime)
 apps/backend/data/acars/config.json
 apps/backend/backups/
+apps/backend/bin/
+apps/backend/.matter/
 
 *.tsbuildinfo

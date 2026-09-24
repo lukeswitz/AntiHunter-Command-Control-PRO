@@ -451,22 +451,13 @@ export class FirewallService {
     if (!req) {
       return null;
     }
-    const forwarded = req.headers['x-forwarded-for'];
-    let candidate: string | undefined;
-    if (Array.isArray(forwarded)) {
-      candidate = forwarded[0];
-    } else if (typeof forwarded === 'string' && forwarded.length > 0) {
-      candidate = forwarded.split(',')[0];
-    }
-    if (!candidate) {
-      candidate =
-        req.ip ||
-        (req.connection && 'remoteAddress' in req.connection
-          ? req.connection.remoteAddress
-          : undefined) ||
-        (req.socket && 'remoteAddress' in req.socket ? req.socket.remoteAddress : undefined) ||
-        undefined;
-    }
+    const candidate =
+      req.ip ||
+      (req.connection && 'remoteAddress' in req.connection
+        ? req.connection.remoteAddress
+        : undefined) ||
+      (req.socket && 'remoteAddress' in req.socket ? req.socket.remoteAddress : undefined) ||
+      undefined;
     return this.normalizeIp(candidate ?? null);
   }
 

@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { MdAdd, MdDelete, MdLink, MdRefresh } from 'react-icons/md';
 
+import {
+  currentPushSubscription,
+  disablePush,
+  enablePush,
+  pushSupported,
+  sendTestPush,
+} from '../api/push';
 import type { Webhook } from '../api/types';
 import {
   createWebhook,
@@ -59,6 +66,114 @@ const DEFAULT_FORM_STATE: WebhookFormState = {
   clientKey: '',
   caBundle: '',
 };
+
+const WEBHOOK_PRESETS = [
+  {
+    key: 'discord',
+    label: 'Discord',
+    url: 'https://discord.com/api/webhooks/<id>/<token>',
+    hint: 'Discord: Server Settings > Integrations > Webhooks > Copy Webhook URL. Posts the alert summary as the message.',
+  },
+  {
+    key: 'slack',
+    label: 'Slack',
+    url: 'https://hooks.slack.com/services/<path>',
+    hint: 'Slack: create an Incoming Webhook for a channel and paste its URL.',
+  },
+  {
+    key: 'ifttt',
+    label: 'IFTTT',
+    url: 'https://maker.ifttt.com/trigger/<event>/json/with/key/<key>',
+    hint: 'IFTTT: Webhooks service > "Receive a web request with a JSON payload". Replace <event> and <key>. The applet reads fields such as {{JsonPayload.content}}.',
+  },
+  {
+    key: 'home-assistant',
+    label: 'Home Assistant / Apple Home',
+    url: 'https://<home-assistant-host>/api/webhook/<webhook_id>',
+    hint: 'Home Assistant: automation with a Webhook trigger; use trigger.json.summary, trigger.json.rule.severity, trigger.json.data.mac. Apple Home: expose the resulting HA entity through the HomeKit Bridge integration.',
+  },
+] as const;
+
+export function PushNotificationsCard() {
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const supported = pushSupported();
+
+  useEffect(() => {
+    if (!supported) {
+      return;
+    }
+    void currentPushSubscription().then((sub) => setSubscribed(Boolean(sub)));
+  }, [supported]);
+
+  const run = async (action: () => Promise<unknown>, done: string) => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      await action();
+      setSubscribed(Boolean(await currentPushSubscription()));
+      setStatus(done);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <article className="config-card">
+      <header>
+        <h3>Push notifications on this device</h3>
+        <p>
+          Alerts are end-to-end encrypted to this browser. On iPhone/iPad, add this page to the Home
+          Screen first and open it from there.
+        </p>
+      </header>
+      <div className="config-card__body">
+        {!supported ? (
+          <p className="empty-state">
+            This browser does not support Web Push here. It requires HTTPS (or localhost), and on
+            iOS the Home Screen app.
+          </p>
+        ) : (
+          <div className="controls-row">
+            {subscribed ? (
+              <>
+                <button
+                  type="button"
+                  className="control-chip"
+                  disabled={busy}
+                  onClick={() => run(sendTestPush, 'Test sent.')}
+                >
+                  Send test
+                </button>
+                <button
+                  type="button"
+                  className="control-chip control-chip--ghost"
+                  disabled={busy}
+                  onClick={() => run(disablePush, 'Disabled on this device.')}
+                >
+                  Disable
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="control-chip"
+                disabled={busy || subscribed === null}
+                onClick={() => run(enablePush, 'Enabled on this device.')}
+              >
+                Enable on this device
+              </button>
+            )}
+          </div>
+        )}
+        {status && <p className="config-hint">{status}</p>}
+      </div>
+    </article>
+  );
+}
 
 export function WebhooksSection() {
   const queryClient = useQueryClient();
@@ -195,6 +310,23 @@ export function WebhooksSection() {
     testMutation.mutate(id);
   };
 
+  const applyPreset = (key: string) => {
+    const preset = WEBHOOK_PRESETS.find((item) => item.key === key);
+    if (!preset) {
+      return;
+    }
+    setFormState((prev) => ({
+      ...prev,
+      name: prev.name || preset.label,
+      url: preset.url,
+      subscribedEvents: ['ALERT_TRIGGERED', 'NODE_ALERT'],
+    }));
+  };
+
+  const activePreset = WEBHOOK_PRESETS.find((item) =>
+    formState.url.startsWith(item.url.split('<')[0]),
+  );
+
   return (
     <div className="config-grid webhooks-stack">
       <article className="config-card">
@@ -270,6 +402,30 @@ export function WebhooksSection() {
           <p>Define HTTPS callback URLs to notify when alerts trigger.</p>
         </header>
         <form className="config-card__body" onSubmit={handleSubmit}>
+          {formMode === 'create' && (
+            <label className="form-field">
+              <span>Preset</span>
+              <select
+                className="control-input"
+                value=""
+                onChange={(event) => applyPreset(event.target.value)}
+              >
+                <option value="">Custom URL</option>
+                {WEBHOOK_PRESETS.map((preset) => (
+                  <option key={preset.key} value={preset.key}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {activePreset && <p className="config-hint">{activePreset.hint}</p>}
+          {activePreset && activePreset.key !== 'home-assistant' && (
+            <p className="config-hint">
+              {activePreset.label} can read every alert sent to it. For end-to-end encrypted alerts
+              use push notifications or Signal.
+            </p>
+          )}
           <div className="form-grid">
             <label>
               <span>Name</span>

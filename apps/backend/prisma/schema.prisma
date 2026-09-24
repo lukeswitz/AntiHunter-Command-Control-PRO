@@ -48,6 +48,40 @@ model User {
   alertRules          AlertRule[]
   webhooks            Webhook[]
   updateLogs          UpdateLog[]
+  pushSubscriptions   PushSubscription[]
+}
+
+model RemoteAlertConfig {
+  id                  Int      @id @default(1)
+  tsAllowedLogins     String[] @default([])
+  vapidPublicKey      String?
+  vapidPrivateKey     String?
+  vapidSubject        String?
+  ntfyEnabled         Boolean  @default(false)
+  ntfyUrl             String?
+  ntfyToken           String?
+  signalEnabled       Boolean  @default(false)
+  signalApiUrl        String?
+  signalNumber        String?
+  signalRecipients    String[] @default([])
+  matrixEnabled       Boolean  @default(false)
+  matrixHomeserverUrl String?
+  matrixAccessToken   String?
+  matrixRoomId        String?
+  matterEnabled       Boolean  @default(false)
+  matterLayout        String   @default("bridge")
+  updatedAt           DateTime @updatedAt
+}
+
+model PushSubscription {
+  endpoint  String   @id
+  p256dh    String
+  auth      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 enum Role {
