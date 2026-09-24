@@ -124,10 +124,19 @@ export class RemoteAlertConfigService {
     this.listeners.add(listener);
   }
 
+  private loading: Promise<RemoteAlertConfig> | null = null;
+
   async get(): Promise<RemoteAlertConfig> {
     if (this.cached) {
       return this.cached;
     }
+    this.loading ??= this.load().finally(() => {
+      this.loading = null;
+    });
+    return this.loading;
+  }
+
+  private async load(): Promise<RemoteAlertConfig> {
     const existing = await this.prisma.remoteAlertConfig.findUnique({ where: { id: 1 } });
     const row =
       existing ??
