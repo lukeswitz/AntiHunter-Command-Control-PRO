@@ -1,5 +1,14 @@
 import { Type } from 'class-transformer';
-import { IsEmail, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class LoginDto {
   @IsEmail()
@@ -8,6 +17,10 @@ export class LoginDto {
   @IsString()
   @MinLength(4)
   password!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberMe?: boolean;
 
   @IsOptional()
   @IsString()

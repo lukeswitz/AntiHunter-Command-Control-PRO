@@ -53,6 +53,6 @@ export class AuthController {
     if (!userId) {
       throw new BadRequestException('Missing authentication context');
     }
-    return this.authService.acknowledgeLegal(userId);
+    return this.authService.acknowledgeLegal(userId, req.auth?.rememberMe ?? false);
   }
 }
