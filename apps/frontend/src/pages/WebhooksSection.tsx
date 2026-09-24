@@ -129,9 +129,7 @@ export function PushNotificationsCard() {
       </header>
       <div className="config-card__body">
         {!supported ? (
-          <p className="empty-state">
-            Not supported here. Needs HTTPS.
-          </p>
+          <p className="empty-state">Not supported here. Needs HTTPS.</p>
         ) : (
           <div className="controls-row">
             {subscribed ? (
