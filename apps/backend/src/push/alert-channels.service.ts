@@ -9,6 +9,7 @@ import {
   RemoteAlertConfigService,
   tierFor,
 } from './remote-alert-config.service';
+import { SignalConnectorService } from './signal-connector.service';
 
 const NTFY_PRIORITY: Record<AlarmLevel, string> = {
   INFO: '2',
@@ -31,6 +32,7 @@ export class AlertChannelsService {
     private readonly push: PushService,
     private readonly matter: MatterService,
     private readonly config: RemoteAlertConfigService,
+    private readonly connector: SignalConnectorService,
   ) {}
 
   async alert(
@@ -129,31 +131,39 @@ export class AlertChannelsService {
   }
 
   private signalBase(config: RemoteAlertConfig): URL {
-    const url = httpsOrLoopback(config.signalApiUrl || 'http://signal-proxy:8080');
+    const fallback = this.connector.isManaged()
+      ? SignalConnectorService.managedUrl()
+      : 'http://signal-proxy:8080';
+    const url = httpsOrLoopback(config.signalApiUrl || fallback);
     if (!url) {
       throw new BadRequestException('Signal connector URL is not allowed');
     }
     return url;
   }
 
-  async signalStatus(): Promise<{ reachable: boolean; linkedNumber: string | null }> {
+  async signalStatus(): Promise<{
+    reachable: boolean;
+    linkedNumber: string | null;
+    managed: boolean;
+  }> {
     const config = await this.config.get();
+    const managed = this.connector.isManaged();
     try {
       const response = await fetch(new URL('/v1/accounts', this.signalBase(config)), {
         redirect: 'error',
         signal: AbortSignal.timeout(5_000),
       });
       if (!response.ok) {
-        return { reachable: false, linkedNumber: null };
+        return { reachable: false, linkedNumber: null, managed };
       }
       const accounts = (await response.json()) as unknown;
       const first = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
       if (first && first !== config.signalNumber) {
         await this.config.update({ signalNumber: first });
       }
-      return { reachable: true, linkedNumber: first };
+      return { reachable: true, linkedNumber: first, managed };
     } catch {
-      return { reachable: false, linkedNumber: null };
+      return { reachable: false, linkedNumber: null, managed };
     }
   }
 
