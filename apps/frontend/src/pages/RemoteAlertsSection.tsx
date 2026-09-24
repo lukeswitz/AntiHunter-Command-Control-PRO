@@ -3,7 +3,6 @@ import { toDataURL } from 'qrcode';
 import { useEffect, useState } from 'react';
 
 import { PushNotificationsCard } from './WebhooksSection';
-import { listAlertRules } from '../api/alert-rules';
 import {
   AlertChannel,
   AlertTier,
@@ -11,7 +10,10 @@ import {
   eraseMatter,
   generateVapidKeys,
   getMatterStatus,
+  fetchSignalLinkQr,
   getRemoteAlertConfig,
+  getSignalStatus,
+  listAlertSources,
   listPushSubscriptions,
   RemoteAlertConfig,
   RemoteAlertConfigUpdate,
@@ -146,10 +148,7 @@ function AdminCards() {
       <article className="config-card">
         <header>
           <h3>Remote access (Tailscale)</h3>
-          <p>
-            Tailnet users listed here can reach the login page through the Tailscale entrance. An
-            empty list blocks everyone. Your normal login and 2FA still apply.
-          </p>
+          <p>Who can connect over Tailscale.</p>
         </header>
         <div className="config-card__body">
           <label className="form-field">
@@ -162,10 +161,6 @@ function AdminCards() {
               onChange={(event) => set('tsAllowedLogins', event.target.value)}
             />
           </label>
-          <p className="config-hint">
-            Start the entrance with <code>docker compose --profile remote up -d</code> after setting
-            TS_AUTHKEY (a tagged tag:ahcc key) in .env. Funnel stays off.
-          </p>
           <div className="controls-row">
             <button
               type="button"
@@ -200,7 +195,7 @@ function AdminCards() {
       <article className="config-card">
         <header>
           <h3>Signal</h3>
-          <p>End-to-end encrypted. Needs the signal-api container linked to your Signal account.</p>
+          <p>End-to-end encrypted.</p>
         </header>
         <div className="config-card__body">
           <label className="control-checkbox">
@@ -211,43 +206,17 @@ function AdminCards() {
             />
             <span>Send alerts to Signal</span>
           </label>
-          <div className="form-grid">
-            <label>
-              <span>Signal API URL</span>
-              <input
-                className="control-input"
-                value={form.signalApiUrl}
-                placeholder="http://signal-api:8080"
-                onChange={(event) => set('signalApiUrl', event.target.value)}
-              />
-            </label>
-            <label>
-              <span>Sending number (linked account)</span>
-              <input
-                className="control-input"
-                value={form.signalNumber}
-                placeholder="+15551234567"
-                onChange={(event) => set('signalNumber', event.target.value)}
-              />
-            </label>
-          </div>
+          <SignalLink />
           <label className="form-field">
-            <span>Recipients (one per line)</span>
+            <span>Also send to (optional, one number per line)</span>
             <textarea
               className="control-input"
-              rows={3}
+              rows={2}
               value={form.signalRecipients}
+              placeholder="+15551234567"
               onChange={(event) => set('signalRecipients', event.target.value)}
             />
           </label>
-          <p className="config-hint">
-            Link once: run{' '}
-            <code>docker compose --profile signal run --rm -p 127.0.0.1:8090:8080 signal-api</code>,
-            open http://127.0.0.1:8090/v1/qrcodelink?device_name=ahcc, scan it from Signal &gt;
-            Settings &gt; Linked devices, stop it, then{' '}
-            <code>docker compose --profile signal up -d</code>. The API has no password, so it is
-            never published.
-          </p>
           <div className="controls-row">
             <button
               type="button"
@@ -256,8 +225,6 @@ function AdminCards() {
               onClick={() =>
                 save('signal', {
                   signalEnabled: form.signalEnabled,
-                  signalApiUrl: form.signalApiUrl,
-                  signalNumber: form.signalNumber,
                   signalRecipients: lines(form.signalRecipients),
                 })
               }
@@ -451,15 +418,57 @@ function AdminCards() {
   );
 }
 
-const NODE_SOURCES: Array<{ key: string; label: string }> = [
-  { key: 'node:attack', label: 'Node: deauth / disassoc attack' },
-  { key: 'node:tamper', label: 'Node: tamper' },
-  { key: 'node:erase', label: 'Node: erase' },
-  { key: 'node:vibration', label: 'Node: vibration' },
-  { key: 'node:mesh-guard', label: 'Node: mesh guard' },
-  { key: 'node:other', label: 'Node: other ALERT-level events' },
-  { key: 'mqtt', label: 'Alerts from linked MQTT sites' },
-];
+function SignalLink() {
+  const statusQuery = useQuery({
+    queryKey: ['remote-alerts-signal'],
+    queryFn: getSignalStatus,
+    refetchInterval: (query) => (query.state.data?.linkedNumber ? false : 4_000),
+  });
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const status = statusQuery.data;
+
+  useEffect(() => {
+    if (status?.linkedNumber && qrUrl) {
+      URL.revokeObjectURL(qrUrl);
+      setQrUrl(null);
+    }
+  }, [status?.linkedNumber, qrUrl]);
+
+  if (!status) {
+    return <p className="config-hint">Checking Signal…</p>;
+  }
+  if (!status.reachable) {
+    return <p className="config-hint">Signal connector not running.</p>;
+  }
+  if (status.linkedNumber) {
+    return <p className="config-hint">Linked: {status.linkedNumber}. Alerts go to Note to Self.</p>;
+  }
+  return (
+    <div className="form-field">
+      {qrUrl ? (
+        <>
+          <img src={qrUrl} alt="Signal link QR code" width={200} height={200} />
+          <p className="config-hint">Signal → Settings → Linked devices → + → scan.</p>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="control-chip"
+          onClick={() => {
+            setError(null);
+            fetchSignalLinkQr()
+              .then((blob) => setQrUrl(URL.createObjectURL(blob)))
+              .catch((err) => setError(errorText(err)));
+          }}
+        >
+          Link Signal
+        </button>
+      )}
+      {error && <p className="config-hint">{error}</p>}
+    </div>
+  );
+}
 
 function AlertLevelsCard(props: {
   tiers: Record<string, AlertTier>;
@@ -467,20 +476,23 @@ function AlertLevelsCard(props: {
   onSave: (tiers: Record<string, AlertTier>) => void;
   notice?: string;
 }) {
-  const rulesQuery = useQuery({
-    queryKey: ['alert-rules', 'all'],
-    queryFn: () => listAlertRules({ includeAll: true, includeInactive: true }),
+  const sourcesQuery = useQuery({
+    queryKey: ['remote-alerts-sources', props.tiers],
+    queryFn: listAlertSources,
   });
-  const [draft, setDraft] = useState<Record<string, AlertTier>>(props.tiers);
-  useEffect(() => setDraft(props.tiers), [props.tiers]);
+  const [draft, setDraft] = useState<Record<string, AlertTier>>({});
+  useEffect(() => {
+    const next: Record<string, AlertTier> = {};
+    for (const source of sourcesQuery.data ?? []) {
+      next[source.key] = source.tier;
+    }
+    setDraft(next);
+  }, [sourcesQuery.data]);
 
-  const sources = [
-    ...(rulesQuery.data ?? []).map((rule) => ({
-      key: `rule:${rule.id}`,
-      label: `Rule: ${rule.name}${rule.isActive ? '' : ' (inactive)'}`,
-    })),
-    ...NODE_SOURCES,
-  ];
+  const sources = (sourcesQuery.data ?? []).map((source) => ({
+    key: source.key,
+    label: `${source.group}: ${source.label}`,
+  }));
 
   return (
     <article className="config-card">
@@ -490,7 +502,7 @@ function AlertLevelsCard(props: {
           Choose how each detection source reaches your phone and Home. <strong>Alert</strong> sends
           the message and turns on the AntiHunter Alert sensor. <strong>Critical</strong> also turns
           on the AntiHunter Critical sensor and marks the message critical. <strong>Off</strong>{' '}
-          sends nothing (webhooks and email are unchanged). New sources start as Alert.
+          sends nothing (webhooks and email are unchanged). Nothing is Critical until you choose it.
         </p>
       </header>
       <div className="config-card__body">
@@ -509,7 +521,7 @@ function AlertLevelsCard(props: {
                   <td>
                     <select
                       className="control-input"
-                      value={draft[source.key] ?? 'alert'}
+                      value={draft[source.key] ?? 'off'}
                       onChange={(event) =>
                         setDraft((prev) => ({
                           ...prev,

@@ -6,6 +6,7 @@ import { Agent, request } from 'undici';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AlertChannelsService } from '../push/alert-channels.service';
+import { nodeAlertSource } from '../push/alert-sources';
 import {
   SerialAlertEvent,
   SerialCommandAck,
@@ -85,8 +86,6 @@ function alertBody(context: WebhookDispatchContext): string {
     ...alertFields(context).map(([name, value]) => `${name}: ${value}`),
   ].join('\n');
 }
-
-const NODE_ALERT_CATEGORIES = new Set(['attack', 'erase', 'mesh-guard', 'tamper', 'vibration']);
 
 function discordEscape(value: string): string {
   return value.replace(/[\\*_~`|>[\]()<@]/g, '\\$&');
@@ -215,6 +214,21 @@ export class WebhookDispatcherService {
     } = {},
   ): Promise<void> {
     const timestamp = options.timestamp ?? new Date();
+    this.pushAlert(
+      {
+        event: 'event.target',
+        eventType: WebhookEventType.TARGET_DETECTED,
+        timestamp,
+        nodeId: event.nodeId ?? null,
+        message: `Target detected${event.name ? `: ${event.name}` : ''}`,
+        mac: event.mac,
+        rssi: event.rssi ?? null,
+        channel: event.channel ?? null,
+        lat: event.lat ?? null,
+        lon: event.lon ?? null,
+      },
+      'target',
+    );
     await this.dispatchToSubscribers(WebhookEventType.TARGET_DETECTED, {
       event: 'event.target',
       eventType: WebhookEventType.TARGET_DETECTED,
@@ -249,7 +263,8 @@ export class WebhookDispatcherService {
     const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined);
     const num = (value: unknown) =>
       typeof value === 'number' && Number.isFinite(value) ? value : null;
-    if (event.level === 'ALERT' || event.level === 'CRITICAL') {
+    const source = nodeAlertSource(event.category, event.level, event.data);
+    if (source) {
       this.pushAlert(
         {
           event: 'node.alert',
@@ -258,14 +273,14 @@ export class WebhookDispatcherService {
           nodeId: event.nodeId ?? null,
           severity: event.level as AlarmLevel,
           message: options.message ?? event.message,
-          mac: text(data.mac) ?? text(data.src),
+          mac: text(data.mac) ?? text(data.src) ?? text(data.bssid),
           ssid: text(data.ssid) ?? text(data.name) ?? null,
-          rssi: num(data.rssi),
+          rssi: num(data.rssi) ?? (Number.isFinite(Number(data.rssi)) ? Number(data.rssi) : null),
           channel: num(data.channel),
           lat: options.lat ?? null,
           lon: options.lon ?? null,
         },
-        `node:${NODE_ALERT_CATEGORIES.has(event.category ?? '') ? event.category : 'other'}`,
+        source,
       );
     }
     await this.dispatchToSubscribers(WebhookEventType.NODE_ALERT, {

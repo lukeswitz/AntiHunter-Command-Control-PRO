@@ -25,12 +25,16 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
 }
 
 export async function enablePush(): Promise<void> {
+  const permission =
+    Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+  if (permission !== 'granted' && Notification.permission !== 'granted') {
+    throw new Error(
+      `Notifications are ${Notification.permission} for this site. Allow them in the browser's site settings (and for the browser in system settings), then try again.`,
+    );
+  }
   const { publicKey } = await apiClient.get<{ publicKey: string | null }>('/push/public-key');
   if (!publicKey) {
-    throw new Error('Push is not configured on the server (VAPID keys missing).');
-  }
-  if ((await Notification.requestPermission()) !== 'granted') {
-    throw new Error('Notification permission was not granted.');
+    throw new Error('Push is not configured on the server.');
   }
   const reg = await registration();
   const subscription =

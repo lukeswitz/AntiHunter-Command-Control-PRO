@@ -128,19 +128,60 @@ export class AlertChannelsService {
     await this.post(url, { method: 'POST', headers, body });
   }
 
-  private async sendSignal(config: RemoteAlertConfig, message: string, strict = false) {
-    const url = httpsOrLoopback(config.signalApiUrl);
-    if (!url || !config.signalNumber || !config.signalRecipients.length) {
-      return this.missing(strict, 'Signal API URL, number and recipients');
+  private signalBase(config: RemoteAlertConfig): URL {
+    const url = httpsOrLoopback(config.signalApiUrl || 'http://signal-api:8080');
+    if (!url) {
+      throw new BadRequestException('Signal connector URL is not allowed');
     }
-    await this.post(new URL('/v2/send', url), {
+    return url;
+  }
+
+  async signalStatus(): Promise<{ reachable: boolean; linkedNumber: string | null }> {
+    const config = await this.config.get();
+    try {
+      const response = await fetch(new URL('/v1/accounts', this.signalBase(config)), {
+        redirect: 'error',
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) {
+        return { reachable: false, linkedNumber: null };
+      }
+      const accounts = (await response.json()) as unknown;
+      const first = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
+      if (first && first !== config.signalNumber) {
+        await this.config.update({ signalNumber: first });
+      }
+      return { reachable: true, linkedNumber: first };
+    } catch {
+      return { reachable: false, linkedNumber: null };
+    }
+  }
+
+  async signalLinkQr(): Promise<Buffer> {
+    const config = await this.config.get();
+    const response = await fetch(
+      new URL('/v1/qrcodelink?device_name=AntiHunter', this.signalBase(config)),
+      { redirect: 'error', signal: AbortSignal.timeout(60_000) },
+    );
+    if (!response.ok || !response.headers.get('content-type')?.startsWith('image/png')) {
+      throw new BadRequestException(
+        `Signal connector did not return a QR code (${response.status})`,
+      );
+    }
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  private async sendSignal(config: RemoteAlertConfig, message: string, strict = false) {
+    if (!config.signalNumber) {
+      return this.missing(strict, 'Signal (link a device first)');
+    }
+    const recipients = config.signalRecipients.length
+      ? config.signalRecipients
+      : [config.signalNumber];
+    await this.post(new URL('/v2/send', this.signalBase(config)), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        number: config.signalNumber,
-        recipients: config.signalRecipients,
-      }),
+      body: JSON.stringify({ message, number: config.signalNumber, recipients }),
     });
   }
 

@@ -8,11 +8,13 @@ import {
   Post,
   Req,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 
 import { PushService, PushSubscriptionInput } from './push.service';
 import { RemoteAlertConfigService } from './remote-alert-config.service';
+import { TwoFactorRequiredGuard } from './two-factor-required.guard';
 import { Public } from '../auth/auth.decorators';
 
 @Controller('push')
@@ -40,6 +42,7 @@ export class PushController {
   }
 
   @Post('subscriptions')
+  @UseGuards(TwoFactorRequiredGuard)
   async subscribe(@Req() req: Request, @Body() body: PushSubscriptionInput) {
     await this.pushService.subscribe(this.requireUser(req), body);
     return { ok: true };
@@ -54,6 +57,7 @@ export class PushController {
   }
 
   @Post('test')
+  @UseGuards(TwoFactorRequiredGuard)
   async test(@Req() req: Request) {
     await this.pushService.notify('AntiHunter', 'Test notification', this.requireUser(req));
     return { ok: true };
