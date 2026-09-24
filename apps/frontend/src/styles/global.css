@@ -28,6 +28,9 @@
   color: var(--color-text-muted);
   line-height: 1.45;
 }
+.config-hint--warn {
+  color: #f59e0b;
+}
 :root {
   color-scheme: light;
   font-family:
