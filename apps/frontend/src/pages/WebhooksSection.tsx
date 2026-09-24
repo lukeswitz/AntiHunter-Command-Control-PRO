@@ -42,6 +42,7 @@ const WEBHOOK_EVENT_LABELS = WEBHOOK_EVENT_OPTIONS.reduce<Record<string, string>
 
 interface WebhookFormState {
   id?: string;
+  presetKey: string;
   name: string;
   url: string;
   secret: string;
@@ -55,6 +56,7 @@ interface WebhookFormState {
 }
 
 const DEFAULT_FORM_STATE: WebhookFormState = {
+  presetKey: '',
   name: '',
   url: '',
   secret: '',
@@ -223,6 +225,7 @@ export function WebhooksSection() {
     setFormMode('edit');
     setFormState({
       id: webhook.id,
+      presetKey: '',
       name: webhook.name,
       url: webhook.url,
       secret: '',
@@ -309,20 +312,20 @@ export function WebhooksSection() {
 
   const applyPreset = (key: string) => {
     const preset = WEBHOOK_PRESETS.find((item) => item.key === key);
-    if (!preset) {
-      return;
-    }
-    setFormState((prev) => ({
-      ...prev,
-      name: prev.name || preset.label,
-      url: preset.url,
-      subscribedEvents: ['ALERT_TRIGGERED', 'NODE_ALERT'],
-    }));
+    setFormState((prev) =>
+      preset
+        ? {
+            ...prev,
+            presetKey: key,
+            name: preset.label,
+            url: preset.url,
+            subscribedEvents: ['ALERT_TRIGGERED', 'NODE_ALERT'],
+          }
+        : { ...prev, presetKey: '', url: '' },
+    );
   };
 
-  const activePreset = WEBHOOK_PRESETS.find((item) =>
-    formState.url.startsWith(item.url.split('<')[0]),
-  );
+  const activePreset = WEBHOOK_PRESETS.find((item) => item.key === formState.presetKey);
 
   return (
     <div className="config-grid webhooks-stack">
@@ -404,7 +407,7 @@ export function WebhooksSection() {
               <span>Preset</span>
               <select
                 className="control-input"
-                value=""
+                value={formState.presetKey}
                 onChange={(event) => applyPreset(event.target.value)}
               >
                 <option value="">Custom URL</option>
