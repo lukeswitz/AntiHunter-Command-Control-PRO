@@ -76,10 +76,10 @@ const BASE_LAYERS: BaseLayerDefinition[] = [
   },
   {
     key: 'dark',
-    name: 'Dark (Carto)',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    tileOptions: { maxZoom: 19 },
+    name: 'Dark (Esri)',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
+    tileOptions: { maxZoom: 19, maxNativeZoom: 16 },
   },
 ];
 
