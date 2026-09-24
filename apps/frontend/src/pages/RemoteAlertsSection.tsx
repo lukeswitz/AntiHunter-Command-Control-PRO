@@ -108,8 +108,21 @@ function AdminCards() {
   const saveMutation = useMutation({
     mutationFn: ({ patch }: { patch: RemoteAlertConfigUpdate; card: string }) =>
       updateRemoteAlertConfig(patch),
-    onSuccess: (data, { card }) => {
+    onSuccess: (data, { card, patch }) => {
       queryClient.setQueryData(['remote-alerts'], data);
+      const saved = toForm(data);
+      setForm((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...Object.fromEntries(
+                Object.keys(patch)
+                  .filter((key) => key in saved)
+                  .map((key) => [key, saved[key as keyof FormState]]),
+              ),
+            }
+          : saved,
+      );
       queryClient.invalidateQueries({ queryKey: ['remote-alerts-matter'] });
       setNotice((prev) => ({ ...prev, [card]: 'Saved.' }));
     },
@@ -485,15 +498,53 @@ function TailscaleStatus({ enabled }: { enabled: boolean }) {
     return <p className="config-hint">Checking…</p>;
   }
   if (s.running) {
+    const url = s.dnsName ? `${s.https ? 'https' : 'http'}://${s.dnsName}` : null;
     return (
-      <p className="config-hint">
-        Connected as {s.dnsName ?? 'this node'}
-        {s.tailnet ? ` (${s.tailnet})` : ''}.
-      </p>
+      <>
+        <p className="config-hint">
+          Connected
+          {s.tailnet ? ` to ${s.tailnet}` : ''}.{' '}
+          {url ? (
+            <>
+              Open AHCC at{' '}
+              <a href={url} target="_blank" rel="noreferrer">
+                {url}
+              </a>
+            </>
+          ) : null}
+          {s.ip ? (
+            <>
+              {' '}
+              or{' '}
+              <a href={`http://${s.ip}`} target="_blank" rel="noreferrer">
+                http://{s.ip}
+              </a>
+            </>
+          ) : null}
+        </p>
+        {s.https ? null : (
+          <p className="config-hint">
+            For https and phone alerts, turn on HTTPS Certificates in{' '}
+            <a href="https://login.tailscale.com/admin/dns" target="_blank" rel="noreferrer">
+              Tailscale → DNS
+            </a>
+            .
+          </p>
+        )}
+      </>
     );
   }
   if (s.lastError) {
-    return <p className="config-hint config-hint--warn">{s.lastError}</p>;
+    return (
+      <>
+        {s.dnsName ? (
+          <p className="config-hint">
+            Address: <code>https://{s.dnsName}</code>
+          </p>
+        ) : null}
+        <p className="config-hint config-hint--warn">{s.lastError}</p>
+      </>
+    );
   }
   if (s.connecting) {
     return <p className="config-hint">Joining the tailnet…</p>;

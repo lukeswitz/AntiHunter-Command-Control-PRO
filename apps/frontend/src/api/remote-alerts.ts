@@ -103,6 +103,8 @@ export const getTailscaleStatus = () =>
     running: boolean;
     connecting: boolean;
     dnsName: string | null;
+    https: boolean;
+    ip: string | null;
     tailnet: string | null;
     lastError: string | null;
     lastExit: string | null;

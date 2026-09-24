@@ -13,6 +13,8 @@ interface HelperStatus {
   dnsName?: string;
   tailnet?: string;
   message?: string;
+  https?: boolean;
+  ip?: string;
 }
 
 @Injectable()
@@ -39,10 +41,14 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
     connecting: boolean;
     dnsName: string | null;
     tailnet: string | null;
+    https: boolean;
+    ip: string | null;
     lastError: string | null;
     lastExit: string | null;
   } {
     return {
+      https: this.helperStatus?.https ?? false,
+      ip: this.helperStatus?.ip ?? null,
       running: Boolean(this.helper) && this.helperStatus?.type === 'running',
       connecting: Boolean(this.helper) && this.helperStatus?.type !== 'running',
       dnsName: this.helperStatus?.dnsName ?? null,
@@ -83,7 +89,9 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
       HOME: process.env.HOME,
       AHCC_TS_AUTHKEY: authKey,
       AHCC_TS_HOSTNAME: hostname?.trim() || process.env.TS_HOSTNAME?.trim() || 'ahcc',
-      AHCC_TS_UPSTREAM: process.env.AHCC_TS_UPSTREAM?.trim() || 'http://127.0.0.1:8080',
+      AHCC_TS_UPSTREAM:
+        process.env.AHCC_TS_UPSTREAM?.trim() ||
+        (process.env.NODE_ENV === 'production' ? 'http://127.0.0.1:8080' : 'http://127.0.0.1:5173'),
       AHCC_TS_STATE: join(process.cwd(), '.tailscale'),
       AHCC_TS_ALLOWED: allowed.join(','),
     };
