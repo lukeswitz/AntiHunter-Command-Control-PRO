@@ -367,6 +367,8 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | `VAPID_*`, `TS_ALLOWED_LOGINS`, `NTFY_*`, `SIGNAL_*`, `MATRIX_*`, `AHCC_MATTER_ENABLED`, `AHCC_MATTER_LAYOUT` | _(unset)_ | Read once, on first start, into **Config → Remote Access & Alerts**. After that the database holds them; change them in the UI. |
 | `AHCC_MATTER_BIN`                                                              | _(unset)_ | Path to the signed `ahcc-matter` executable (`apps/backend/tools/matter/build.sh`). Unset runs the Matter device on node. |
 | `AHCC_MATTER_STORAGE`, `AHCC_MATTER_PORT`, `AHCC_MATTER_PASSCODE`              | `./.matter`, `5540`, random | Matter pairing state (kept `0700`), UDP port, and a fixed 8-digit setup passcode. |
+| `AHCC_MATTER_INTERFACE`                                                        | _(unset)_ | Network interface the Matter device listens and announces on (e.g. `en0`). Unset uses all interfaces. |
+| `REMOTE_ALERTS_SECRET_KEY` / `REMOTE_ALERTS_KEY_FILE`                          | _(unset)_ / `./.secrets/remote-alerts.key` | Key that encrypts alert tokens and the push signing key in the database. Unset generates a random key file (`0600`) on first start; back it up with the database. |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS.        |
 | `SITE_ID`                                                                      | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing.    |
 

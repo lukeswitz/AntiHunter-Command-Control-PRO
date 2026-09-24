@@ -1,7 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { RemoteAlertConfig } from '@prisma/client';
 
+import { SecretBox } from './secret-box';
 import { PrismaService } from '../prisma/prisma.service';
+
+const SEALED_FIELDS = ['vapidPrivateKey', 'ntfyToken', 'matrixAccessToken'] as const;
+const PLAIN_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', 'signal-api']);
 
 export type RemoteAlertConfigUpdate = Partial<
   Omit<RemoteAlertConfig, 'id' | 'updatedAt' | 'vapidPublicKey' | 'vapidPrivateKey'>
@@ -14,6 +18,17 @@ function env(name: string): string | null {
   return process.env[name]?.trim() || null;
 }
 
+function envUrl(name: string): string | null {
+  const value = env(name);
+  if (value && !isAllowedChannelUrl(value)) {
+    new Logger('RemoteAlertConfigService').warn(
+      `${name} ignored: must be https, or http to localhost or signal-api`,
+    );
+    return null;
+  }
+  return value;
+}
+
 function list(value: string | null): string[] {
   return (value ?? '')
     .split(',')
@@ -24,9 +39,12 @@ function list(value: string | null): string[] {
 export function isAllowedChannelUrl(raw: string): boolean {
   try {
     const url = new URL(raw);
-    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-    const internal = !url.hostname.includes('.') && !url.hostname.includes(':');
-    return url.protocol === 'https:' || (url.protocol === 'http:' && (loopback || internal));
+    if (url.username || url.password) {
+      return false;
+    }
+    return (
+      url.protocol === 'https:' || (url.protocol === 'http:' && PLAIN_HTTP_HOSTS.has(url.hostname))
+    );
   } catch {
     return false;
   }
@@ -34,10 +52,47 @@ export function isAllowedChannelUrl(raw: string): boolean {
 
 @Injectable()
 export class RemoteAlertConfigService {
+  private readonly logger = new Logger(RemoteAlertConfigService.name);
+  private readonly box = new SecretBox();
   private cached: RemoteAlertConfig | null = null;
   private readonly listeners = new Set<(config: RemoteAlertConfig) => void>();
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private seal<T extends Partial<RemoteAlertConfig>>(data: T): T {
+    const out = { ...data };
+    for (const field of SEALED_FIELDS) {
+      const value = out[field];
+      if (typeof value === 'string' && value && !this.box.isSealed(value)) {
+        (out as Record<string, unknown>)[field] = this.box.seal(value);
+      }
+    }
+    return out;
+  }
+
+  private open(row: RemoteAlertConfig): { config: RemoteAlertConfig; legacy: boolean } {
+    const config = { ...row };
+    let legacy = false;
+    for (const field of SEALED_FIELDS) {
+      const value = config[field];
+      if (!value) {
+        continue;
+      }
+      if (!this.box.isSealed(value)) {
+        legacy = true;
+        continue;
+      }
+      try {
+        config[field] = this.box.open(value);
+      } catch (error) {
+        this.logger.error(
+          `Cannot decrypt ${field} (wrong or missing key): ${error instanceof Error ? error.message : error}`,
+        );
+        config[field] = null;
+      }
+    }
+    return { config, legacy };
+  }
 
   onChange(listener: (config: RemoteAlertConfig) => void): void {
     this.listeners.add(listener);
@@ -48,30 +103,39 @@ export class RemoteAlertConfigService {
       return this.cached;
     }
     const existing = await this.prisma.remoteAlertConfig.findUnique({ where: { id: 1 } });
-    this.cached =
+    const row =
       existing ??
       (await this.prisma.remoteAlertConfig.create({
-        data: {
+        data: this.seal({
           id: 1,
           tsAllowedLogins: list(env('TS_ALLOWED_LOGINS')).map((login) => login.toLowerCase()),
           vapidPublicKey: env('VAPID_PUBLIC_KEY'),
           vapidPrivateKey: env('VAPID_PRIVATE_KEY'),
           vapidSubject: env('VAPID_SUBJECT'),
-          ntfyEnabled: Boolean(env('NTFY_URL')),
-          ntfyUrl: env('NTFY_URL'),
+          ntfyEnabled: Boolean(envUrl('NTFY_URL')),
+          ntfyUrl: envUrl('NTFY_URL'),
           ntfyToken: env('NTFY_TOKEN'),
           signalEnabled: Boolean(env('SIGNAL_NUMBER')),
-          signalApiUrl: env('SIGNAL_API_URL'),
+          signalApiUrl: envUrl('SIGNAL_API_URL'),
           signalNumber: env('SIGNAL_NUMBER'),
           signalRecipients: list(env('SIGNAL_RECIPIENTS')),
           matrixEnabled: Boolean(env('MATRIX_ACCESS_TOKEN')),
-          matrixHomeserverUrl: env('MATRIX_HOMESERVER_URL'),
+          matrixHomeserverUrl: envUrl('MATRIX_HOMESERVER_URL'),
           matrixAccessToken: env('MATRIX_ACCESS_TOKEN'),
           matrixRoomId: env('MATRIX_ROOM_ID'),
           matterEnabled: env('AHCC_MATTER_ENABLED') === 'true',
           matterLayout: env('AHCC_MATTER_LAYOUT') === 'flat' ? 'flat' : 'bridge',
-        },
+        }),
       }));
+    const { config, legacy } = this.open(row);
+    this.cached = config;
+    if (legacy) {
+      const resealed = this.seal(
+        Object.fromEntries(SEALED_FIELDS.map((field) => [field, row[field]])),
+      );
+      await this.prisma.remoteAlertConfig.update({ where: { id: 1 }, data: resealed });
+      this.logger.log('Encrypted remote alert secrets that were stored in plain text');
+    }
     return this.cached;
   }
 
@@ -86,7 +150,7 @@ export class RemoteAlertConfigService {
       const value = data[field];
       if (typeof value === 'string' && value.trim() && !isAllowedChannelUrl(value.trim())) {
         throw new BadRequestException(
-          `${field} must be https, or http to localhost or a docker service name`,
+          `${field} must be https, or http to localhost or signal-api, without a username or password`,
         );
       }
     }
@@ -116,7 +180,11 @@ export class RemoteAlertConfigService {
   }
 
   private async save(data: Partial<RemoteAlertConfig>): Promise<RemoteAlertConfig> {
-    this.cached = await this.prisma.remoteAlertConfig.update({ where: { id: 1 }, data });
+    const row = await this.prisma.remoteAlertConfig.update({
+      where: { id: 1 },
+      data: this.seal(data),
+    });
+    this.cached = this.open(row).config;
     for (const listener of this.listeners) {
       listener(this.cached);
     }

@@ -60,11 +60,14 @@ services:
       AHCC_MATTER_ENABLED: ${AHCC_MATTER_ENABLED:-false}
       AHCC_MATTER_PASSCODE: ${AHCC_MATTER_PASSCODE:-}
       AHCC_MATTER_STORAGE: /app/data/matter
+      AHCC_MATTER_INTERFACE: ${AHCC_MATTER_INTERFACE:-}
+      REMOTE_ALERTS_SECRET_KEY: ${REMOTE_ALERTS_SECRET_KEY:-}
     ports:
       - '127.0.0.1:3000:3000'
     volumes:
       - ./.git:/app/.git:ro
       - matter-state:/app/data/matter
+      - remote-secrets:/app/apps/backend/.secrets
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthz').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
       interval: 10s
@@ -94,7 +97,7 @@ services:
         condition: service_healthy
 
   tailscale:
-    image: tailscale/tailscale:stable
+    image: tailscale/tailscale:v1.102.4@sha256:2667499ed87ae29218f292556ba062918402dd5e92e93637af14867e4df12dd3
     container_name: cc_tailscale
     profiles: ['remote']
     hostname: ${TS_HOSTNAME:-ahcc}
@@ -114,7 +117,7 @@ services:
         condition: service_healthy
 
   signal-api:
-    image: bbernhard/signal-cli-rest-api:latest
+    image: bbernhard/signal-cli-rest-api:0.100@sha256:2399d449123cdad56c4d859277e3b9127e1a00c4d2ab4601c239882609286cf8
     container_name: cc_signal
     profiles: ['signal']
     restart: unless-stopped
@@ -133,3 +136,4 @@ volumes:
   tailscale-state:
   matter-state:
   signal-state:
+  remote-secrets:

@@ -5,6 +5,7 @@ import { OccupancySensorDevice } from '@matter/main/devices/occupancy-sensor';
 import { AggregatorEndpoint } from '@matter/main/endpoints/aggregator';
 import { randomInt } from 'node:crypto';
 import { chmodSync, mkdirSync, readdirSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -97,9 +98,34 @@ async function main() {
   restrictTree(storage);
   Environment.default.vars.set('storage.path', storage);
 
+  const network: { port: number; listeningAddressIpv4?: string; listeningAddressIpv6?: string } = {
+    port: Number(process.env.AHCC_MATTER_PORT) || 5540,
+  };
+  const iface = process.env.AHCC_MATTER_INTERFACE?.trim();
+  if (iface) {
+    const addresses = networkInterfaces()[iface];
+    if (!addresses?.length) {
+      throw new Error(`AHCC_MATTER_INTERFACE ${iface} not found`);
+    }
+    Environment.default.vars.set('mdns.networkInterface', iface);
+    const v4 = addresses.find((entry) => entry.family === 'IPv4');
+    const v6 =
+      addresses.find((entry) => entry.family === 'IPv6' && !entry.address.startsWith('fe80')) ??
+      addresses.find((entry) => entry.family === 'IPv6');
+    if (v4) {
+      network.listeningAddressIpv4 = v4.address;
+    }
+    if (v6) {
+      network.listeningAddressIpv6 = v6.address.startsWith('fe80')
+        ? `${v6.address}%${iface}`
+        : v6.address;
+    }
+    log(`bound to ${iface} (${[v4?.address, v6?.address].filter(Boolean).join(', ')})`);
+  }
+
   const server = await ServerNode.create({
     id: 'ahcc',
-    network: { port: Number(process.env.AHCC_MATTER_PORT) || 5540 },
+    network,
     commissioning: { passcode: passcode(), discriminator: randomInt(4096) },
     productDescription: {
       name: 'AntiHunter',

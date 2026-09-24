@@ -95,7 +95,10 @@ export class AlertChannelsService {
       return this.missing(strict, 'ntfy topic URL');
     }
     const headers: Record<string, string> = {
-      Title: title,
+      Title: title
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/[^\x20-\x7e\xa0-\xff]/g, '?')
+        .slice(0, 200),
       Priority: NTFY_PRIORITY[severity ?? 'NOTICE'],
       Tags:
         severity === 'CRITICAL' ? 'rotating_light' : severity === 'ALERT' ? 'warning' : 'satellite',

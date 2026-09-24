@@ -165,7 +165,9 @@ Security: the tunnel dials out from the AHCC computer, so no port opens on your 
 
 No remote access needed. AHCC dials out to the service when an alert rule fires, when an alert arrives over MQTT, and when a node reports an alert (attack, anomaly). Each message carries the rule and severity, the alert text, and the device MAC, SSID, RSSI, channel, node, location and time when the alert has them.
 
-Set push, Signal, ntfy, Matrix and Matter in **Config** → **Remote Access & Alerts** (admins only). Each card has **Send test**. Discord, Slack, IFTTT and Home Assistant are webhooks in **Config** → **Webhooks**.
+Set push, Signal, ntfy, Matrix and Matter in **Config** → **Remote Access & Alerts**. Only admins see these settings, and only admins with two-factor authentication turned on can change them or send tests ([step 0](#prep)). Each card has **Send test**.
+
+Tokens and the push signing key are encrypted in the database (AES-256-GCM). The key is `REMOTE_ALERTS_SECRET_KEY`, or a random key written once to `apps/backend/.secrets/remote-alerts.key` (Docker: the `remote-secrets` volume). A database dump alone does not reveal them. Back up the key with the database; without it, re-enter the tokens and press **Replace keys**. Discord, Slack, IFTTT and Home Assistant are webhooks in **Config** → **Webhooks**.
 
 | Channel | Who can read the alert text | Setup |
 | ------- | --------------------------- | ----- |
@@ -213,7 +215,7 @@ The ntfy server can read every alert. Run your own ntfy server, require login, a
 
 Messages are not end-to-end encrypted; the homeserver can read them. Use your own homeserver, a bot account, and a private room. **Config** → **Remote Access & Alerts** → **Matrix**: homeserver URL, room ID (`!abc:example.com`), bot access token, **Save**, **Send test**.
 
-URLs for ntfy, Signal and Matrix must be `https://`, or `http://` to `localhost` or a Docker service name. Tokens are never shown again after saving; leave the field blank to keep the saved one, or click **Remove token**.
+URLs for ntfy, Signal and Matrix must be `https://`, or `http://` to `localhost` or `signal-api`, with no username or password in the URL. Tokens are never shown again after saving; leave the field blank to keep the saved one, or click **Remove token**.
 
 Treat every webhook URL below as a password: anyone who has it can post to your channel. Don't paste it in chats or screenshots.
 
@@ -282,6 +284,7 @@ Docker: Matter pairing uses local-network discovery (mDNS), which Docker's defau
 
 Lock it down
 
+- Set `AHCC_MATTER_INTERFACE` (e.g. `en0`, `eth0`) to listen and announce only on your home network interface, not on VPN or Docker interfaces.
 - Pairing state, including the device's private keys, is stored in `AHCC_MATTER_STORAGE` (default `apps/backend/.matter`) with permissions `0700`/`0600`. Keep it out of backups you share.
 - The setup code is printed in the backend log until the device is paired. Pair it right away.
 - Google Home may show one bridged sensor as "Matter device" instead of its name (open Matter SDK bug, no fix yet). Rename it in Google Home.
