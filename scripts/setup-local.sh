@@ -1239,8 +1239,8 @@ END
     if [[ "$db_exists" != "1" ]]; then
         info "Creating database: $DB_NAME"
         local create_output
-        create_output=$(echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";" | eval $PG_SUPER_CMD 2>&1)
-        local create_status=$?
+        local create_status=0
+        create_output=$(echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";" | eval $PG_SUPER_CMD -v ON_ERROR_STOP=1 2>&1) || create_status=$?
         
         if [[ $create_status -ne 0 ]]; then
             local error_lines
@@ -1253,9 +1253,10 @@ END
                 if echo "$error_lines" | grep -qi "collation"; then
                     warn "This appears to be a collation-related error"
                     info "Attempting to create database with explicit template..."
-                    
-                    create_output=$(echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\" TEMPLATE template0;" | eval $PG_SUPER_CMD 2>&1)
-                    if [[ $? -eq 0 ]] && ! echo "$create_output" | grep -qi "^ERROR:"; then
+
+                    create_status=0
+                    create_output=$(echo "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\" TEMPLATE template0;" | eval $PG_SUPER_CMD -v ON_ERROR_STOP=1 2>&1) || create_status=$?
+                    if [[ $create_status -eq 0 ]] && ! echo "$create_output" | grep -qi "^ERROR:"; then
                         success "Database created using template0"
                     else
                         error "Failed even with template0: $create_output"
@@ -1422,6 +1423,7 @@ setup_database() {
     step "Setting up database schema..."
     
     info "Verifying database connection..."
+    local has_migrations_table=""
     if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
         error "Cannot connect to database. Prisma migrations will fail."
         error "Database URL: postgresql://$DB_USER:***@$DB_HOST:$DB_PORT/$DB_NAME"
@@ -1454,7 +1456,6 @@ setup_database() {
         success "Database connection verified"
         
         info "Checking if database needs Prisma initialization..."
-        local has_migrations_table
         has_migrations_table=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '_prisma_migrations');" 2>/dev/null || echo "f")
         
         if [[ "$has_migrations_table" == "f" ]]; then
@@ -1482,7 +1483,11 @@ setup_database() {
         fi
         return 1
     }
-    
+
+    if compgen -G "prisma/migrations/*/migration.sql" >/dev/null; then
+        has_migrations_table="use_deploy"
+    fi
+
     if [[ "$has_migrations_table" == "f" ]]; then
         info "Initializing database schema with prisma db push..."
         
@@ -1650,11 +1655,11 @@ EOF
     echo "   CLUSTER_WORKERS=4 pnpm AHCC:cluster"
     echo ""
     echo -e "${BLUE}3. Access the web interface:${NC}"
-    echo "   Open: ${CYAN}http://localhost:$FRONTEND_PORT${NC}"
+    echo -e "   Open: ${CYAN}http://localhost:$FRONTEND_PORT${NC}"
     echo ""
     echo -e "${BLUE}4. Login credentials:${NC}"
-    echo "   Email:    ${CYAN}$ADMIN_EMAIL${NC}"
-    echo "   Password: ${CYAN}$ADMIN_PASSWORD${NC}"
+    echo -e "   Email:    ${CYAN}$ADMIN_EMAIL${NC}"
+    echo -e "   Password: ${CYAN}$ADMIN_PASSWORD${NC}"
     echo ""
     echo -e "${YELLOW}Note: Backend API runs on port $BACKEND_PORT${NC}"
     echo -e "${YELLOW}      Frontend dev server runs on port $FRONTEND_PORT${NC}"
@@ -1923,9 +1928,9 @@ main() {
     echo -e "${BLUE}"
     cat <<'EOF'
     ___          __  _ __  __            __
-    /   |  ____  / /_(_) / / /_  ______  / /____  _____
-    / /| | / __ \/ __/ / /_/ / / / / __ \/ __/ _ \/ ___/
-/ ___ |/ / / / /_/ / __  / /_/ / / / / /_/  __/ /
+   /   |  ____  / /_(_) / / /_  ______  / /____  _____
+  / /| | / __ \/ __/ / /_/ / / / / __ \/ __/ _ \/ ___/
+ / ___ |/ / / / /_/ / __  / /_/ / / / / /_/  __/ /
 /_/  |_/_/ /_/\__/_/_/ /_/\__,_/_/ /_/\__/\___/_/
 
         Command & Control Pro - Local Setup
