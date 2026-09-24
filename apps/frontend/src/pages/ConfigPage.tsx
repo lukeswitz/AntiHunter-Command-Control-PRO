@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { RemoteAlertsSection } from './RemoteAlertsSection';
-import { WebhooksSection } from './WebhooksSection';
 import { apiClient } from '../api/client';
 import type {
   AlarmConfig,
@@ -300,11 +299,10 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: 
   { id: 'mqtt', label: 'MQTT Federation', description: 'Remote site replication' },
   { id: 'chat', label: 'Chat', description: 'Encrypted operator chat keys' },
   { id: 'detection', label: 'Detection Defaults', description: 'Scan and alert presets' },
-  { id: 'webhooks', label: 'Webhooks', description: 'External alert destinations' },
   {
     id: 'remote',
-    label: 'Remote Access & Alerts',
-    description: 'Tailscale, phone push, Signal, Matter',
+    label: 'Alerts & Remote Access',
+    description: 'Phone, Signal, webhooks, Home',
   },
   { id: 'map', label: 'Map & Coverage', description: 'Map viewport and coverage rings' },
   { id: 'oui', label: 'OUI Resolver', description: 'Vendor cache imports & exports' },
@@ -4253,20 +4251,9 @@ export function ConfigPage() {
             </div>
           </section>
 
-          <section className={cardClass('webhooks')}>
-            <header>
-              <h2>Webhooks</h2>
-              <p>Manage outbound alert endpoints and review recent deliveries.</p>
-            </header>
-            <WebhooksSection />
-          </section>
-
           <section className={cardClass('remote')}>
             <header>
-              <h2>Remote Access & Alerts</h2>
-              <p>
-                Reach AHCC away from home and get alerts on your phone and in Apple or Google Home.
-              </p>
+              <h2>Alerts & Remote Access</h2>
             </header>
             <RemoteAlertsSection />
           </section>

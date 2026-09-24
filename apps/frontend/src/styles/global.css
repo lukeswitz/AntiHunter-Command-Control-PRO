@@ -6107,3 +6107,30 @@ body.theme-dark .strategy-table__row--selected {
 .baseline-legend {
   margin-top: 0.6rem;
 }
+.channel-row > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.25rem 0;
+}
+.channel-row > summary::-webkit-details-marker {
+  display: none;
+}
+.channel-row > summary::before {
+  content: '▸';
+  margin-right: 0.5rem;
+  color: var(--color-text-muted);
+}
+.channel-row[open] > summary::before {
+  content: '▾';
+}
+.channel-row__title {
+  flex: 1;
+  font-weight: 600;
+}
+.channel-row[open] > .config-card__body {
+  margin-top: 0.75rem;
+}

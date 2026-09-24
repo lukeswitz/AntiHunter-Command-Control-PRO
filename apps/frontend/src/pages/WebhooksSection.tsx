@@ -124,17 +124,13 @@ export function PushNotificationsCard() {
   return (
     <article className="config-card">
       <header>
-        <h3>Push notifications on this device</h3>
-        <p>
-          Alerts are end-to-end encrypted to this browser. On iPhone/iPad, add this page to the Home
-          Screen first and open it from there.
-        </p>
+        <h3>Alerts on this device</h3>
+        <p>iPhone: add to Home Screen first.</p>
       </header>
       <div className="config-card__body">
         {!supported ? (
           <p className="empty-state">
-            This browser does not support Web Push here. It requires HTTPS (or localhost), and on
-            iOS the Home Screen app.
+            Not supported here. Needs HTTPS.
           </p>
         ) : (
           <div className="controls-row">
