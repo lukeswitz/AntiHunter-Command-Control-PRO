@@ -572,7 +572,7 @@ try {
   check(
     'serial config exposes send mode / hop limit / channel (env fallback applied)',
     serialCfgDefault.status === 200 &&
-      ['plain', 'protobuf', 'protobuf-ack'].includes(serialCfgDefault.json?.sendMode) &&
+      ['plain', 'protobuf'].includes(serialCfgDefault.json?.sendMode) &&
       serialCfgDefault.json?.hopLimit === 3 &&
       serialCfgDefault.json?.sendChannel === 0,
     JSON.stringify(serialCfgDefault.json),
@@ -580,13 +580,13 @@ try {
   const serialSave = await call(
     'PUT',
     '/serial/config',
-    { sendMode: 'protobuf-ack', hopLimit: 5, sendChannel: 2 },
+    { sendMode: 'plain', hopLimit: 5, sendChannel: 2 },
     adminToken,
   );
   check(
     'serial send settings persist',
     serialSave.status === 200 &&
-      serialSave.json?.sendMode === 'protobuf-ack' &&
+      serialSave.json?.sendMode === 'plain' &&
       serialSave.json?.hopLimit === 5 &&
       serialSave.json?.sendChannel === 2,
     JSON.stringify(serialSave.json),

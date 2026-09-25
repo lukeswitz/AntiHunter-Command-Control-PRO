@@ -1238,9 +1238,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
       const isMeshtasticRadio = this.localRadio.num !== undefined;
       if (isMeshtasticRadio && sendMode !== 'plain') {
-        const wantAck = sendMode === 'protobuf-ack';
         await this.sendMeshtasticCommand(line, {
-          wantAck,
+          wantAck: false,
           hopLimit: Number.isFinite(hopLimit) ? (hopLimit as number) : undefined,
         });
       } else {
