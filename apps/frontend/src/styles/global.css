@@ -6441,6 +6441,16 @@ body.theme-dark .strategy-table__row--selected {
   box-shadow: 0 0 6px currentColor;
 }
 
+.radio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.radio-actions input {
+  width: 120px;
+}
+
 .offline-maps {
   font-size: 0.8rem;
   color: var(--color-text);
