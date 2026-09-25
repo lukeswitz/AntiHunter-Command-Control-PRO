@@ -5,6 +5,7 @@ import { MdDeleteSweep, MdRefresh, MdShield } from 'react-icons/md';
 import { apiClient } from '../api/client';
 import type { CommandRequest, CommandResponse, SiteSummary } from '../api/types';
 import {
+  CSI_SENSITIVITIES,
   SENTINEL_DEFAULT_MODE,
   SENTINEL_DETECTORS,
   SENTINEL_GROUPS,
@@ -50,6 +51,10 @@ export function SentinelPage() {
   const [selectedMode, setSelectedMode] = useState<string>(SENTINEL_DEFAULT_MODE);
   const [selectedBoot, setSelectedBoot] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ level: 'ok' | 'error'; message: string } | null>(null);
+  const [csiSeconds, setCsiSeconds] = useState('300');
+  const [csiForever, setCsiForever] = useState(false);
+  const [csiChannel, setCsiChannel] = useState('');
+  const [csiSensitivity, setCsiSensitivity] = useState<string | null>(null);
 
   const targetOptions = useMemo(() => {
     const options = [{ value: '@ALL', label: 'All nodes (@ALL)' }];
@@ -104,6 +109,22 @@ export function SentinelPage() {
     if (typeFilter === 'ALL') return detections;
     return detections.filter((detection) => detection.detectionType === typeFilter);
   }, [detections, typeFilter]);
+
+  const csiNodes = useMemo(() => {
+    const latest = new Map<string, (typeof detections)[number]>();
+    detections.forEach((detection) => {
+      if (!detection.detectionType.startsWith('CSI_')) return;
+      if (!latest.has(detection.nodeId)) latest.set(detection.nodeId, detection);
+    });
+    return Array.from(latest.values());
+  }, [detections]);
+
+  const startCsi = () => {
+    const params = [csiForever ? '0' : csiSeconds.trim() || '300'];
+    if (csiForever) params.push('FOREVER');
+    if (csiChannel) params.push(`CH${csiChannel}`);
+    send('CSI_MOTION_START', params);
+  };
 
   const busy = mutation.isPending;
 
@@ -282,6 +303,135 @@ export function SentinelPage() {
                     />
                     <span className="sentinel-node__id">{status.nodeId}</span>
                     <span className="sentinel-node__meta">{meta}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </article>
+
+      <article className="config-card">
+        <div className="panel__header">
+          <h2 className="panel__title">CSI Motion</h2>
+        </div>
+        <p className="form-hint">
+          WiFi channel-state motion sensing. Uses the target selected above. Runs as a scan, so the
+          node must be idle; stop it with Stop.
+        </p>
+        <div className="sentinel-control-grid">
+          <div className="sentinel-control-col">
+            <div className="sentinel-field">
+              <label htmlFor="csi-seconds">Duration (seconds)</label>
+              <input
+                id="csi-seconds"
+                type="number"
+                min={1}
+                max={86400}
+                value={csiSeconds}
+                disabled={csiForever}
+                onChange={(event) => setCsiSeconds(event.target.value)}
+              />
+            </div>
+            <div className="sentinel-field">
+              <label htmlFor="csi-channel">Channel</label>
+              <select
+                id="csi-channel"
+                value={csiChannel}
+                onChange={(event) => setCsiChannel(event.target.value)}
+              >
+                <option value="">Auto survey</option>
+                {Array.from({ length: 14 }, (_, i) => i + 1).map((ch) => (
+                  <option key={ch} value={String(ch)}>
+                    {ch}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="sentinel-field">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={csiForever}
+                  onChange={(event) => setCsiForever(event.target.checked)}
+                />{' '}
+                Run forever
+              </span>
+            </label>
+
+            <div className="sentinel-block">
+              <span className="form-label">Run</span>
+              <div className="sentinel-controls">
+                <button
+                  type="button"
+                  className="control-chip control-chip--primary"
+                  disabled={!canSend || busy}
+                  onClick={startCsi}
+                >
+                  Start
+                </button>
+                <button
+                  type="button"
+                  className="control-chip control-chip--ghost"
+                  disabled={!canSend || busy}
+                  onClick={() => send('STOP')}
+                >
+                  Stop
+                </button>
+                <button
+                  type="button"
+                  className="control-chip control-chip--ghost"
+                  disabled={!canSend || busy}
+                  onClick={() => send('CSI_RECAL')}
+                >
+                  <MdRefresh /> Recalibrate
+                </button>
+              </div>
+            </div>
+
+            <div className="sentinel-block">
+              <span className="form-label">Sensitivity</span>
+              <div className="sentinel-controls">
+                {CSI_SENSITIVITIES.map((level) => (
+                  <button
+                    key={level.value}
+                    type="button"
+                    className={`control-chip${csiSensitivity === level.value ? ' is-active' : ''}`}
+                    disabled={!canSend || busy}
+                    onClick={() => {
+                      setCsiSensitivity(level.value);
+                      send('CSI_CFG', [`SENSITIVITY=${level.value}`]);
+                    }}
+                  >
+                    {level.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="sentinel-node-panel">
+            <h3>Node Motion</h3>
+            {csiNodes.length === 0 ? (
+              <p className="form-hint">No CSI motion events received yet.</p>
+            ) : (
+              csiNodes.map((event) => {
+                const moving = event.detectionType === 'CSI_MOTION';
+                const score = typeof event.data.score === 'number' ? event.data.score : undefined;
+                const dwell =
+                  typeof event.data.dwellSeconds === 'number' ? event.data.dwellSeconds : undefined;
+                return (
+                  <div key={event.nodeId} className="sentinel-node">
+                    <span
+                      className={`sentinel-node__dot${moving ? ' sentinel-node__dot--run' : ''}`}
+                    />
+                    <span className="sentinel-node__id">{event.nodeId}</span>
+                    <span className="sentinel-node__meta">
+                      {moving
+                        ? `motion${score !== undefined ? ` S=${score}` : ''}`
+                        : `clear${dwell !== undefined ? ` after ${dwell}s` : ''}`}{' '}
+                      · {formatTime(event.timestamp)}
+                    </span>
                   </div>
                 );
               })
