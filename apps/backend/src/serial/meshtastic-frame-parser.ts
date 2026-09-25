@@ -2,13 +2,22 @@ import { Transform, TransformCallback } from 'node:stream';
 
 const MAGIC_BYTE_1 = 0x94;
 const MAGIC_BYTE_2 = 0xc3;
-const HEADER_SIZE = 4;
-const MAX_PAYLOAD_SIZE = 4096;
+const MAX_PAYLOAD_SIZE = 512;
 
 export type MeshtasticFrameEvent = { type: 'frame'; data: Buffer } | { type: 'text'; data: string };
 
+enum State {
+  WaitStart1,
+  WaitStart2,
+  WaitLenHi,
+  WaitLenLo,
+  ReadPayload,
+}
+
 export class MeshtasticFrameParser extends Transform {
-  private buffer = Buffer.alloc(0);
+  private state = State.WaitStart1;
+  private payloadLen = 0;
+  private payload: number[] = [];
   private textAccumulator = '';
 
   constructor() {
@@ -16,94 +25,82 @@ export class MeshtasticFrameParser extends Transform {
   }
 
   override _transform(chunk: Buffer, _encoding: string, callback: TransformCallback): void {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-    this.extract();
+    for (const byte of chunk) {
+      this.consume(byte);
+    }
     callback();
   }
 
   override _flush(callback: TransformCallback): void {
     this.flushText();
-    this.buffer = Buffer.alloc(0);
     callback();
   }
 
-  private extract(): void {
-    while (this.buffer.length > 0) {
-      const magicIndex = this.findMagic();
-
-      if (magicIndex < 0) {
-        this.accumulateText(this.buffer);
-        const lastByte = this.buffer[this.buffer.length - 1];
-        if (lastByte === MAGIC_BYTE_1) {
-          this.buffer = this.buffer.subarray(this.buffer.length - 1);
+  private consume(byte: number): void {
+    switch (this.state) {
+      case State.WaitStart1:
+        if (byte === MAGIC_BYTE_1) {
+          this.state = State.WaitStart2;
         } else {
-          this.buffer = Buffer.alloc(0);
+          this.accumulateText(byte);
         }
-        return;
-      }
+        break;
 
-      if (magicIndex > 0) {
-        this.accumulateText(this.buffer.subarray(0, magicIndex));
-        this.buffer = this.buffer.subarray(magicIndex);
-      }
+      case State.WaitStart2:
+        if (byte === MAGIC_BYTE_2) {
+          this.flushText();
+          this.state = State.WaitLenHi;
+        } else {
+          this.accumulateText(MAGIC_BYTE_1);
+          this.state = State.WaitStart1;
+          this.consume(byte);
+        }
+        break;
 
-      if (this.buffer.length < HEADER_SIZE) {
-        return;
-      }
+      case State.WaitLenHi:
+        this.payloadLen = byte << 8;
+        this.state = State.WaitLenLo;
+        break;
 
-      const payloadLength = (this.buffer[2] << 8) | this.buffer[3];
-      if (payloadLength === 0 || payloadLength > MAX_PAYLOAD_SIZE) {
-        this.accumulateText(this.buffer.subarray(0, 2));
-        this.buffer = this.buffer.subarray(2);
-        continue;
-      }
+      case State.WaitLenLo:
+        this.payloadLen |= byte;
+        if (this.payloadLen === 0 || this.payloadLen > MAX_PAYLOAD_SIZE) {
+          this.state = State.WaitStart1;
+        } else {
+          this.payload = [];
+          this.state = State.ReadPayload;
+        }
+        break;
 
-      const totalLength = HEADER_SIZE + payloadLength;
-      if (this.buffer.length < totalLength) {
-        return;
-      }
-
-      this.flushText();
-      const payload = Buffer.from(this.buffer.subarray(HEADER_SIZE, totalLength));
-      this.push({ type: 'frame', data: payload } satisfies MeshtasticFrameEvent);
-      this.buffer = this.buffer.subarray(totalLength);
+      case State.ReadPayload:
+        this.payload.push(byte);
+        if (this.payload.length >= this.payloadLen) {
+          this.push({
+            type: 'frame',
+            data: Buffer.from(this.payload),
+          } satisfies MeshtasticFrameEvent);
+          this.payload = [];
+          this.state = State.WaitStart1;
+        }
+        break;
     }
   }
 
-  private accumulateText(bytes: Buffer): void {
-    const text = bytes.toString('utf8');
-    this.textAccumulator += text;
-    this.emitCompleteLines();
-  }
-
-  private emitCompleteLines(): void {
-    let idx: number;
-    while ((idx = this.textAccumulator.search(/\r?\n|\r/)) >= 0) {
-      const line = this.textAccumulator.slice(0, idx).trim();
-      const eol =
-        this.textAccumulator[idx] === '\r' && this.textAccumulator[idx + 1] === '\n' ? 2 : 1;
-      this.textAccumulator = this.textAccumulator.slice(idx + eol);
-      if (line) {
-        this.push({ type: 'text', data: line } satisfies MeshtasticFrameEvent);
-      }
+  private accumulateText(byte: number): void {
+    if (byte === 0x0a || byte === 0x0d) {
+      this.flushText();
+      return;
+    }
+    if (this.textAccumulator.length < 4096) {
+      this.textAccumulator += String.fromCharCode(byte);
     }
   }
 
   private flushText(): void {
-    this.emitCompleteLines();
-    const remaining = this.textAccumulator.trim();
-    if (remaining) {
-      this.push({ type: 'text', data: remaining } satisfies MeshtasticFrameEvent);
-    }
+    const line = this.textAccumulator.replace(/[^\x20-\x7e]/g, '').trim();
     this.textAccumulator = '';
-  }
-
-  private findMagic(): number {
-    for (let i = 0; i <= this.buffer.length - 2; i++) {
-      if (this.buffer[i] === MAGIC_BYTE_1 && this.buffer[i + 1] === MAGIC_BYTE_2) {
-        return i;
-      }
+    if (line) {
+      this.push({ type: 'text', data: line } satisfies MeshtasticFrameEvent);
     }
-    return -1;
   }
 }
