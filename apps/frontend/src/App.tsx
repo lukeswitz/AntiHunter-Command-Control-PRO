@@ -27,6 +27,7 @@ import { ChatPage } from './pages/ChatPage';
 import { CommandConsolePage } from './pages/CommandConsolePage';
 import { ConfigPage } from './pages/ConfigPage';
 import { ExportsPage } from './pages/ExportsPage';
+import { FleetSecurityPage } from './pages/FleetSecurityPage';
 import { GeofencePage } from './pages/GeofencePage';
 import { InventoryPage } from './pages/InventoryPage';
 import { MapPage } from './pages/MapPage';
@@ -136,6 +137,7 @@ export default function App() {
               <Route path="/acars" element={<AcarsPage />} />
               <Route path="/adsb" element={<AdsbPage />} />
               <Route path="/nodes" element={<NodesPage />} />
+              <Route path="/fleet" element={<FleetSecurityPage />} />
               <Route path="/targets" element={<TargetsPage />} />
               <Route path="/strategy" element={<StrategyAdvisorPage />} />
               <Route path="/inventory" element={<InventoryPage />} />

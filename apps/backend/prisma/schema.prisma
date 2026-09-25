@@ -991,6 +991,111 @@ model DevicePresence {
   @@index([lastSeen])
 }
 
+model FleetIdentity {
+  id            String    @id @default(cuid())
+  label         String    @unique
+  publicKey     Bytes     @unique
+  fingerprint   String    @unique
+  role          String
+  source        String
+  createdAt     DateTime  @default(now())
+  revokedAt     DateTime?
+  revokedReason String?
+  notes         String?
+
+  @@index([role])
+}
+
+model FleetNodeTrust {
+  nodeNum           BigInt    @id
+  adminKeyFps       Json      @default("[]")
+  isManaged         Boolean   @default(false)
+  lastVerifiedAt    DateTime?
+  lastVerifyMethod  String?
+  lastDriftCheckAt  DateTime?
+  driftStatus       String    @default("unknown")
+  currentPskFp      String?
+  previousPskFp     String?
+  strandedSince     DateTime?
+  recoveryAttempts  Int       @default(0)
+  lastRecoveryAt    DateTime?
+  lastRecoveryError String?
+  notes             String?
+
+  @@index([driftStatus])
+  @@index([strandedSince])
+}
+
+model FleetChannel {
+  channelIndex   Int       @id
+  name           String
+  role           String
+  pskFingerprint String?
+  pskLength      Int?
+  lastRotatedAt  DateTime?
+  lastRotatedBy  String?
+  lastRotationId String?
+}
+
+model FleetRotation {
+  id                  String    @id @default(cuid())
+  kind                String
+  channelIndex        Int?
+  stagingChannelIndex Int?
+  piLocalPhase        String    @default("pending")
+  startedBy           String?
+  startedAt           DateTime  @default(now())
+  completedAt         DateTime?
+  retiredAt           DateTime?
+  targets             Json
+  newPskFp            String?
+  newPsk              Bytes?
+  notes               String?
+
+  jobs FleetJob[]
+
+  @@index([startedAt])
+  @@index([kind])
+}
+
+model FleetPolicy {
+  id                  Int      @id @default(1)
+  expectedAdminKeyFps Json     @default("[]")
+  expectedIsManaged   Boolean  @default(false)
+  expectedChannels    Json     @default("[]")
+  updatedAt           DateTime @default(now())
+  updatedBy           String?
+}
+
+model FleetJob {
+  id            String    @id @default(cuid())
+  kind          String
+  rotationId    String?
+  targetNodeNum BigInt?
+  state         String    @default("queued")
+  attempts      Int       @default(0)
+  lastError     String?
+  payload       Json      @default("{}")
+  enqueuedAt    DateTime  @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  workerId      String?
+
+  rotation FleetRotation? @relation(fields: [rotationId], references: [id], onDelete: Cascade)
+
+  @@index([state, enqueuedAt])
+  @@index([rotationId])
+}
+
+model FleetRecoveryPsk {
+  slot       Int      @id
+  fp         String   @unique
+  rawPsk     Bytes
+  pskHash    Int
+  addedAt    DateTime @default(now())
+  rotationId String?
+}
+
 model DeviceVisit {
   id        String   @id @default(cuid())
   mac       String

@@ -14,6 +14,13 @@ import { SerialPortStream } from '@serialport/stream';
 import { randomUUID } from 'crypto';
 import { Observable, Subject } from 'rxjs';
 
+import {
+  ChannelRoleName,
+  ChannelView,
+  RadioReKeyRefused,
+  SecurityConfigView,
+  SecurityUpdate,
+} from './fleet-admin.types';
 import { MeshtasticFrameEvent, MeshtasticFrameParser } from './meshtastic-frame-parser';
 import { createParser, ProtocolKey } from './protocol-registry';
 import {
@@ -307,6 +314,17 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private readonly meshNodeNames = new Map<number, string>();
   private localRadio: LocalRadioInfo = {};
   private radioConfig: Record<string, unknown> = {};
+  private readonly fleetTx = new Map<
+    number,
+    {
+      expectedFrom: number;
+      expectsReply: boolean;
+      resolve: (value: unknown) => void;
+      reject: (error: Error) => void;
+      timer: NodeJS.Timeout;
+    }
+  >();
+  private readonly sessionPasskeys = new Map<number, Uint8Array>();
   private configNonce = 0;
 
   constructor(
@@ -401,6 +419,10 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
   getMeshNodeCount(): number {
     return this.meshNodeNames.size;
+  }
+
+  getMeshNodeNames(): Map<number, string> {
+    return new Map(this.meshNodeNames);
   }
 
   ownsPort(): boolean {
@@ -658,6 +680,302 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     await setLines({ dtr: false, rts: true });
     await new Promise((resolve) => setTimeout(resolve, 100));
     await setLines({ dtr: false, rts: false });
+  }
+
+  // --- Fleet security admin transport (Meshtastic AdminMessage over serial) ---
+
+  private readonly SECURITY_CONFIG_TYPE = 7;
+  private readonly ROLE_TO_NUM: Record<ChannelRoleName, number> = {
+    DISABLED: 0,
+    PRIMARY: 1,
+    SECONDARY: 2,
+  };
+  private readonly NUM_TO_ROLE: ChannelRoleName[] = ['DISABLED', 'PRIMARY', 'SECONDARY'];
+
+  private fleetLocalNum(): number {
+    if (!this.localRadio.num) {
+      throw new BadRequestException('Radio not identified yet. Press Refresh and try again.');
+    }
+    return this.localRadio.num;
+  }
+
+  private isLocalTarget(nodeNum: number): boolean {
+    return this.localRadio.num !== undefined && nodeNum === this.localRadio.num;
+  }
+
+  private async buildAdminInit(
+    descriptor:
+      | { t: 'getConfig'; configType: number }
+      | { t: 'setSecurity'; security: SecurityUpdate }
+      | { t: 'getChannel'; index: number }
+      | {
+          t: 'setChannel';
+          channel: { index: number; name: string; role: ChannelRoleName; psk: Buffer };
+        }
+      | { t: 'beginEdit' }
+      | { t: 'commitEdit' },
+    remote: boolean,
+    to: number,
+  ): Promise<Record<string, unknown>> {
+    const { Config, Channel } = await loadMeshModule();
+    const init: Record<string, unknown> = {};
+    if (remote) {
+      const passkey = this.sessionPasskeys.get(to);
+      if (passkey && passkey.length) {
+        init.sessionPasskey = passkey;
+      }
+    }
+    switch (descriptor.t) {
+      case 'getConfig':
+        init.payloadVariant = { case: 'getConfigRequest', value: descriptor.configType };
+        break;
+      case 'getChannel':
+        init.payloadVariant = { case: 'getChannelRequest', value: descriptor.index + 1 };
+        break;
+      case 'beginEdit':
+        init.payloadVariant = { case: 'beginEditSettings', value: true };
+        break;
+      case 'commitEdit':
+        init.payloadVariant = { case: 'commitEditSettings', value: true };
+        break;
+      case 'setSecurity': {
+        const sec: Record<string, unknown> = {};
+        const u = descriptor.security;
+        if (u.publicKey) sec.publicKey = u.publicKey;
+        if (u.privateKey) sec.privateKey = u.privateKey;
+        if (u.adminKeys) sec.adminKey = u.adminKeys;
+        if (u.isManaged !== undefined) sec.isManaged = u.isManaged;
+        if (u.adminChannelEnabled !== undefined) sec.adminChannelEnabled = u.adminChannelEnabled;
+        init.payloadVariant = {
+          case: 'setConfig',
+          value: create(Config.ConfigSchema, {
+            payloadVariant: { case: 'security', value: sec },
+          }),
+        };
+        break;
+      }
+      case 'setChannel':
+        init.payloadVariant = {
+          case: 'setChannel',
+          value: create(Channel.ChannelSchema, {
+            index: descriptor.channel.index,
+            role: this.ROLE_TO_NUM[descriptor.channel.role],
+            settings: { name: descriptor.channel.name, psk: descriptor.channel.psk },
+          }),
+        };
+        break;
+    }
+    return init;
+  }
+
+  private expectsAdminReply(descriptor: { t: string }): boolean {
+    return descriptor.t === 'getConfig' || descriptor.t === 'getChannel';
+  }
+
+  private async sendAdmin(
+    nodeNum: number,
+    descriptor: Parameters<SerialService['buildAdminInit']>[0],
+    options: { remote: boolean; timeoutMs: number; fireForget?: boolean },
+  ): Promise<{ payloadVariant?: { case?: string; value?: unknown } } | null> {
+    if (!this.ownsPort()) {
+      throw new BadRequestException('Fleet security requires the node with the serial port');
+    }
+    const { Admin, Mesh, Portnums } = await loadMeshModule();
+    const init = await this.buildAdminInit(descriptor, options.remote, nodeNum);
+    const admin = create(Admin.AdminMessageSchema, init as never);
+    const payload = toBinary(Admin.AdminMessageSchema, admin);
+    const packetId = this.nextPacketId();
+    const packet = create(Mesh.MeshPacketSchema, {
+      id: packetId,
+      to: nodeNum,
+      channel: 0,
+      wantAck: true,
+      pkiEncrypted: options.remote,
+      hopLimit: 3,
+      payloadVariant: {
+        case: 'decoded',
+        value: create(Mesh.DataSchema, {
+          portnum: Portnums.PortNum.ADMIN_APP,
+          payload,
+          wantResponse: this.expectsAdminReply(descriptor),
+        }),
+      },
+    });
+    const binary = toBinary(
+      Mesh.ToRadioSchema,
+      create(Mesh.ToRadioSchema, { payloadVariant: { case: 'packet', value: packet } }),
+    );
+    const frame = Buffer.alloc(4 + binary.length);
+    frame[0] = 0x94;
+    frame[1] = 0xc3;
+    frame[2] = (binary.length >> 8) & 0xff;
+    frame[3] = binary.length & 0xff;
+    Buffer.from(binary).copy(frame, 4);
+
+    if (options.fireForget) {
+      await this.commandQueue.add(async () => {
+        this.ensureConnected();
+        await this.writeBuffer(frame);
+      });
+      return null;
+    }
+
+    const expectsReply = this.expectsAdminReply(descriptor);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.fleetTx.delete(packetId);
+        reject(new Error(`radio admin timed out (${descriptor.t})`));
+      }, options.timeoutMs);
+      this.fleetTx.set(packetId, {
+        expectedFrom: nodeNum,
+        expectsReply,
+        resolve: resolve as (value: unknown) => void,
+        reject,
+        timer,
+      });
+      this.commandQueue
+        .add(async () => {
+          this.ensureConnected();
+          await this.writeBuffer(frame);
+        })
+        .catch((error) => {
+          const pending = this.fleetTx.get(packetId);
+          if (pending) {
+            this.fleetTx.delete(packetId);
+            clearTimeout(pending.timer);
+          }
+          reject(error instanceof Error ? error : new Error(String(error)));
+        });
+    });
+  }
+
+  private decodeSecurityView(admin: {
+    payloadVariant?: { case?: string; value?: unknown };
+  }): SecurityConfigView {
+    const cfg = admin.payloadVariant;
+    if (cfg?.case !== 'getConfigResponse') {
+      throw new Error('admin reply missing get_config_response');
+    }
+    const config = cfg.value as { payloadVariant?: { case?: string; value?: unknown } };
+    if (config.payloadVariant?.case !== 'security') {
+      throw new Error('config reply missing security section');
+    }
+    const sec = config.payloadVariant.value as {
+      publicKey?: Uint8Array;
+      privateKey?: Uint8Array;
+      adminKey?: Uint8Array[];
+      isManaged?: boolean;
+      adminChannelEnabled?: boolean;
+    };
+    return {
+      publicKey: Buffer.from(sec.publicKey ?? new Uint8Array()),
+      adminKeys: (sec.adminKey ?? []).map((k) => Buffer.from(k)),
+      isManaged: sec.isManaged ?? false,
+      adminChannelEnabled: sec.adminChannelEnabled ?? false,
+      hasPrivateKey: (sec.privateKey?.length ?? 0) === 32,
+    };
+  }
+
+  private decodeChannelView(admin: {
+    payloadVariant?: { case?: string; value?: unknown };
+  }): ChannelView {
+    const cfg = admin.payloadVariant;
+    if (cfg?.case !== 'getChannelResponse') {
+      throw new Error('admin reply missing get_channel_response');
+    }
+    const ch = cfg.value as {
+      index?: number;
+      role?: number;
+      settings?: { name?: string; psk?: Uint8Array };
+    };
+    return {
+      index: ch.index ?? 0,
+      role: this.NUM_TO_ROLE[ch.role ?? 0] ?? 'DISABLED',
+      name: ch.settings?.name ?? '',
+      psk: Buffer.from(ch.settings?.psk ?? new Uint8Array()),
+    };
+  }
+
+  async fleetGetSecurity(nodeNum: number): Promise<SecurityConfigView> {
+    const remote = !this.isLocalTarget(nodeNum);
+    const reply = await this.sendAdmin(
+      nodeNum,
+      { t: 'getConfig', configType: this.SECURITY_CONFIG_TYPE },
+      { remote, timeoutMs: remote ? 30_000 : 10_000 },
+    );
+    if (!reply) throw new Error('empty security reply');
+    return this.decodeSecurityView(reply);
+  }
+
+  async fleetSetSecurity(nodeNum: number, update: SecurityUpdate): Promise<void> {
+    const remote = !this.isLocalTarget(nodeNum);
+    // Re-key guard (finding #17): OTA set-security without a 32-byte private key regenerates the node keypair.
+    if (update.privateKey === undefined) {
+      throw new RadioReKeyRefused(
+        'Refusing over-the-air security change: Meshtastic would regenerate the node keypair and cut off admin. Provision admin keys locally over USB instead.',
+      );
+    }
+    await this.sendAdmin(
+      nodeNum,
+      { t: 'setSecurity', security: update },
+      {
+        remote,
+        timeoutMs: remote ? 30_000 : 10_000,
+      },
+    );
+  }
+
+  async fleetGetChannel(nodeNum: number, index: number): Promise<ChannelView> {
+    const remote = !this.isLocalTarget(nodeNum);
+    const reply = await this.sendAdmin(
+      nodeNum,
+      { t: 'getChannel', index },
+      { remote, timeoutMs: remote ? 30_000 : 10_000 },
+    );
+    if (!reply) throw new Error('empty channel reply');
+    return this.decodeChannelView(reply);
+  }
+
+  async fleetSetChannelLocal(channel: {
+    index: number;
+    name: string;
+    role: ChannelRoleName;
+    psk: Buffer;
+  }): Promise<void> {
+    await this.sendAdmin(
+      this.fleetLocalNum(),
+      { t: 'setChannel', channel },
+      {
+        remote: false,
+        timeoutMs: 10_000,
+      },
+    );
+  }
+
+  async fleetEstablishSession(nodeNum: number): Promise<void> {
+    await this.fleetGetChannel(nodeNum, 0);
+  }
+
+  async fleetFireForget(
+    nodeNum: number,
+    descriptor: Parameters<SerialService['buildAdminInit']>[0],
+  ): Promise<void> {
+    await this.sendAdmin(nodeNum, descriptor, { remote: true, timeoutMs: 0, fireForget: true });
+  }
+
+  async fleetLocalAdmin(
+    descriptor: Parameters<SerialService['buildAdminInit']>[0],
+    timeoutMs = 10_000,
+  ): Promise<{ payloadVariant?: { case?: string; value?: unknown } } | null> {
+    return this.sendAdmin(this.fleetLocalNum(), descriptor, { remote: false, timeoutMs });
+  }
+
+  async fleetRemoteAdmin(
+    nodeNum: number,
+    descriptor: Parameters<SerialService['buildAdminInit']>[0],
+    timeoutMs = 30_000,
+  ): Promise<{ payloadVariant?: { case?: string; value?: unknown } } | null> {
+    return this.sendAdmin(nodeNum, descriptor, { remote: true, timeoutMs });
   }
 
   getParsedStream(): Observable<SerialParseResult> {
@@ -1454,6 +1772,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           portnum?: number;
           payload?: Uint8Array;
           wantResponse?: boolean;
+          requestId?: number;
         };
       };
     },
@@ -1607,8 +1926,86 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         break;
       }
 
+      case Portnums.PortNum.ADMIN_APP: {
+        if (!data.payload?.length) return;
+        await this.handleAdminReply(fromNode, data.requestId ?? 0, data.payload);
+        break;
+      }
+
+      case Portnums.PortNum.ROUTING_APP: {
+        await this.handleRoutingReply(
+          fromNode,
+          data.requestId ?? 0,
+          data.payload ?? new Uint8Array(),
+        );
+        break;
+      }
+
       default:
         break;
+    }
+  }
+
+  private async handleAdminReply(
+    fromNode: number,
+    requestId: number,
+    payload: Uint8Array,
+  ): Promise<void> {
+    const { Admin } = await loadMeshModule();
+    let admin: { sessionPasskey?: Uint8Array; payloadVariant?: { case?: string; value?: unknown } };
+    try {
+      admin = fromBinary(Admin.AdminMessageSchema, payload) as never;
+    } catch {
+      return;
+    }
+    if (admin.sessionPasskey && admin.sessionPasskey.length > 0 && fromNode) {
+      this.sessionPasskeys.set(fromNode, admin.sessionPasskey);
+    }
+    if (!requestId) return;
+    const pending = this.fleetTx.get(requestId);
+    if (!pending || (pending.expectedFrom !== 0 && pending.expectedFrom !== fromNode)) {
+      return;
+    }
+    this.fleetTx.delete(requestId);
+    clearTimeout(pending.timer);
+    pending.resolve(admin);
+  }
+
+  private async handleRoutingReply(
+    fromNode: number,
+    requestId: number,
+    payload: Uint8Array,
+  ): Promise<void> {
+    if (!requestId) return;
+    const { Mesh } = await loadMeshModule();
+    let errorReason = 0;
+    try {
+      const routing = fromBinary(Mesh.RoutingSchema, payload) as {
+        variant?: { case?: string; value?: number };
+      };
+      if (routing.variant?.case === 'errorReason') {
+        errorReason = Number(routing.variant.value ?? 0);
+      }
+    } catch {
+      errorReason = -1;
+    }
+    const pending = this.fleetTx.get(requestId);
+    if (!pending || (pending.expectedFrom !== 0 && pending.expectedFrom !== fromNode)) {
+      return;
+    }
+    const failed = errorReason !== 0;
+    if (pending.expectsReply && !failed) {
+      return;
+    }
+    this.fleetTx.delete(requestId);
+    clearTimeout(pending.timer);
+    if (failed) {
+      if (errorReason === 32 && fromNode) {
+        this.sessionPasskeys.delete(fromNode);
+      }
+      pending.reject(new Error(`radio admin failed: routing error ${errorReason}`));
+    } else {
+      pending.resolve(null);
     }
   }
 
