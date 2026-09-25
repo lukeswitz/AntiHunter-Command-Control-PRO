@@ -20,6 +20,7 @@ import { ExportsModule } from './exports/exports.module';
 import { FaaModule } from './faa/faa.module';
 import { FirewallMiddleware } from './firewall/firewall.middleware';
 import { FirewallModule } from './firewall/firewall.module';
+import { FleetSecModule } from './fleet-sec/fleet-sec.module';
 import { GeofencesModule } from './geofences/geofences.module';
 import { HealthModule } from './health/health.module';
 import { IngestModule } from './ingest/ingest.module';
@@ -107,6 +108,7 @@ import { WsModule } from './ws/ws.module';
     UsersModule,
     TilesModule,
     StatusBroadcastModule,
+    FleetSecModule,
     ExportsModule,
     WebhooksModule,
     UpdateModule,

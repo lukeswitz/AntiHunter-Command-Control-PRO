@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join } from 'node:path';
@@ -447,6 +447,125 @@ try {
       JSON.stringify(analystRefresh.json).includes('INSUFFICIENT_ROLE'),
     JSON.stringify(analystRefresh),
   );
+
+  console.log('fleet security');
+  const fleetIdentities = await call('GET', '/fleet-security/identities', null, analystToken);
+  check(
+    'fleet identities readable, empty at start',
+    fleetIdentities.status === 200 &&
+      Array.isArray(fleetIdentities.json) &&
+      fleetIdentities.json.length === 0,
+    JSON.stringify(fleetIdentities.json),
+  );
+  const fleetTrust = await call('GET', '/fleet-security/trust', null, analystToken);
+  check('fleet trust roster readable', fleetTrust.status === 200 && Array.isArray(fleetTrust.json));
+  const fleetPolicy = await call('GET', '/fleet-security/policy', null, analystToken);
+  check(
+    'fleet policy has defaults',
+    fleetPolicy.status === 200 && fleetPolicy.json?.expectedIsManaged === false,
+    JSON.stringify(fleetPolicy.json),
+  );
+  const fleetChannels = await call('GET', '/fleet-security/channels', null, analystToken);
+  check(
+    'fleet channels readable',
+    fleetChannels.status === 200 && Array.isArray(fleetChannels.json),
+  );
+
+  const pubDer = generateKeyPairSync('x25519').publicKey.export({ type: 'spki', format: 'der' });
+  const pubB64 = Buffer.from(pubDer.subarray(12)).toString('base64');
+  const analystRegister = await call(
+    'POST',
+    '/fleet-security/identities',
+    { label: 'op-key', publicKey: pubB64, role: 'operator' },
+    analystToken,
+  );
+  check(
+    'analyst cannot register identity',
+    analystRegister.status === 403 &&
+      JSON.stringify(analystRegister.json).includes('INSUFFICIENT_ROLE'),
+    JSON.stringify(analystRegister),
+  );
+  const register = await call(
+    'POST',
+    '/fleet-security/identities',
+    { label: 'op-key', publicKey: pubB64, role: 'operator' },
+    adminToken,
+  );
+  check(
+    'admin registers an operator identity',
+    (register.status === 201 || register.status === 200) && Boolean(register.json?.fingerprint),
+    JSON.stringify(register),
+  );
+  const identitiesAfter = await call('GET', '/fleet-security/identities', null, adminToken);
+  check(
+    'registered identity shows in the list',
+    identitiesAfter.json?.some((i) => i.fingerprint === register.json.fingerprint),
+  );
+
+  const rekey = await call(
+    'PUT',
+    '/fleet-security/trust/305419896/admin-keys',
+    { keyFingerprints: [register.json.fingerprint] },
+    adminToken,
+  );
+  check(
+    'OTA admin-key change refused to protect the node keypair (finding #17)',
+    rekey.status === 400 && /regenerate the node keypair/i.test(rekey.json?.message ?? ''),
+    JSON.stringify(rekey),
+  );
+
+  const badRotate = await call(
+    'POST',
+    '/fleet-security/rotations',
+    { channelIndex: 0, targets: [123456], ack: 'NOPE' },
+    adminToken,
+  );
+  check('rotation without ack=ROTATE rejected', badRotate.status === 400);
+  const analystRotate = await call(
+    'POST',
+    '/fleet-security/rotations',
+    { channelIndex: 0, targets: [123456], ack: 'ROTATE' },
+    analystToken,
+  );
+  check(
+    'analyst cannot start rotation',
+    analystRotate.status === 403 &&
+      JSON.stringify(analystRotate.json).includes('INSUFFICIENT_ROLE'),
+    JSON.stringify(analystRotate),
+  );
+  const rotate = await call(
+    'POST',
+    '/fleet-security/rotations',
+    { channelIndex: 0, targets: [123456], ack: 'ROTATE', notes: 'e2e' },
+    adminToken,
+  );
+  check(
+    'admin creates a rotation (random PSK, fingerprint only)',
+    (rotate.status === 201 || rotate.status === 200) &&
+      Boolean(rotate.json?.rotationId) &&
+      /^([0-9a-f]{2}:){7}[0-9a-f]{2}$/.test(rotate.json?.newPskFingerprint ?? ''),
+    JSON.stringify(rotate),
+  );
+  const rotationRow = await call(
+    'GET',
+    `/fleet-security/rotations/${rotate.json.rotationId}`,
+    null,
+    adminToken,
+  );
+  check(
+    'rotation row readable and never exposes the PSK',
+    rotationRow.status === 200 &&
+      rotationRow.json?.newPskFp === rotate.json.newPskFingerprint &&
+      !('newPsk' in (rotationRow.json ?? {})),
+    JSON.stringify(rotationRow.json),
+  );
+  const analystPolicy = await call(
+    'PUT',
+    '/fleet-security/policy',
+    { expectedIsManaged: true },
+    analystToken,
+  );
+  check('analyst cannot change policy', analystPolicy.status === 403);
 
   console.log('disabled accounts');
   check(

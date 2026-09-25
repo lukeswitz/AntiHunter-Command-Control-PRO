@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 
 import { RadioAction, SerialService } from './serial.service';
 
-type Proto = typeof import('@meshtastic/protobufs');
+type Proto = typeof import('@meshtastic/protobufs', {
+  with: { 'resolution-mode': 'import' },
+});
 
 let passed = 0;
 let failed = 0;

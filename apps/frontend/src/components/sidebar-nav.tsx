@@ -20,6 +20,7 @@ import {
   MdSettingsInputAntenna,
   MdShield,
   MdTerminal,
+  MdVpnKey,
   MdWifiTethering,
 } from 'react-icons/md';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -45,6 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/adsb', label: 'ADS-B', icon: MdRadar },
   { to: '/geofences', label: 'Geofences', icon: MdOutlineAreaChart },
   { to: '/nodes', label: 'Nodes', icon: MdSensors },
+  { to: '/fleet', label: 'Fleet Security', icon: MdVpnKey },
   { to: '/sentinel', label: 'Sentinel', icon: MdShield },
   { to: '/scheduler', label: 'Scheduler', icon: MdEventNote },
   { to: '/strategy', label: 'Strategy Advisor', icon: MdHub, hideOnMobile: true },
