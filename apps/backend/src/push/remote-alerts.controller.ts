@@ -7,11 +7,12 @@ import {
   Param,
   Post,
   Put,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { RemoteAlertConfig, Role } from '@prisma/client';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 
 import { AlertChannel, AlertChannelsService } from './alert-channels.service';
 import { DEVICE_SOURCES } from './alert-sources';
@@ -160,8 +161,19 @@ export class RemoteAlertsController {
   }
 
   @Get('matter/status')
-  matterStatus() {
-    return this.matter.status();
+  async matterStatus(@Req() req: Request) {
+    const status = this.matter.status();
+    const userId = req.auth?.sub;
+    const user = userId
+      ? await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { twoFactorEnabled: true },
+        })
+      : null;
+    if (user?.twoFactorEnabled) {
+      return status;
+    }
+    return { ...status, manualPairingCode: null, qrPairingCode: null, passcode: null };
   }
 
   @Post('matter/restart')

@@ -52,6 +52,7 @@ services:
       NTFY_URL: ${NTFY_URL:-}
       NTFY_TOKEN: ${NTFY_TOKEN:-}
       SIGNAL_API_URL: ${SIGNAL_API_URL:-http://signal-proxy:8080}
+      SIGNAL_PROXY_TOKEN: ${SIGNAL_PROXY_TOKEN:-}
       SIGNAL_NUMBER: ${SIGNAL_NUMBER:-}
       SIGNAL_RECIPIENTS: ${SIGNAL_RECIPIENTS:-}
       MATRIX_HOMESERVER_URL: ${MATRIX_HOMESERVER_URL:-}
@@ -127,6 +128,7 @@ services:
     restart: unless-stopped
     environment:
       MODE: native
+      AUTO_RECEIVE_SCHEDULE: '0 */6 * * *'
     networks:
       - signal-internal
     volumes:
@@ -140,6 +142,7 @@ services:
     command: ['node', '/app/proxy.mjs']
     environment:
       SIGNAL_UPSTREAM: http://signal-api:8080
+      SIGNAL_PROXY_TOKEN: ${SIGNAL_PROXY_TOKEN:-}
       PORT: '8080'
     volumes:
       - ./docker/signal-proxy/proxy.mjs:/app/proxy.mjs:ro

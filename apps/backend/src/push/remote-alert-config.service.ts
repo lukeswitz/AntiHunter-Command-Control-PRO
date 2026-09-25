@@ -120,6 +120,10 @@ export class RemoteAlertConfigService {
     return { config, legacy };
   }
 
+  signalProxyToken(): string {
+    return env('SIGNAL_PROXY_TOKEN') ?? this.box.derive('signal-proxy');
+  }
+
   onChange(listener: (config: RemoteAlertConfig) => void): void {
     this.listeners.add(listener);
   }
