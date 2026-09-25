@@ -899,7 +899,35 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  private securityFromRadioConfig(): SecurityConfigView | null {
+    const sec = this.radioConfig['security'] as
+      | {
+          publicKey?: Uint8Array;
+          privateKey?: Uint8Array;
+          adminKey?: Uint8Array[];
+          isManaged?: boolean;
+          adminChannelEnabled?: boolean;
+        }
+      | undefined;
+    if (!sec || !(sec.publicKey?.length ?? 0)) {
+      return null;
+    }
+    return {
+      publicKey: Buffer.from(sec.publicKey ?? new Uint8Array()),
+      adminKeys: (sec.adminKey ?? []).map((k) => Buffer.from(k)),
+      isManaged: sec.isManaged ?? false,
+      adminChannelEnabled: sec.adminChannelEnabled ?? false,
+      hasPrivateKey: (sec.privateKey?.length ?? 0) === 32,
+    };
+  }
+
   async fleetGetSecurity(nodeNum: number): Promise<SecurityConfigView> {
+    if (this.isLocalTarget(nodeNum)) {
+      const local = this.securityFromRadioConfig();
+      if (local) {
+        return local;
+      }
+    }
     const remote = !this.isLocalTarget(nodeNum);
     const reply = await this.sendAdmin(
       nodeNum,
@@ -1597,9 +1625,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`Frame parser error: ${err.message}`, err.stack);
       });
 
-      void this.initMeshtasticApi().catch((err) => {
-        this.logger.warn(`Meshtastic API init: ${err instanceof Error ? err.message : err}`);
-      });
+      void this.identifyRadioWithRetry();
     } else {
       const readDelimiter = options.autoDetectDelimiter ? '\n' : options.delimiter;
       this.lineParser = this.port.pipe(
@@ -1662,6 +1688,23 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
     await this.writeBuffer(frame);
     this.logger.log(`Meshtastic API handshake sent (nonce=${nonce})`);
+  }
+
+  private async identifyRadioWithRetry(): Promise<void> {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      if (!this.port) {
+        return;
+      }
+      try {
+        await this.initMeshtasticApi();
+      } catch (err) {
+        this.logger.warn(`Meshtastic API init: ${err instanceof Error ? err.message : err}`);
+      }
+      await delay(3000);
+      if (this.localRadio.num) {
+        return;
+      }
+    }
   }
 
   private async handleMeshtasticFrame(frame: Buffer): Promise<void> {
