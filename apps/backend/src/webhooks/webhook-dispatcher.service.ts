@@ -398,6 +398,9 @@ export class WebhookDispatcherService {
 
     const payload = {
       summary,
+      value1: summary,
+      value2: context.severity ?? '',
+      value3: context.mac ?? '',
       content: discordEscape(summary).slice(0, 2000),
       allowed_mentions: { parse: [] },
       text: `*${slackEscape(alertTitle(context))}*\n${slackEscape(alertBody(context))}`.slice(
