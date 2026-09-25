@@ -123,6 +123,32 @@ export function PushNotificationsCard() {
     }
   };
 
+  const handleTest = async () => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const result = await sendTestPush();
+      if (!result.configured) {
+        setStatus('Push is not configured on the server.');
+      } else if (result.failed > 0) {
+        const first = result.failures[0];
+        setStatus(
+          `Push service rejected it (${first?.status ?? 'error'}): ${first?.message ?? 'unknown'}.`,
+        );
+      } else if (result.sent === 0) {
+        setStatus('No subscribed device for your account. Enable it here first.');
+      } else {
+        setStatus(
+          `Accepted for ${result.sent} device(s). If nothing appears, the block is in macOS notification settings or Focus.`,
+        );
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="remote-subsection">
       <div className="channel-row__head">
@@ -143,17 +169,7 @@ export function PushNotificationsCard() {
           <div className="controls-row">
             {subscribed ? (
               <>
-                <button
-                  type="button"
-                  className="control-chip"
-                  disabled={busy}
-                  onClick={() =>
-                    run(
-                      sendTestPush,
-                      'Test sent. If nothing appears, allow notifications for the browser in system settings and turn off Focus/Do Not Disturb.',
-                    )
-                  }
-                >
+                <button type="button" className="control-chip" disabled={busy} onClick={handleTest}>
                   Send test
                 </button>
                 <button

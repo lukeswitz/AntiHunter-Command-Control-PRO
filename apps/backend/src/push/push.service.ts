@@ -22,6 +22,14 @@ export interface PushSubscriptionInput {
   keys: { p256dh: string; auth: string };
 }
 
+export interface PushDeliveryResult {
+  configured: boolean;
+  sent: number;
+  failed: number;
+  gone: number;
+  failures: { service: string; status: number | null; message: string }[];
+}
+
 @Injectable()
 export class PushService {
   private readonly logger = new Logger(PushService.name);
@@ -114,22 +122,29 @@ export class PushService {
     await this.prisma.pushSubscription.deleteMany({ where: { endpoint, userId } });
   }
 
-  async notify(title: string, body: string, onlyUserId?: string): Promise<void> {
+  async notify(title: string, body: string, onlyUserId?: string): Promise<PushDeliveryResult> {
     const vapidDetails = await this.vapid();
     if (!vapidDetails) {
-      return;
+      return { configured: false, sent: 0, failed: 0, gone: 0, failures: [] };
     }
     const subscriptions = await this.prisma.pushSubscription.findMany({
       where: { user: { isActive: true }, ...(onlyUserId ? { userId: onlyUserId } : {}) },
     });
     if (!subscriptions.length) {
-      return;
+      return { configured: true, sent: 0, failed: 0, gone: 0, failures: [] };
     }
     const payload = JSON.stringify({
       title: title.slice(0, 120),
       body: body.slice(0, 1500),
       url: '/alerts/events',
     });
+    const result: PushDeliveryResult = {
+      configured: true,
+      sent: 0,
+      failed: 0,
+      gone: 0,
+      failures: [],
+    };
     await Promise.all(
       subscriptions.map(async (sub) => {
         try {
@@ -138,18 +153,26 @@ export class PushService {
             payload,
             { TTL: 3600, urgency: 'high', vapidDetails },
           );
+          result.sent += 1;
         } catch (error) {
           const status = (error as { statusCode?: number }).statusCode;
+          const message = error instanceof Error ? error.message : String(error);
           if (status === 404 || status === 410) {
             await this.prisma.pushSubscription.deleteMany({ where: { endpoint: sub.endpoint } });
+            result.gone += 1;
             return;
           }
-          this.logger.warn(
-            `Push delivery failed (${status ?? 'network'}): ${error instanceof Error ? error.message : error}`,
-          );
+          result.failed += 1;
+          result.failures.push({
+            service: new URL(sub.endpoint).hostname,
+            status: status ?? null,
+            message,
+          });
+          this.logger.warn(`Push delivery failed (${status ?? 'network'}): ${message}`);
         }
       }),
     );
+    return result;
   }
 
   private validateEndpoint(raw: unknown): string {
