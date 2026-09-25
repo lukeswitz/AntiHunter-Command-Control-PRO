@@ -100,6 +100,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Why antenna consistency matters:** the algorithm assumes each node's antenna gain, orientation, and cable length are roughly the same. If one node has a wildly different antenna the RSSI weighting becomes biased and the centroid will drift toward that node. Always field the same antenna cut/length and mount height when you want high-confidence estimates.
 - **Mesh density expectations:** tracking is most accurate inside the convex hull of the mesh. You can still “track” a MAC outside the mesh, but the estimate will hug the nearest node because it only has one line of bearing. The more evenly spaced your omni nodes are, the more believable the interpolation becomes. Think of it as RSSI-based trilateration rather than precise GNSS.
 - **Spacing guidance:** plan for at least ~50 m spacing between nodes. Tighter spacing boosts confidence and reduces dilution of precision; wider spacing works, but the estimator has less overlap between coverage lobes and will “snap” toward the loudest node.
+- **Command post status broadcast:** Config → Serial Connection → **Mesh Status Broadcast** sends `<short name>: STATUS: Mode:C2 Scan:IDLE Hits:<mesh nodes> Temp:<°C or ?>C Up:HH:MM:SS [GPS:lat,lon] [Batt:NN%]` to `@ALL` on a 1–60 minute timer, in the same shape as the firmware STATUS reply, so other command posts show this one as a node. Timer, GPS, and answering `@ALL STATUS` / `@<short name> STATUS` are each opt-in and default off. The STATUS parser accepts `Temp:?C` for hosts without a temperature sensor.
 - **Limitations & reflections:** this is an estimation tool. It does not account for multipath reflections, terrain shielding, buildings, or antenna tilt. Treat the purple overlay as a probable region, not a guaranteed fix—obstacles and RF noise will widen the true uncertainty.
 
 ### Alert Automation & Integrations
@@ -127,6 +128,8 @@ Each primary view ships with rich operator context.
 #### Map
 
 Tracks live nodes, renders trails and geofences, and highlights alerts in real time.
+
+Base maps load through the backend's tile cache (`AHCC_TILE_CACHE`, default `data/tiles`, capped by `AHCC_TILE_CACHE_MAX_MB`, default 2048). Tiles you have viewed keep working without internet. Admins and operators can open **Offline maps** on the map to save an area around the map center for USGS Topo, USGS Imagery, or OpenTopoMap. OpenStreetMap and Esri layers are cache-on-view only, per their tile terms.
 
 ![Map view showing live nodes and radius overlays](images/Map.png)
 
@@ -284,6 +287,7 @@ AntiHunter ships with layered defenses: RBAC, MFA, rate limiting, and a programm
 - JWT sessions expire quickly and inherit whatever you set for `JWT_EXPIRY`.
 - Operators must accept the legal notice before accessing the console.
 - TOTP-based 2FA plus invitation/password reset expirations protect account lifecycle flows.
+- **Forgot password** on the login screen emails a single-use reset link (same reply whether or not the email exists; tokens stored as SHA-256). Resetting clears lockout and signs out every session issued before the reset. Invitation links open an **accept invite** screen that creates the account with the invited role, features, and sites.
 
 | Setting / Env var             | Default                     | Purpose                                                             |
 | ----------------------------- | --------------------------- | ------------------------------------------------------------------- |
@@ -295,6 +299,8 @@ AntiHunter ships with layered defenses: RBAC, MFA, rate limiting, and a programm
 | `TWO_FACTOR_TOKEN_EXPIRY`     | `10m`                       | Window during which submitted 2FA codes remain valid.               |
 | `TWO_FACTOR_WINDOW`           | `1`                         | Number of TOTP steps accepted on either side of the current window. |
 | `TWO_FACTOR_SECRET_KEY`       | _(optional)_                | Seed used when bootstrapping TOTP secrets in offline environments.  |
+| `RATE_LIMIT_RECOVERY_LIMIT`   | `5`                         | Forgot-password / reset / accept-invite requests per IP per window. |
+| `RATE_LIMIT_RECOVERY_TTL`     | `900`                       | Window in seconds for the recovery limit.                           |
 
 ### Abuse & Rate Limiting
 

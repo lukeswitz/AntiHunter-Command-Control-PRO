@@ -29,6 +29,7 @@ import type {
   FaaRegistryStatusResponse,
   StartFaaSyncResponse,
 } from '../api/types';
+import { StatusBroadcastCard } from '../components/StatusBroadcastCard';
 import { applyAlertOverrides, extractAlertColors } from '../constants/alert-colors';
 import {
   THEME_PRESETS,
@@ -3330,6 +3331,13 @@ export function ConfigPage() {
               </div>
             </div>
           </section>
+
+          <StatusBroadcastCard
+            className={cardClass('serial')}
+            settings={appSettings}
+            onChange={updateAppSetting}
+            canSend={authUser?.role === 'ADMIN' || authUser?.role === 'OPERATOR'}
+          />
 
           <section className={cardClass('tak')}>
             <header>

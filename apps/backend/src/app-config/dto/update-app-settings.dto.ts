@@ -191,4 +191,22 @@ export class UpdateAppSettingsDto {
   @IsInt()
   @Min(1)
   passwordResetExpiryHours?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  statusBroadcastEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(60)
+  @Max(3600)
+  statusBroadcastIntervalSec?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  statusBroadcastGps?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  statusReplyEnabled?: boolean;
 }

@@ -603,6 +603,10 @@ export interface AppSettings {
   securityAppUrl: string;
   invitationExpiryHours: number;
   passwordResetExpiryHours: number;
+  statusBroadcastEnabled: boolean;
+  statusBroadcastIntervalSec: number;
+  statusBroadcastGps: boolean;
+  statusReplyEnabled: boolean;
   mailPasswordSet: boolean;
   updatedAt: string;
 }

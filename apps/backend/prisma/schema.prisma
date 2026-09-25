@@ -164,6 +164,11 @@ model AppConfig {
   timezone String?
   env      String  @default("DEV")
 
+  statusBroadcastEnabled     Boolean @default(false)
+  statusBroadcastIntervalSec Int     @default(600)
+  statusBroadcastGps         Boolean @default(false)
+  statusReplyEnabled         Boolean @default(false)
+
   protocol        String @default("meshtastic-rewrite")
   ackTimeoutMs    Int    @default(3000)
   resultTimeoutMs Int    @default(10000)

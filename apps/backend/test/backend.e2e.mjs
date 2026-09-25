@@ -357,6 +357,49 @@ try {
     JSON.stringify(analystClear),
   );
 
+  console.log('status broadcast');
+  const defaults = await call('GET', '/config/app', null, adminToken);
+  check(
+    'broadcast settings default off',
+    defaults.json?.statusBroadcastEnabled === false &&
+      defaults.json?.statusBroadcastGps === false &&
+      defaults.json?.statusReplyEnabled === false &&
+      defaults.json?.statusBroadcastIntervalSec === 600,
+    JSON.stringify(defaults.json),
+  );
+  const saved = await call(
+    'PUT',
+    '/config/app',
+    { statusBroadcastEnabled: true, statusBroadcastIntervalSec: 300, statusBroadcastGps: true },
+    adminToken,
+  );
+  check(
+    'broadcast settings save',
+    saved.status === 200 &&
+      saved.json?.statusBroadcastEnabled === true &&
+      saved.json?.statusBroadcastIntervalSec === 300 &&
+      saved.json?.statusBroadcastGps === true,
+    JSON.stringify(saved),
+  );
+  const tooFast = await call('PUT', '/config/app', { statusBroadcastIntervalSec: 30 }, adminToken);
+  check('interval under 60 s rejected', tooFast.status === 400);
+  const manual = await call('POST', '/status-broadcast/send', null, adminToken);
+  check(
+    'send without a radio reports why',
+    manual.status === 200 &&
+      manual.json?.sent === false &&
+      /Radio not identified/.test(manual.json?.reason),
+    JSON.stringify(manual),
+  );
+  const lastBroadcast = await call('GET', '/status-broadcast', null, adminToken);
+  check('last result readable', lastBroadcast.json?.last?.sent === false);
+  const analystSend = await call('POST', '/status-broadcast/send', null, analystToken);
+  check(
+    'analyst cannot send broadcast',
+    analystSend.status === 403 && JSON.stringify(analystSend.json).includes('INSUFFICIENT_ROLE'),
+    JSON.stringify(analystSend),
+  );
+
   console.log('rate limit');
   let limited = false;
   for (let i = 0; i < 35 && !limited; i += 1) {
