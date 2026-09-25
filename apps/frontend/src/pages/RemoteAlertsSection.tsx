@@ -421,6 +421,7 @@ function AdminCards() {
           </a>{' '}
           — click “Generate auth key”, turn on <strong>Tags</strong> and pick <code>tag:ahcc</code>.
         </p>
+        <p className="config-hint">No firewall or “Allow incoming connections” changes needed.</p>
         <label className="form-field">
           <span>Hostname on the tailnet</span>
           <input
