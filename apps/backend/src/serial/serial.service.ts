@@ -310,6 +310,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     { timestamp: number; content: string; rawLine: string }
   >(); // dedupe key -> {timestamp, content, rawLine}
   private readonly MESSAGE_CACHE_TTL_MS = 3000;
+  private readonly seenPacketIds = new Map<number, number>();
+  private readonly PACKET_ID_TTL_MS = 30000;
   private frameParser?: MeshtasticFrameParser;
   private readonly meshNodeNames = new Map<number, string>();
   private localRadio: LocalRadioInfo = {};
@@ -1609,6 +1611,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`[FRAME] protobuf ${(event.data as Buffer).length}B`);
         void this.handleMeshtasticFrame(event.data);
       } else if (event.type === 'text') {
+        if (this.localRadio.num !== undefined) return;
         const line = (event.data as string).trim();
         if (!line) return;
         this.logger.log(`[TEXT] ${line.slice(0, 200)}`);
@@ -1808,6 +1811,20 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     const decoded = packet.payloadVariant;
     if (!decoded || decoded.case !== 'decoded' || !decoded.value) return;
+
+    if (packet.id) {
+      const now = Date.now();
+      const last = this.seenPacketIds.get(packet.id);
+      if (last !== undefined && now - last < this.PACKET_ID_TTL_MS) {
+        return;
+      }
+      this.seenPacketIds.set(packet.id, now);
+      if (this.seenPacketIds.size > 512) {
+        for (const [id, ts] of this.seenPacketIds) {
+          if (now - ts > this.PACKET_ID_TTL_MS) this.seenPacketIds.delete(id);
+        }
+      }
+    }
 
     const data = decoded.value;
     const fromNode = packet.from ?? 0;
