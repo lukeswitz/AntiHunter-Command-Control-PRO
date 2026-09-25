@@ -113,9 +113,9 @@ export class MatterService implements OnModuleInit, OnModuleDestroy {
     const jsHelper = join(__dirname, 'matter-helper.js');
     let helper: ChildProcess;
     if (binary) {
-      helper = spawn(binary, [], { env, stdio });
+      helper = spawn(binary, [], { env, stdio, detached: true });
     } else if (existsSync(jsHelper)) {
-      helper = spawn(process.execPath, [jsHelper], { env, stdio });
+      helper = spawn(process.execPath, [jsHelper], { env, stdio, detached: true });
     } else {
       helper = spawn(
         process.execPath,
@@ -124,6 +124,7 @@ export class MatterService implements OnModuleInit, OnModuleDestroy {
           env: { ...env, PATH: process.env.PATH, TS_NODE_TRANSPILE_ONLY: 'true' },
           stdio,
           cwd: join(__dirname, '..', '..'),
+          detached: true,
         },
       );
     }
