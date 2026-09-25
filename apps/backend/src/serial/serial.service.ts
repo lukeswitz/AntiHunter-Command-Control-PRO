@@ -210,6 +210,16 @@ interface RateCounter {
   resetAt: number;
 }
 
+export interface LocalRadioInfo {
+  num?: number;
+  shortName?: string;
+  longName?: string;
+  lat?: number;
+  lon?: number;
+  positionAt?: number;
+  batteryLevel?: number;
+}
+
 export interface QueueCommandRequest {
   id: string;
   target: string;
@@ -265,6 +275,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private readonly MESSAGE_CACHE_TTL_MS = 3000;
   private frameParser?: MeshtasticFrameParser;
   private readonly meshNodeNames = new Map<number, string>();
+  private localRadio: LocalRadioInfo = {};
   private configNonce = 0;
 
   constructor(
@@ -351,6 +362,14 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
   getIncomingStream(): Observable<string> {
     return this.incoming$.asObservable();
+  }
+
+  getLocalRadio(): LocalRadioInfo {
+    return { ...this.localRadio };
+  }
+
+  getMeshNodeCount(): number {
+    return this.meshNodeNames.size;
   }
 
   getParsedStream(): Observable<SerialParseResult> {
@@ -610,6 +629,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     this.targetRates.clear();
     this.recentMessageCache.clear();
     this.meshNodeNames.clear();
+    this.localRadio = {};
     this.packetIdCounter = Math.floor(Math.random() * 0xffff);
     this.broadcastState();
   }
@@ -788,6 +808,24 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     );
 
     await this.writeBuffer(frame);
+  }
+
+  private updateLocalPosition(latitudeI?: number, longitudeI?: number): void {
+    if (!latitudeI && !longitudeI) {
+      return;
+    }
+    this.localRadio = {
+      ...this.localRadio,
+      lat: (latitudeI ?? 0) / 1e7,
+      lon: (longitudeI ?? 0) / 1e7,
+      positionAt: Date.now(),
+    };
+  }
+
+  private updateLocalBattery(level?: number): void {
+    if (level && level > 0) {
+      this.localRadio = { ...this.localRadio, batteryLevel: Math.min(100, level) };
+    }
   }
 
   private nextPacketId(): number {
@@ -1030,16 +1068,34 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           );
           break;
 
+        case 'myInfo': {
+          const myInfo = variant.value as { myNodeNum?: number };
+          if (myInfo.myNodeNum) {
+            this.localRadio = { ...this.localRadio, num: myInfo.myNodeNum };
+          }
+          break;
+        }
+
         case 'nodeInfo': {
           const info = variant.value as {
             num?: number;
             user?: { longName?: string; shortName?: string };
             position?: { latitudeI?: number; longitudeI?: number };
+            deviceMetrics?: { batteryLevel?: number };
           };
           if (info.num && info.user?.longName) {
             this.meshNodeNames.set(info.num, info.user.longName);
             const hex = info.num.toString(16);
             this.logger.debug(`Node mapping: 0x${hex} → ${info.user.longName}`);
+          }
+          if (info.num && info.num === this.localRadio.num) {
+            this.localRadio = {
+              ...this.localRadio,
+              shortName: info.user?.shortName || this.localRadio.shortName,
+              longName: info.user?.longName || this.localRadio.longName,
+            };
+            this.updateLocalPosition(info.position?.latitudeI, info.position?.longitudeI);
+            this.updateLocalBattery(info.deviceMetrics?.batteryLevel);
           }
           break;
         }
@@ -1143,6 +1199,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           const lat = (position.latitudeI ?? 0) / 1e7;
           const lon = (position.longitudeI ?? 0) / 1e7;
           if (lat === 0 && lon === 0) return;
+          if (fromNode && fromNode === this.localRadio.num) {
+            this.updateLocalPosition(position.latitudeI, position.longitudeI);
+          }
 
           const raw = `${nodeName} GPS:${lat.toFixed(6)},${lon.toFixed(6)}`;
           this.incoming$.next(raw);
@@ -1207,6 +1266,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
           if (variant.case === 'deviceMetrics' && variant.value) {
             const dm = variant.value;
+            if (fromNode && fromNode === this.localRadio.num) {
+              this.updateLocalBattery(dm.batteryLevel);
+            }
             const raw = `${nodeName} battery:${dm.batteryLevel ?? '?'}% voltage:${dm.voltage?.toFixed(2) ?? '?'}V uptime:${dm.uptimeSeconds ?? 0}s`;
             this.incoming$.next(raw);
             const event: SerialParseResult = {

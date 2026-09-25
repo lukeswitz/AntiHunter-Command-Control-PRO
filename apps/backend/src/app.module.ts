@@ -32,6 +32,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ProbeInventoryModule } from './probe-inventory/probe-inventory.module';
 import { SerialModule } from './serial/serial.module';
 import { SitesModule } from './sites/sites.module';
+import { StatusBroadcastModule } from './status-broadcast/status-broadcast.module';
 import { TakModule } from './tak/tak.module';
 import { TargetsModule } from './targets/targets.module';
 import { TilesModule } from './tiles/tiles.module';
@@ -105,6 +106,7 @@ import { WsModule } from './ws/ws.module';
     MailModule,
     UsersModule,
     TilesModule,
+    StatusBroadcastModule,
     ExportsModule,
     WebhooksModule,
     UpdateModule,
