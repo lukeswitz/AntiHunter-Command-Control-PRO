@@ -281,8 +281,8 @@ type ConfigSectionId =
   | 'map'
   | 'oui'
   | 'firewall'
-  | 'webhooks'
   | 'remote'
+  | 'remote-access'
   | 'faa'
   | 'system-updates';
 
@@ -304,8 +304,13 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: 
   { id: 'detection', label: 'Detection Defaults', description: 'Scan and alert presets' },
   {
     id: 'remote',
-    label: 'Alerts & Remote Access',
+    label: 'Remote Alerts',
     description: 'Phone, Signal, webhooks, Home',
+  },
+  {
+    id: 'remote-access',
+    label: 'Remote Access',
+    description: 'Tailscale tailnet access',
   },
   { id: 'map', label: 'Map & Coverage', description: 'Map viewport and coverage rings' },
   { id: 'oui', label: 'OUI Resolver', description: 'Vendor cache imports & exports' },
@@ -4363,9 +4368,16 @@ export function ConfigPage() {
 
           <section className={cardClass('remote')}>
             <header>
-              <h2>Alerts & Remote Access</h2>
+              <h2>Remote Alerts</h2>
             </header>
-            <RemoteAlertsSection />
+            <RemoteAlertsSection view="alerts" />
+          </section>
+
+          <section className={cardClass('remote-access')}>
+            <header>
+              <h2>Remote Access</h2>
+            </header>
+            <RemoteAlertsSection view="access" />
           </section>
 
           <section className={cardClass('map')}>
