@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { RemoteAlertsSection } from './RemoteAlertsSection';
 import { apiClient } from '../api/client';
@@ -369,7 +370,13 @@ export function ConfigPage() {
   });
   const chatAddonEnabled =
     useAuthStore((state) => state.user?.preferences?.notifications?.addons?.chat ?? false) ?? false;
-  const [activeSection, setActiveSection] = useState<ConfigSectionId>('alarms');
+  const [searchParams] = useSearchParams();
+  const requestedSection = searchParams.get('section');
+  const [activeSection, setActiveSection] = useState<ConfigSectionId>(
+    requestedSection && CONFIG_SECTIONS.some((s) => s.id === requestedSection)
+      ? (requestedSection as ConfigSectionId)
+      : 'alarms',
+  );
   const visibleSections = useMemo(
     () => (chatAddonEnabled ? CONFIG_SECTIONS : CONFIG_SECTIONS.filter((s) => s.id !== 'chat')),
     [chatAddonEnabled],

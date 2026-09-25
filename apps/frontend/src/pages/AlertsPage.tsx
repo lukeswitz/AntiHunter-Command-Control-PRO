@@ -332,6 +332,9 @@ export function AlertsPage() {
               />
             </label>
             <div className="alerts-header__actions">
+              <NavLink to="/config?section=remote" className="control-chip control-chip--ghost">
+                Remote alerts
+              </NavLink>
               <button
                 type="button"
                 className="control-chip control-chip--ghost"
