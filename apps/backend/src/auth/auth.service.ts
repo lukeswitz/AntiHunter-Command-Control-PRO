@@ -355,6 +355,19 @@ export class AuthService {
 
   async verifyToken(token: string): Promise<AuthTokenPayload> {
     const payload = jwt.verify(token, this.jwtSecret) as AuthTokenPayload;
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { passwordChangedAt: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Account no longer exists');
+    }
+    if (
+      user.passwordChangedAt &&
+      payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)
+    ) {
+      throw new UnauthorizedException('Session ended by password change');
+    }
     return payload;
   }
 

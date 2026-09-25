@@ -96,6 +96,10 @@ export default () => ({
         limit: parseNumberEnv(process.env.RATE_LIMIT_2FA_LIMIT, 10),
         ttlSeconds: parseNumberEnv(process.env.RATE_LIMIT_2FA_TTL, 300),
       },
+      'auth-recovery': {
+        limit: parseNumberEnv(process.env.RATE_LIMIT_RECOVERY_LIMIT, 5),
+        ttlSeconds: parseNumberEnv(process.env.RATE_LIMIT_RECOVERY_TTL, 900),
+      },
     },
   },
   mail: {

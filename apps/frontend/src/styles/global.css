@@ -2568,6 +2568,19 @@ body.theme-dark .control-chip[disabled] {
   background: rgba(148, 163, 184, 0.14);
   color: #1e293b;
 }
+.auth-overlay__text-link {
+  align-self: center;
+  padding: 0.25rem;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.auth-overlay__text-link:hover {
+  color: #e2e8f0;
+  text-decoration: underline;
+}
 .error-text {
   color: var(--color-error);
   font-size: 0.8rem;
