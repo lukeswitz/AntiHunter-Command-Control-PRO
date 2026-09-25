@@ -146,8 +146,11 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
   }
 
   private which(cmd: string): Promise<boolean> {
+    const win = process.platform === 'win32';
+    const shell = win ? 'cmd' : '/bin/sh';
+    const args = win ? ['/c', `where ${cmd}`] : ['-c', `command -v ${cmd}`];
     return new Promise((resolve) => {
-      const child = spawn('/bin/sh', ['-c', `command -v ${cmd}`], { stdio: 'ignore' });
+      const child = spawn(shell, args, { stdio: 'ignore' });
       child.on('error', () => resolve(false));
       child.on('exit', (code) => resolve(code === 0));
     });
@@ -184,7 +187,15 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
     ]);
     const steps: Array<{ text: string; cmd?: string; url?: string }> = [];
     if (!dockerFound) {
-      steps.push({ text: 'Install Docker', url: 'https://docs.docker.com/get-docker/' });
+      if (platform === 'win32') {
+        steps.push({
+          text: 'Install Docker Desktop, then enable virtualization (WSL2 or Hyper-V). Note: a Windows VM on an Apple Silicon Mac cannot run Docker — use a physical PC or the Docker connector on another host.',
+          url: 'https://www.docker.com/products/docker-desktop/',
+          cmd: 'winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements',
+        });
+      } else {
+        steps.push({ text: 'Install Docker', url: 'https://docs.docker.com/get-docker/' });
+      }
     } else if (colimaFound) {
       steps.push({ text: 'Start the Docker VM', cmd: 'colima start' });
     }

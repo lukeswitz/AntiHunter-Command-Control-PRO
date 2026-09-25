@@ -167,7 +167,7 @@ No remote access needed. AHCC dials out to the service when an alert rule fires,
 
 Set push, Signal, ntfy, Matrix and Matter in **Config** → **Remote Access & Alerts**. Only admins see these settings, and only admins with two-factor authentication turned on can change them or send tests ([step 0](#prep)). Each card has **Send test**.
 
-Tokens and the push signing key are encrypted in the database (AES-256-GCM). The key is `REMOTE_ALERTS_SECRET_KEY`, or a random key written once to `apps/backend/.secrets/remote-alerts.key` (Docker: the `remote-secrets` volume). A database dump alone does not reveal them. Back up the key with the database; without it, re-enter the tokens and press **Replace keys**. Discord, Slack, IFTTT and Home Assistant are webhooks in **Config** → **Webhooks**.
+Tokens and the push signing key are encrypted in the database (AES-256-GCM). The key is `REMOTE_ALERTS_SECRET_KEY` when set; otherwise a random key stored at rest per OS: the macOS Keychain, Windows DPAPI (bound to the account AHCC runs as), or, for the `deploy-production.sh` service on Linux, a `systemd-creds` credential (sealed to the TPM when present). Without those it falls back to `apps/backend/.secrets/remote-alerts.key` (Docker: the `remote-secrets` volume). A database dump alone does not reveal the tokens. Back up the key with the database; without it, re-enter the tokens and press **Replace keys**. Discord, Slack, IFTTT and Home Assistant are webhooks in **Config** → **Webhooks**.
 
 | Channel | Who can read the alert text | Setup |
 | ------- | --------------------------- | ----- |
@@ -193,25 +193,33 @@ The alert is encrypted on the AHCC computer for your phone's key; Apple, Google 
 
 ### Signal (end-to-end encrypted)
 
-AHCC links a Signal device (like Signal Desktop) and posts to a private **AntiHunter Alerts** group it creates. A linked device can otherwise act as the whole account, so AHCC boxes it in:
+AHCC links a Signal device (like Signal Desktop) and posts to a private **AntiHunter Alerts** group it creates. A linked device can otherwise act as the whole account, so AHCC boxes it in — how depends on where the connector runs:
 
-- The connector (`signal-api`) runs on an internal-only Docker network with no published port.
-- The backend reaches it only through `signal-proxy`, which rejects everything except reading the account, linking, creating a group, and sending to a group. It cannot send to a phone number, read messages, or list your contacts.
-- AHCC's own code only ever sends to its own group, and the config API refuses to change the number, connector URL, or recipients.
+- **Docker, macOS, Windows:** the connector (`signal-api`) sits on an internal-only network with no published port. The backend reaches it only through `signal-proxy`, which allows nothing but reading the account, linking, creating the group, and sending to that group — it cannot send to a phone number, read messages, or list your contacts.
+- **Linux isolated host mode:** signal-cli runs as a separate `ahcc-signal` user with its account data in an encrypted (gocryptfs) store. The backend never touches those files or the daemon; it reaches them only through a local gate socket that exposes the same four actions.
+- Either way, AHCC's own code only ever sends to its own group, and the config API refuses to change the number, connector URL, or recipients.
 
-**Hardened out of the box.** Extra steps you take:
+**The installers and the in-app Signal card do most of this for you.** Your steps:
 
 1. **Use a dedicated Signal number**, not your personal one. A linked device is account-wide; keep it on a number that does nothing else.
-2. Start the connector for your install:
-   - **Docker:** `docker compose --profile signal up -d` — runs the connector and proxy, neither published.
-   - **Host, x86_64 Linux:** nothing to start. AHCC downloads signal-cli, verifies it against a pinned checksum, and runs it itself the first time you link (stored under `<backend cwd>/.signal-cli`, `AHCC_SIGNAL_HOME` to change).
-   - **Host, macOS / arm:** signal-cli has no native build there, so run the connector container yourself. The in-app **Signal** card detects Docker/Colima and prints the exact command (container `cc_signal` on `127.0.0.1:8079`) plus start/stop/restart and a Docker install link. AHCC auto-detects the connector on that loopback port — no `SIGNAL_API_URL` to set.
-3. **Config** → **Remote Access & Alerts** → **Signal** → tick **Send alerts to Signal** → **Link Signal**. On the phone: Signal → **Settings** → **Linked devices** → **+** → scan the QR. Then **Send test**.
+2. Set up the connector for your system — find yours:
+
+   | System | What to do | What the app does |
+   |---|---|---|
+   | **Linux (recommended)** | Answer **yes** to "Install Signal alerts" in `setup-local.sh` / `deploy-production.sh`. | Installs signal-cli as the locked-down `ahcc-signal` service with encrypted state and a gate socket; sets `AHCC_SIGNAL_GATE`. Nothing to start. |
+   | **Linux (didn't run the installer, x86_64)** | Nothing. | The first time you link, AHCC downloads signal-cli (pinned checksum), stores it at `AHCC_SIGNAL_HOME` (default `<backend cwd>/.signal-cli`, files `0700`), and runs it itself. |
+   | **Docker** | `docker compose --profile signal up -d` | Runs the connector and proxy, neither published. |
+   | **macOS / arm Linux** | Open **Config → Remote Access & Alerts → Signal** and run the command the card shows. | The card detects Docker/Colima, prints the exact start/stop/restart commands (loopback `127.0.0.1:8079`) and a Docker install link, then finds the connector automatically. |
+   | **Windows** | Install Docker Desktop (`winget install -e --id Docker.DockerDesktop` — the card links it) and turn on virtualization (WSL2 or Hyper-V), then run the card's command. | Same Docker connector on `127.0.0.1:8079`. **A Windows VM on an Apple Silicon Mac can't run Docker** (no nested virtualization) — run the connector on a physical PC or another host and set `SIGNAL_API_URL` to it over a trusted link. |
+
+3. **Config → Remote Access & Alerts → Signal** → tick **Send alerts to Signal** → **Link Signal**. On the phone: Signal → **Settings** → **Linked devices** → **+** → scan the QR. Then **Send test**.
 4. Add other people by opening the **AntiHunter Alerts** group in Signal and inviting them. The group is created admin-only (no member can add others, post, or share an invite link), so alerts stay one-way.
 
 **Check:** the **AntiHunter Alerts** group gets `AntiHunter test`.
 
-**Host mode, Linux** calls signal-cli directly — no proxy, because AHCC is the only caller and only ever runs send-to-group. The binary and account data stay under `AHCC_SIGNAL_HOME` at `0700`. Auto-acquire is x86_64 Linux only; elsewhere the in-app card walks you through the loopback Docker connector (`127.0.0.1:8079`). **Check for updates** on the Signal card compares the installed signal-cli against the latest release.
+The **remote-alerts key** that encrypts your tokens is sealed to the machine, not left in a file: macOS Keychain, Windows DPAPI, or a `systemd-creds` credential for the Linux service (TPM-sealed when present). **Check for updates** on the Signal card compares the installed signal-cli against the latest release.
+
+For the full hardening, what was tested, and the residual attacks to weigh against your threat appetite, see [Signal & remote-alerts security](SIGNAL-SECURITY.md).
 
 ### ntfy
 
