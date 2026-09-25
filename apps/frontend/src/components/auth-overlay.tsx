@@ -1,9 +1,29 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
+import { apiClient } from '../api/client';
 import type { ThemePresetId } from '../constants/theme';
 import { useAuthStore } from '../stores/auth-store';
 
 const LAST_THEME_PRESET_STORAGE_KEY = 'ahcc:lastThemePreset';
+
+type RecoveryMode = { kind: 'forgot' } | { kind: 'reset' | 'invite'; token: string };
+
+function recoveryFromLocation(): RecoveryMode | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const token = new URLSearchParams(window.location.search).get('token');
+  if (!token) {
+    return null;
+  }
+  if (window.location.pathname === '/reset-password') {
+    return { kind: 'reset', token };
+  }
+  if (window.location.pathname === '/accept-invite') {
+    return { kind: 'invite', token };
+  }
+  return null;
+}
 
 export function AuthOverlay() {
   const { status, isSubmitting, error, disclaimer, postLoginNotice, userThemePreset } =
@@ -30,6 +50,13 @@ export function AuthOverlay() {
   const [honeypotValue, setHoneypotValue] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [preferredPreset, setPreferredPreset] = useState<ThemePresetId>('tactical_ops');
+  const [recovery, setRecovery] = useState<RecoveryMode | null>(recoveryFromLocation);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const formStartRef = useRef<number>(Date.now());
@@ -109,6 +136,52 @@ export function AuthOverlay() {
     void verifyTwoFactor(twoFactorCode.trim());
   };
 
+  const leaveRecovery = (message: string | null) => {
+    if (window.location.pathname !== '/') {
+      window.history.replaceState(null, '', '/');
+    }
+    setRecovery(null);
+    setNewPassword('');
+    setConfirmPassword('');
+    setRecoveryError(null);
+    setNotice(message);
+  };
+
+  const handleRecovery = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!recovery) {
+      return;
+    }
+    setRecoveryError(null);
+    if (recovery.kind !== 'forgot' && newPassword !== confirmPassword) {
+      setRecoveryError('Passwords do not match.');
+      return;
+    }
+    setRecoveryBusy(true);
+    try {
+      if (recovery.kind === 'forgot') {
+        await apiClient.post('/auth/forgot-password', { email: recoveryEmail.trim() });
+        leaveRecovery('If that email has an account, a reset link is on its way.');
+      } else if (recovery.kind === 'reset') {
+        await apiClient.post('/auth/reset-password', {
+          token: recovery.token,
+          password: newPassword,
+        });
+        leaveRecovery('Password changed. Sign in with your new password.');
+      } else {
+        await apiClient.post('/auth/accept-invite', {
+          token: recovery.token,
+          password: newPassword,
+        });
+        leaveRecovery('Account created. Sign in to continue.');
+      }
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
   const legalReady = useMemo(() => hasScrolled && ackChecked, [hasScrolled, ackChecked]);
 
   if (!overlayVisible) {
@@ -129,10 +202,74 @@ export function AuthOverlay() {
           />
         </header>
 
-        {error ? <div className="auth-overlay__error">{error}</div> : null}
+        {error && !recovery ? <div className="auth-overlay__error">{error}</div> : null}
+        {recoveryError ? <div className="auth-overlay__error">{recoveryError}</div> : null}
+        {notice && !recovery ? <p className="auth-overlay__hint">{notice}</p> : null}
 
         {status === 'checking' ? (
           <div className="auth-overlay__loading">Validating session.</div>
+        ) : recovery ? (
+          <form onSubmit={handleRecovery} className="auth-overlay__form">
+            {recovery.kind === 'forgot' ? (
+              <label>
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={recoveryEmail}
+                  autoComplete="username"
+                  onChange={(event) => setRecoveryEmail(event.target.value)}
+                />
+              </label>
+            ) : (
+              <>
+                <label>
+                  <span>{recovery.kind === 'invite' ? 'Choose a password' : 'New password'}</span>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    minLength={8}
+                    autoComplete="new-password"
+                    onChange={(event) => setNewPassword(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Confirm password</span>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    minLength={8}
+                    autoComplete="new-password"
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                  />
+                </label>
+              </>
+            )}
+            <button
+              type="submit"
+              className="submit-button"
+              disabled={
+                recoveryBusy ||
+                (recovery.kind === 'forgot'
+                  ? !recoveryEmail.trim()
+                  : newPassword.length < 8 || !confirmPassword)
+              }
+            >
+              {recoveryBusy
+                ? 'Working.'
+                : recovery.kind === 'forgot'
+                  ? 'Send reset link'
+                  : recovery.kind === 'invite'
+                    ? 'Create account'
+                    : 'Set password'}
+            </button>
+            <button
+              type="button"
+              className="auth-overlay__text-link"
+              onClick={() => leaveRecovery(null)}
+            >
+              Back to sign in
+            </button>
+          </form>
         ) : showLegalStep ? (
           <form onSubmit={handleAccept} className="auth-overlay__form">
             <div
@@ -239,6 +376,18 @@ export function AuthOverlay() {
             </label>
             <button type="submit" className="submit-button" disabled={isSubmitting}>
               {isSubmitting ? 'Signing in.' : 'Sign In'}
+            </button>
+            <button
+              type="button"
+              className="auth-overlay__text-link"
+              onClick={() => {
+                clearError();
+                setNotice(null);
+                setRecoveryEmail(email);
+                setRecovery({ kind: 'forgot' });
+              }}
+            >
+              Forgot password?
             </button>
           </form>
         )}

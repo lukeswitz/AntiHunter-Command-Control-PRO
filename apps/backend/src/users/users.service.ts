@@ -2,15 +2,17 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, Role, SiteAccessLevel, UserPreference } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AcceptInvitationDto } from './dto/account-recovery.dto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ListUsersDto } from './dto/list-users.dto';
@@ -117,8 +119,14 @@ interface PreferenceUpdateData {
 const PASSWORD_RESET_TOKEN_BYTES = 32;
 const INVITATION_TOKEN_BYTES = 32;
 
+export function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
@@ -531,10 +539,14 @@ export class UsersService {
       this.configService.get<number>('security.passwordResetExpiryHours', 4),
     );
 
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
     await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
-        token,
+        token: hashResetToken(token),
         expiresAt,
       },
     });
@@ -632,6 +644,95 @@ export class UsersService {
     );
 
     return invitation;
+  }
+
+  requestPasswordReset(email: string): void {
+    void this.issueSelfServiceReset(email.toLowerCase()).catch((error) =>
+      this.logger.error(
+        `Self-service password reset failed: ${error instanceof Error ? error.message : error}`,
+      ),
+    );
+  }
+
+  private async issueSelfServiceReset(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !user.isActive) {
+      return;
+    }
+    await this.sendPasswordReset(user.id, user.id);
+  }
+
+  async resetPassword(token: string, password: string): Promise<void> {
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { token: hashResetToken(token) },
+      include: { user: true },
+    });
+    if (!record || record.consumedAt || record.expiresAt <= new Date() || !record.user.isActive) {
+      throw new BadRequestException('This reset link is invalid or has expired.');
+    }
+    const passwordHash = await argon2.hash(password);
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: {
+          passwordHash,
+          passwordChangedAt: now,
+          failedLoginAttempts: 0,
+          lastFailedLoginAt: null,
+          lockedAt: null,
+          lockedUntil: null,
+          lockedReason: null,
+          lockedBy: null,
+        },
+      }),
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: record.userId, consumedAt: null },
+        data: { consumedAt: now },
+      }),
+    ]);
+    await this.writeAudit(record.userId, 'USER_PASSWORD_RESET', record.userId, null, {
+      resetAt: now.toISOString(),
+    });
+  }
+
+  async acceptInvitation(dto: AcceptInvitationDto): Promise<void> {
+    const invitation = await this.prisma.userInvitation.findUnique({
+      where: { token: dto.token },
+    });
+    if (!invitation || invitation.acceptedAt || invitation.expiresAt <= new Date()) {
+      throw new BadRequestException('This invitation is invalid or has expired.');
+    }
+    const claimed = await this.prisma.userInvitation.updateMany({
+      where: { id: invitation.id, acceptedAt: null },
+      data: { acceptedAt: new Date() },
+    });
+    if (claimed.count !== 1) {
+      throw new BadRequestException('This invitation is invalid or has expired.');
+    }
+    try {
+      await this.createUser(
+        {
+          email: invitation.email,
+          password: dto.password,
+          role: invitation.role,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          permissions: invitation.permissions.length ? invitation.permissions : undefined,
+          siteAccess: invitation.siteIds.map((siteId) => ({
+            siteId,
+            level: SiteAccessLevel.VIEW,
+          })),
+        } as CreateUserDto,
+        invitation.inviterId ?? undefined,
+      );
+    } catch (error) {
+      await this.prisma.userInvitation.update({
+        where: { id: invitation.id },
+        data: { acceptedAt: null },
+      });
+      throw error;
+    }
   }
   // #endregion
 
