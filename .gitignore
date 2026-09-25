@@ -62,5 +62,7 @@ apps/backend/data/tiles/
 **/.secrets/
 .parity-todo.md
 .diginode-findings.md
+.diginode-parity-audit.md
+.code-journal.md
 
 *.tsbuildinfo
