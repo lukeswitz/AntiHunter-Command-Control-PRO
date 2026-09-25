@@ -53,7 +53,7 @@ export class UpdateSerialConfigDto {
   reconnectMaxAttempts?: number | null;
 
   @IsOptional()
-  @IsIn(['plain', 'protobuf', 'protobuf-ack'])
+  @IsIn(['plain', 'protobuf'])
   sendMode?: string | null;
 
   @IsOptional()

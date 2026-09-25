@@ -1388,8 +1388,7 @@ export function ConfigPage() {
     onSuccess: (state) => {
       if (state.connected) {
         const mode = serialConfig?.sendMode ?? 'protobuf';
-        const modeLabel =
-          mode === 'plain' ? 'plain text' : mode === 'protobuf-ack' ? 'protobuf + ack' : 'protobuf';
+        const modeLabel = mode === 'plain' ? 'plain text' : 'protobuf';
         setSerialTestStatus({
           status: 'success',
           message:
@@ -3238,12 +3237,10 @@ export function ConfigPage() {
                   onChange={(event) => updateSerialSetting({ sendMode: event.target.value })}
                 >
                   <option value="protobuf">Protobuf packet</option>
-                  <option value="protobuf-ack">Protobuf packet + ack</option>
                   <option value="plain">Plain text line</option>
                 </select>
                 <span className="config-hint">
-                  Command wire format: protobuf (Meshtastic frame), + ack (with delivery
-                  confirmation), or plain text.
+                  Command wire format: protobuf (Meshtastic frame) or plain text.
                 </span>
               </div>
               <div className="config-row">
