@@ -79,21 +79,21 @@ const lines = (value: string) =>
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-export function RemoteAlertsSection() {
+export function RemoteAlertsSection({ view = 'alerts' }: { view?: 'alerts' | 'access' }) {
   const isAdmin = useAuthStore((state) => state.user?.role === 'ADMIN');
   return (
     <div className="config-card__body remote-alerts">
-      <PushNotificationsCard />
+      {view === 'alerts' ? <PushNotificationsCard /> : null}
       {isAdmin ? (
-        <AdminCards />
+        <AdminCards view={view} />
       ) : (
-        <p className="empty-state">Only administrators can change remote access and alerts.</p>
+        <p className="empty-state">Only administrators can change these settings.</p>
       )}
     </div>
   );
 }
 
-function AdminCards() {
+function AdminCards({ view }: { view: 'alerts' | 'access' }) {
   const queryClient = useQueryClient();
   const configQuery = useQuery({ queryKey: ['remote-alerts'], queryFn: getRemoteAlertConfig });
   const [form, setForm] = useState<FormState | null>(null);
@@ -156,6 +156,88 @@ function AdminCards() {
   const busy = saveMutation.isPending || testMutation.isPending;
   const noticeFor = (key: string) =>
     notice[key] ? <p className="config-hint">{notice[key]}</p> : null;
+
+  if (view === 'access') {
+    return (
+      <ChannelRow
+        title="Remote access (Tailscale)"
+        on={config.tailscaleEnabled}
+        hint="Reach AHCC over your private tailnet — built in, no separate client. AHCC joins the tailnet itself and only the listed logins get in."
+        status={config.tailscaleEnabled ? 'On' : 'Off'}
+      >
+        <label className="control-checkbox">
+          <input
+            type="checkbox"
+            checked={form.tailscaleEnabled}
+            onChange={(event) => set('tailscaleEnabled', event.target.checked)}
+          />
+          <span>Enable remote access</span>
+        </label>
+        <TailscaleStatus enabled={config.tailscaleEnabled} />
+        <label className="form-field">
+          <span>Tailscale auth key</span>
+          <input
+            className="control-input"
+            type="password"
+            autoComplete="off"
+            value={form.tsAuthKey}
+            placeholder={config.hasTsAuthKey ? 'Saved (leave blank to keep)' : 'tskey-auth-…'}
+            onChange={(event) => set('tsAuthKey', event.target.value)}
+          />
+        </label>
+        <p className="config-hint">
+          Get a key at{' '}
+          <a
+            href="https://login.tailscale.com/admin/settings/keys"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Tailscale → Settings → Keys
+          </a>{' '}
+          — click “Generate auth key”, turn on <strong>Tags</strong> and pick <code>tag:ahcc</code>.
+        </p>
+        <p className="config-hint">No firewall or “Allow incoming connections” changes needed.</p>
+        <label className="form-field">
+          <span>Hostname on the tailnet</span>
+          <input
+            className="control-input"
+            value={form.tsHostname}
+            placeholder="ahcc"
+            onChange={(event) => set('tsHostname', event.target.value)}
+          />
+        </label>
+        <label className="form-field">
+          <span>Allowed Tailscale logins</span>
+          <textarea
+            className="control-input"
+            rows={3}
+            value={form.tsAllowedLogins}
+            placeholder="you@example.com"
+            onChange={(event) => set('tsAllowedLogins', event.target.value)}
+          />
+        </label>
+        <div className="controls-row">
+          <button
+            type="button"
+            className="control-chip"
+            disabled={busy}
+            onClick={() => {
+              save('tailscale', {
+                tailscaleEnabled: form.tailscaleEnabled,
+                tsAuthKey: form.tsAuthKey,
+                tsHostname: form.tsHostname,
+                tsAllowedLogins: lines(form.tsAllowedLogins),
+              });
+              set('tsAuthKey', '');
+            }}
+          >
+            Save
+          </button>
+        </div>
+        {noticeFor('tailscale')}
+      </ChannelRow>
+    );
+  }
 
   return (
     <>
@@ -383,84 +465,6 @@ function AdminCards() {
         busy={busy}
         notice={notice.matter}
       />
-
-      <ChannelRow
-        title="Remote access (Tailscale)"
-        on={config.tailscaleEnabled}
-        hint="Reach AHCC over your private tailnet — built in, no separate client. AHCC joins the tailnet itself and only the listed logins get in."
-        status={config.tailscaleEnabled ? 'On' : 'Off'}
-      >
-        <label className="control-checkbox">
-          <input
-            type="checkbox"
-            checked={form.tailscaleEnabled}
-            onChange={(event) => set('tailscaleEnabled', event.target.checked)}
-          />
-          <span>Enable remote access</span>
-        </label>
-        <TailscaleStatus enabled={config.tailscaleEnabled} />
-        <label className="form-field">
-          <span>Tailscale auth key</span>
-          <input
-            className="control-input"
-            type="password"
-            autoComplete="off"
-            value={form.tsAuthKey}
-            placeholder={config.hasTsAuthKey ? 'Saved (leave blank to keep)' : 'tskey-auth-…'}
-            onChange={(event) => set('tsAuthKey', event.target.value)}
-          />
-        </label>
-        <p className="config-hint">
-          Get a key at{' '}
-          <a
-            href="https://login.tailscale.com/admin/settings/keys"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Tailscale → Settings → Keys
-          </a>{' '}
-          — click “Generate auth key”, turn on <strong>Tags</strong> and pick <code>tag:ahcc</code>.
-        </p>
-        <p className="config-hint">No firewall or “Allow incoming connections” changes needed.</p>
-        <label className="form-field">
-          <span>Hostname on the tailnet</span>
-          <input
-            className="control-input"
-            value={form.tsHostname}
-            placeholder="ahcc"
-            onChange={(event) => set('tsHostname', event.target.value)}
-          />
-        </label>
-        <label className="form-field">
-          <span>Allowed Tailscale logins</span>
-          <textarea
-            className="control-input"
-            rows={3}
-            value={form.tsAllowedLogins}
-            placeholder="you@example.com"
-            onChange={(event) => set('tsAllowedLogins', event.target.value)}
-          />
-        </label>
-        <div className="controls-row">
-          <button
-            type="button"
-            className="control-chip"
-            disabled={busy}
-            onClick={() => {
-              save('tailscale', {
-                tailscaleEnabled: form.tailscaleEnabled,
-                tsAuthKey: form.tsAuthKey,
-                tsHostname: form.tsHostname,
-                tsAllowedLogins: lines(form.tsAllowedLogins),
-              });
-              set('tsAuthKey', '');
-            }}
-          >
-            Save
-          </button>
-        </div>
-        {noticeFor('tailscale')}
-      </ChannelRow>
     </>
   );
 }
