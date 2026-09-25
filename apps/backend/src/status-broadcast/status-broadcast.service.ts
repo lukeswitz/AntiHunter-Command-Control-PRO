@@ -32,6 +32,9 @@ export class StatusBroadcastService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
+    if (!this.serial.ownsPort()) {
+      return;
+    }
     this.subscription = this.serial.getIncomingStream().subscribe((text) => {
       void this.handleIncoming(text);
     });
@@ -78,7 +81,7 @@ export class StatusBroadcastService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleIncoming(text: string): Promise<void> {
-    const radio = this.serial.getLocalRadio();
+    const { radio } = await this.serial.getRadioInfo();
     if (!isStatusRequestFor(text, radio.shortName) || this.pending) {
       return;
     }
@@ -96,7 +99,7 @@ export class StatusBroadcastService implements OnModuleInit, OnModuleDestroy {
 
   private async broadcast(): Promise<StatusBroadcastResult> {
     const settings = await this.appConfig.getSettings();
-    const radio = this.serial.getLocalRadio();
+    const { radio, meshNodeCount } = await this.serial.getRadioInfo();
     const name = radio.shortName || (radio.num ? `!${radio.num.toString(16)}` : undefined);
     if (!name) {
       return this.record({ sent: false, reason: 'Radio not identified yet' });
@@ -105,7 +108,7 @@ export class StatusBroadcastService implements OnModuleInit, OnModuleDestroy {
       radio.positionAt !== undefined && Date.now() - radio.positionAt < GPS_MAX_AGE_MS;
     const frame = buildStatusFrame({
       name,
-      hits: this.serial.getMeshNodeCount(),
+      hits: meshNodeCount,
       tempC: await readHostTempC(),
       uptimeSec: (Date.now() - this.startedAt) / 1000,
       lat: settings.statusBroadcastGps && gpsFresh ? radio.lat : undefined,

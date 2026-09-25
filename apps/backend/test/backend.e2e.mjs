@@ -122,7 +122,7 @@ try {
     PORT: String(port),
     LISTEN_HOST: '127.0.0.1',
     HTTP_PREFIX: 'api',
-    SERIAL_DEVICE: '',
+    SERIAL_DEVICE: '/dev/null-ahcc-e2e',
     NODE_ENV: 'production',
     ADMIN_EMAIL: adminEmail,
     ADMIN_PASSWORD: adminPassword,
@@ -138,6 +138,10 @@ try {
     `UPDATE "AppConfig" SET "mailEnabled"=true, "mailHost"='127.0.0.1', "mailPort"=${smtpPort}, "mailSecure"=false, "mailPreview"=false, "mailFrom"='ahcc@test.local'`,
   );
   psql(testUrl, `UPDATE "User" SET "legalAcceptedAt"=now() WHERE email='${adminEmail}'`);
+  psql(
+    testUrl,
+    `INSERT INTO "SerialConfig" (id, enabled, "updatedAt") VALUES ('serial', false, now()) ON CONFLICT (id) DO UPDATE SET enabled=false`,
+  );
 
   backend = spawn('node', ['dist/main.js'], {
     cwd: backendDir,
@@ -157,6 +161,17 @@ try {
     if (ok) break;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
+
+  const serialState = await fetch(`${api}/serial/state`, {
+    headers: {
+      authorization: `Bearer ${(await login(adminEmail, adminPassword)).json.token}`,
+    },
+  }).then((response) => response.json());
+  check(
+    'test backend never opens a serial port',
+    serialState.connected === false,
+    JSON.stringify(serialState),
+  );
 
   console.log('forgot password');
   const first = await login(adminEmail, adminPassword);
@@ -398,6 +413,39 @@ try {
     'analyst cannot send broadcast',
     analystSend.status === 403 && JSON.stringify(analystSend.json).includes('INSUFFICIENT_ROLE'),
     JSON.stringify(analystSend),
+  );
+
+  console.log('radio');
+  const radioInfo = await call('GET', '/radio', null, analystToken);
+  check(
+    'radio info readable by any user',
+    radioInfo.status === 200 && radioInfo.json?.connected === false,
+    JSON.stringify(radioInfo),
+  );
+  const rebootNoRadio = await call('POST', '/radio/reboot', { seconds: 2 }, adminToken);
+  check(
+    'radio action without a radio explains why',
+    rebootNoRadio.status === 400 &&
+      /not identified|not connected/i.test(rebootNoRadio.json?.message),
+    JSON.stringify(rebootNoRadio),
+  );
+  const badSeconds = await call('POST', '/radio/reboot', { seconds: 99999 }, adminToken);
+  check('out-of-range reboot delay rejected', badSeconds.status === 400);
+  const badGps = await call('POST', '/radio/gps-mode', { gpsMode: 7 }, adminToken);
+  check('unknown GPS mode rejected', badGps.status === 400);
+  const analystReboot = await call('POST', '/radio/reboot', { seconds: 2 }, analystToken);
+  check(
+    'analyst cannot reboot radio',
+    analystReboot.status === 403 &&
+      JSON.stringify(analystReboot.json).includes('INSUFFICIENT_ROLE'),
+    JSON.stringify(analystReboot),
+  );
+  const analystRefresh = await call('POST', '/radio/refresh', null, analystToken);
+  check(
+    'analyst cannot send radio requests',
+    analystRefresh.status === 403 &&
+      JSON.stringify(analystRefresh.json).includes('INSUFFICIENT_ROLE'),
+    JSON.stringify(analystRefresh),
   );
 
   console.log('disabled accounts');

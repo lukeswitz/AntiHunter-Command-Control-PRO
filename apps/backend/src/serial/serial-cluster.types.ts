@@ -9,7 +9,9 @@ export type SerialRpcAction =
   | 'listPorts'
   | 'simulate'
   | 'getState'
-  | 'queueCommand';
+  | 'queueCommand'
+  | 'radioInfo'
+  | 'radioAction';
 
 export type SerializedSerialParseResult = Omit<
   SerialParseResult,

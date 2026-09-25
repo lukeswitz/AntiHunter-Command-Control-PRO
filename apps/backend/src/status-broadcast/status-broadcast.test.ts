@@ -158,9 +158,9 @@ async function main() {
     statusReplyEnabled: false,
   };
   const fakeSerial = {
+    ownsPort: () => true,
     getIncomingStream: () => incoming.asObservable(),
-    getLocalRadio: () => radio,
-    getMeshNodeCount: () => 4,
+    getRadioInfo: async () => ({ radio, meshNodeCount: 4 }),
     queueCommand: async (request: QueueCommandRequest) => {
       sent.push(request);
     },
