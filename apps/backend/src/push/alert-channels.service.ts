@@ -55,7 +55,9 @@ export class AlertChannelsService {
     }
     this.matter.trigger(tier === 'critical' ? 'CRITICAL' : 'ALERT');
     await Promise.all([
-      this.run('push', () => this.push.notify(title, body)),
+      this.run('push', async () => {
+        await this.push.notify(title, body);
+      }),
       config.ntfyEnabled
         ? this.run('ntfy', () => this.sendNtfy(config, title, body, severity))
         : null,
@@ -74,7 +76,8 @@ export class AlertChannelsService {
     const body = `Test notification from AntiHunter Command Center\nTime: ${new Date().toISOString()}`;
     switch (channel) {
       case 'push':
-        return this.push.notify(title, body);
+        await this.push.notify(title, body);
+        return;
       case 'ntfy':
         return this.sendNtfy(config, title, body, 'NOTICE', true);
       case 'signal':

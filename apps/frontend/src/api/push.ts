@@ -57,6 +57,14 @@ export async function disablePush(): Promise<void> {
   await subscription.unsubscribe();
 }
 
-export function sendTestPush(): Promise<unknown> {
-  return apiClient.post('/push/test');
+export interface PushTestResult {
+  configured: boolean;
+  sent: number;
+  failed: number;
+  gone: number;
+  failures: { service: string; status: number | null; message: string }[];
+}
+
+export function sendTestPush(): Promise<PushTestResult> {
+  return apiClient.post<PushTestResult>('/push/test');
 }

@@ -59,8 +59,7 @@ export class PushController {
   @Post('test')
   @UseGuards(TwoFactorRequiredGuard)
   async test(@Req() req: Request) {
-    await this.pushService.notify('AntiHunter', 'Test notification', this.requireUser(req));
-    return { ok: true };
+    return this.pushService.notify('AntiHunter', 'Test notification', this.requireUser(req));
   }
 
   private requireUser(req: Request): string {
