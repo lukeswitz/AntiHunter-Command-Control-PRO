@@ -204,7 +204,9 @@ export class AlertChannelsService {
   private signalGroupCreation: Promise<string> | null = null;
 
   private async ensureSignalGroup(config: RemoteAlertConfig): Promise<string> {
-    const existing = config.signalRecipients.find((value) => value.startsWith('group.'));
+    const existing = this.connector.usesNativeCli(config)
+      ? config.signalRecipients[0]
+      : config.signalRecipients.find((value) => value.startsWith('group.'));
     if (existing) {
       return existing;
     }

@@ -5,19 +5,88 @@ import {
   createHmac,
   randomBytes,
 } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const PREFIX = 'enc:v1:';
+const CREDENTIAL_NAME = 'remote-alerts-key';
+const KEYCHAIN_SERVICE = 'AHCC remote alerts';
+const KEYCHAIN_ACCOUNT = 'remote-alerts-key';
+
+function decodeKey(raw: string, source: string): Buffer {
+  const key = Buffer.from(raw.trim(), 'base64');
+  if (key.length !== 32) {
+    throw new Error(`Remote alerts key from ${source} is not a base64 32-byte key`);
+  }
+  return key;
+}
+
+function keychain(args: string[]): string | null {
+  try {
+    return execFileSync('/usr/bin/security', args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function loadFromKeychain(legacyPath: string): Buffer {
+  const lookup = ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-a', KEYCHAIN_ACCOUNT, '-w'];
+  const stored = keychain(lookup);
+  if (stored) {
+    return decodeKey(stored, 'the macOS Keychain');
+  }
+  const value = existsSync(legacyPath)
+    ? readFileSync(legacyPath, 'utf8').trim()
+    : randomBytes(32).toString('base64');
+  decodeKey(value, existsSync(legacyPath) ? legacyPath : 'a new key');
+  keychain([
+    'add-generic-password',
+    '-U',
+    '-s',
+    KEYCHAIN_SERVICE,
+    '-a',
+    KEYCHAIN_ACCOUNT,
+    '-w',
+    value,
+  ]);
+  if (keychain(lookup) !== value) {
+    throw new Error('Could not store the remote alerts key in the macOS Keychain');
+  }
+  if (existsSync(legacyPath)) {
+    unlinkSync(legacyPath);
+  }
+  return decodeKey(value, 'the macOS Keychain');
+}
 
 function loadKey(): Buffer {
   const fromEnv = process.env.REMOTE_ALERTS_SECRET_KEY?.trim();
   if (fromEnv) {
     return createHash('sha256').update(fromEnv, 'utf8').digest();
   }
+  const credentials = process.env.CREDENTIALS_DIRECTORY?.trim();
+  if (credentials && existsSync(join(credentials, CREDENTIAL_NAME))) {
+    return decodeKey(
+      readFileSync(join(credentials, CREDENTIAL_NAME), 'utf8'),
+      `systemd credential ${CREDENTIAL_NAME}`,
+    );
+  }
   const path =
     process.env.REMOTE_ALERTS_KEY_FILE?.trim() ||
     join(process.cwd(), '.secrets', 'remote-alerts.key');
+  if (process.platform === 'darwin' && !process.env.REMOTE_ALERTS_KEY_FILE) {
+    return loadFromKeychain(path);
+  }
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   chmodSync(dirname(path), 0o700);
   if (!existsSync(path)) {
