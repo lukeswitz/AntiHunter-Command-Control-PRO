@@ -17,6 +17,8 @@ import {
 } from 'react-leaflet';
 import 'leaflet.heat';
 
+import { OfflineMapsControl } from './OfflineMapsControl';
+import { cachedTileUrl, useTileKey } from '../../api/tiles';
 import type {
   AcarsMessage,
   AdsbTrack,
@@ -73,6 +75,20 @@ const BASE_LAYERS: BaseLayerDefinition[] = [
     attribution:
       'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)',
     tileOptions: { maxZoom: 17 },
+  },
+  {
+    key: 'usgs-topo',
+    name: 'US Topo (USGS)',
+    url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles courtesy of the U.S. Geological Survey',
+    tileOptions: { maxZoom: 19, maxNativeZoom: 16 },
+  },
+  {
+    key: 'usgs-imagery',
+    name: 'US Imagery (USGS)',
+    url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles courtesy of the U.S. Geological Survey',
+    tileOptions: { maxZoom: 19, maxNativeZoom: 16 },
   },
   {
     key: 'dark',
@@ -912,6 +928,7 @@ export function CommandCenterMap({
   hideAdsbPhotos = false,
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
+  const tileKey = useTileKey();
   const baseLayerKeys = useMemo(() => BASE_LAYERS.map((layer) => layer.key), []);
   const activeBaseLayerKey = useMemo(() => {
     if (baseLayerKeys.includes(mapStyle)) {
@@ -1051,12 +1068,13 @@ export function CommandCenterMap({
           >
             <TileLayer
               attribution={layer.attribution}
-              url={layer.url}
+              url={tileKey ? cachedTileUrl(layer.key, tileKey) : layer.url}
               {...(layer.tileOptions ?? {})}
             />
           </LayersControl.BaseLayer>
         ))}
       </LayersControl>
+      <OfflineMapsControl layers={BASE_LAYERS} />
       <BaseLayerChangeListener onChange={onMapStyleChange} />
 
       <CoverageHeatLayer

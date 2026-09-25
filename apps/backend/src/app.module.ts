@@ -34,6 +34,7 @@ import { SerialModule } from './serial/serial.module';
 import { SitesModule } from './sites/sites.module';
 import { TakModule } from './tak/tak.module';
 import { TargetsModule } from './targets/targets.module';
+import { TilesModule } from './tiles/tiles.module';
 import { UpdateModule } from './update/update.module';
 import { UsersModule } from './users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
@@ -103,6 +104,7 @@ import { WsModule } from './ws/ws.module';
     MqttModule,
     MailModule,
     UsersModule,
+    TilesModule,
     ExportsModule,
     WebhooksModule,
     UpdateModule,

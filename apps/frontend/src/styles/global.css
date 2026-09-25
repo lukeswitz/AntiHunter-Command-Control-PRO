@@ -6440,3 +6440,104 @@ body.theme-dark .strategy-table__row--selected {
 .config-grid .badge--active::before {
   box-shadow: 0 0 6px currentColor;
 }
+
+.offline-maps {
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+.offline-maps__toggle,
+.offline-maps__panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px var(--color-panel-shadow);
+}
+.offline-maps__toggle {
+  padding: 0.4rem 0.7rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.offline-maps__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 270px;
+  padding: 0.6rem 0.7rem;
+}
+.offline-maps__header,
+.offline-maps__footer,
+.offline-maps__progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.offline-maps__close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.offline-maps__panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--color-text-muted);
+}
+.offline-maps__panel select,
+.offline-maps__panel input {
+  width: 110px;
+  padding: 0.2rem 0.3rem;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 4px;
+}
+.offline-maps__panel select {
+  width: 170px;
+}
+.offline-maps__zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.offline-maps__zoom input {
+  width: 44px;
+}
+.offline-maps__start {
+  padding: 0.4rem;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.offline-maps__start:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.offline-maps__progress progress {
+  flex: 1;
+}
+.offline-maps__footer {
+  color: var(--color-text-muted);
+}
+.offline-maps__footer button,
+.offline-maps__progress button {
+  background: none;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+}
+.offline-maps__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.offline-maps__error {
+  margin: 0;
+  color: var(--color-error);
+}
