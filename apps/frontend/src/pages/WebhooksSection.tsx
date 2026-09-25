@@ -86,7 +86,7 @@ const WEBHOOK_PRESETS = [
     key: 'ifttt',
     label: 'IFTTT',
     url: 'https://maker.ifttt.com/trigger/<event>/json/with/key/<key>',
-    hint: 'IFTTT: Webhooks service > "Receive a web request with a JSON payload". Replace <event> and <key>. Read the alert text with {{JsonPayload.summary}} (also {{JsonPayload.rule.severity}}, {{JsonPayload.data.mac}}).',
+    hint: 'IFTTT: Webhooks service > "Receive a web request". Replace <event> and <key>. In the applet, Value1 is the alert text, Value2 the severity, Value3 the MAC.',
   },
   {
     key: 'home-assistant',
