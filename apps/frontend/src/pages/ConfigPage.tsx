@@ -3242,8 +3242,8 @@ export function ConfigPage() {
                   <option value="plain">Plain text line</option>
                 </select>
                 <span className="config-hint">
-                  Outbound command format: protobuf sends a Meshtastic packet frame, protobuf + ack
-                  also requests delivery confirmation, plain sends the raw text line.
+                  Command wire format: protobuf (Meshtastic frame), + ack (with delivery
+                  confirmation), or plain text.
                 </span>
               </div>
               <div className="config-row">
