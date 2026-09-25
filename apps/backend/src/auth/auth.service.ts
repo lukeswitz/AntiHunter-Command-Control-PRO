@@ -357,10 +357,13 @@ export class AuthService {
     const payload = jwt.verify(token, this.jwtSecret) as AuthTokenPayload;
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { passwordChangedAt: true },
+      select: { passwordChangedAt: true, isActive: true },
     });
     if (!user) {
       throw new UnauthorizedException('Account no longer exists');
+    }
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account disabled');
     }
     if (
       user.passwordChangedAt &&
