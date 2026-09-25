@@ -88,7 +88,15 @@ const DETECTION_LABELS: Record<string, string> = {
   MESH_SPOOF_SELF: 'Mesh Spoof',
   MESH_FLOOD: 'Mesh Flood',
   MESH_CMD_INJECT: 'Mesh Command Injection',
+  CSI_MOTION: 'CSI Motion',
+  CSI_CLEAR: 'CSI Clear',
 };
+
+export const CSI_SENSITIVITIES = [
+  { value: 'LOW', label: 'Low' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HIGH', label: 'High' },
+];
 
 export function sentinelDetectionLabel(detectionType: string): string {
   const upper = detectionType.toUpperCase();

@@ -13,6 +13,7 @@ export const DEVICE_SOURCES: AlertSource[] = [
   { key: 'target', label: 'Target detected', group: 'Detections', defaultTier: 'off' },
   { key: 'node:drone', label: 'Drone', group: 'Detections', defaultTier: 'off' },
   { key: 'node:anomaly', label: 'Baseline anomaly', group: 'Detections', defaultTier: 'off' },
+  { key: 'node:csi', label: 'CSI motion', group: 'Detections', defaultTier: 'off' },
   { key: 'node:tamper', label: 'Tamper', group: 'Node security', defaultTier: 'alert' },
   { key: 'node:vibration', label: 'Vibration', group: 'Node security', defaultTier: 'alert' },
   { key: 'node:erase', label: 'Erase', group: 'Node security', defaultTier: 'alert' },
@@ -34,9 +35,13 @@ export function defaultTier(key: string): AlertTier {
 export function nodeAlertSource(
   category: string | undefined,
   level: string,
-  _data: unknown,
+  data: unknown,
 ): string | null {
   const cat = (category ?? '').toLowerCase();
+  const detectionType = (data as { detectionType?: unknown } | null)?.detectionType;
+  if (cat === 'sentinel' && typeof detectionType === 'string' && detectionType.startsWith('CSI_')) {
+    return level === 'ALERT' ? 'node:csi' : null;
+  }
   if (cat === 'sentinel') {
     return level === 'ALERT' ? 'sentinel' : null;
   }

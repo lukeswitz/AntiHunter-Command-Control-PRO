@@ -179,6 +179,12 @@ const INCIDENTS_CLEAR_ACK_REGEX =
 const DEDUP_CLEAR_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*DEDUP_CLEAR_ACK:(?<status>[A-Z_]+)/i;
 const FACTORY_RESET_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*FACTORY_RESET_ACK:(?<status>.+)$/i;
 
+const CSI_EVENT_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>CSI_MOTION|CSI_CLEAR):\s*CH=(?<ch>\d+)(?:\s+N=(?<links>\d+))?(?:\s+S=(?<score>-?\d+(?:\.\d+)?))?(?:\s+D=(?<dwell>\d+)s)?/i;
+const CSI_ACK_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<kind>CSI_ACK|CSI_CFG_ACK|CSI_RECAL_ACK|CSI_EXCLUDE_ACK):(?<status>.+)$/i;
+const CSI_LEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*CSI_(?<kind>STATUS|JSON)_LEN:(?<len>\d+)/i;
+
 const NODE_ID_FALLBACK = /^([A-Za-z0-9_.:-]+)/;
 
 export class MeshtasticRewriteParser implements SerialProtocolParser {
@@ -244,6 +250,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       this.parseCodes(payload, sourceId, sanitized) ||
       this.parseTriangulationMeta(payload, sourceId, sanitized) ||
       this.parseSentinelAck(payload, sourceId, sanitized) ||
+      this.parseCsi(payload, sourceId, sanitized) ||
       this.parseStatus(payload, sourceId, sanitized) ||
       this.parseTimeSync(payload, sourceId, sanitized) ||
       this.parseStartupGpsHeartbeat(payload, sourceId, sanitized) ||
@@ -688,6 +695,63 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             lon: Number(ridClaim.groups.lon),
             alt: Number(ridClaim.groups.alt),
           },
+          raw,
+        },
+      ];
+    }
+    return null;
+  }
+
+  private parseCsi(
+    payload: string,
+    nodeId: string | undefined,
+    raw: string,
+  ): SerialParseResult[] | null {
+    const event = CSI_EVENT_REGEX.exec(payload);
+    if (event?.groups) {
+      const type = event.groups.type.toUpperCase();
+      const data: Record<string, string | number> = {
+        detectionType: type,
+        channel: Number(event.groups.ch),
+      };
+      if (event.groups.links) data.links = Number(event.groups.links);
+      if (event.groups.score) data.score = Number(event.groups.score);
+      if (event.groups.dwell) data.dwellSeconds = Number(event.groups.dwell);
+      return [
+        {
+          kind: 'alert',
+          level: type === 'CSI_MOTION' ? 'ALERT' : 'NOTICE',
+          category: 'sentinel',
+          nodeId: nodeId ?? event.groups.id,
+          message: payload,
+          data,
+          raw,
+        },
+      ];
+    }
+    const ack = CSI_ACK_REGEX.exec(payload);
+    if (ack?.groups) {
+      const kind = ack.groups.kind.toUpperCase();
+      const detail = ack.groups.status.trim();
+      const failed = /^(BUSY|FAILED|INVALID)\b/i.test(detail);
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? ack.groups.id,
+          ackType: kind,
+          status: failed ? 'ERROR' : 'OK',
+          raw,
+        },
+      ];
+    }
+    const len = CSI_LEN_REGEX.exec(payload);
+    if (len?.groups) {
+      return [
+        {
+          kind: 'command-result',
+          nodeId: nodeId ?? len.groups.id,
+          command: `CSI_${len.groups.kind.toUpperCase()}`,
+          payload,
           raw,
         },
       ];

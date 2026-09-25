@@ -87,7 +87,24 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['CONFIG_SESSION_DEDUP', handleConfigSessionDedup],
   ['MESH_DEDUP_CLEAR', expectNoParams],
   ['FACTORY_RESET', handleFactoryReset],
+  ['CSI_MOTION_START', handleCsiMotionStart],
+  ['CSI_STATUS', expectNoParams],
+  ['CSI_JSON', expectNoParams],
+  ['CSI_RECAL', expectNoParams],
+  ['CSI_EXCLUDE', handleCsiExclude],
+  ['CSI_CFG', handleCsiCfg],
 ]);
+
+const CSI_START_FLAGS = new Set([
+  'FOREVER',
+  'TELEM',
+  'RAW',
+  'MGMTONLY',
+  'MGMTDATA',
+  'LISTEN_ONLY',
+  'ALLOW_TRANSMIT',
+]);
+const CSI_ONOFF = new Set(['ON', 'OFF']);
 
 const SINGLE_NODE_COMMANDS = new Set<string>(['CONFIG_NODEID', 'FACTORY_RESET']);
 
@@ -647,6 +664,105 @@ function handleFactoryReset(params: string[]): string[] {
     throw new BadRequestException('FACTORY_RESET requires a credential.');
   }
   return [tier, credential];
+}
+
+function handleCsiMotionStart(params: string[]): string[] {
+  if (params.length < 1) {
+    throw new BadRequestException(
+      'CSI_MOTION_START expects secs[:FOREVER][:CH<n>][:SOLICIT<ms>][:TELEM][:RAW][:MGMTONLY|MGMTDATA][:LISTEN_ONLY|ALLOW_TRANSMIT].',
+    );
+  }
+  const output = [normalizeDuration(params[0], 0)];
+  for (const raw of params.slice(1)) {
+    const token = raw.trim().toUpperCase();
+    if (CSI_START_FLAGS.has(token)) {
+      output.push(token);
+      continue;
+    }
+    const ch = /^CH(\d{1,2})$/.exec(token);
+    if (ch) {
+      const value = Number(ch[1]);
+      if (value > 14) throw new BadRequestException('CSI channel must be 0 (auto) to 14.');
+      output.push(`CH${value}`);
+      continue;
+    }
+    const solicit = /^SOLICIT(\d{1,4})$/.exec(token);
+    if (solicit) {
+      const value = Number(solicit[1]);
+      if (value < 10 || value > 1000) {
+        throw new BadRequestException('CSI SOLICIT interval must be 10 to 1000 ms.');
+      }
+      output.push(`SOLICIT${value}`);
+      continue;
+    }
+    throw new BadRequestException(`Invalid CSI_MOTION_START token: ${raw}`);
+  }
+  return output;
+}
+
+function handleCsiExclude(params: string[]): string[] {
+  if (params.length !== 1) {
+    throw new BadRequestException('CSI_EXCLUDE expects a MAC address or NONE.');
+  }
+  const value = params[0].trim().toUpperCase();
+  if (value !== 'NONE' && !MAC_PATTERN.test(value)) {
+    throw new BadRequestException('CSI_EXCLUDE expects a MAC address (AA:BB:CC:DD:EE:FF) or NONE.');
+  }
+  return [value];
+}
+
+function handleCsiCfg(params: string[]): string[] {
+  if (params.length < 1) {
+    throw new BadRequestException(
+      'CSI_CFG expects KEY=VALUE tokens: SENSITIVITY, MIN_MOTION, CLEAR_AFTER, SPOTS, CH, BROADCAST, REQUIRE_CE, ALLOW_RANDOM.',
+    );
+  }
+  return params.map((raw) => {
+    const token = raw.trim().toUpperCase();
+    const eq = token.indexOf('=');
+    if (eq <= 0) throw new BadRequestException(`Invalid CSI_CFG token: ${raw}`);
+    const key = token.slice(0, eq);
+    const value = token.slice(eq + 1);
+    const intIn = (min: number, max: number) => {
+      const n = Number(value);
+      if (!/^\d+$/.test(value) || n < min || n > max) {
+        throw new BadRequestException(`CSI_CFG ${key} must be ${min}-${max}.`);
+      }
+    };
+    switch (key) {
+      case 'SENSITIVITY':
+        if (!['LOW', 'MEDIUM', 'MED', 'HIGH'].includes(value)) {
+          const n = Number(value);
+          if (!Number.isFinite(n) || (n !== 0 && (n < 0.005 || n > 20))) {
+            throw new BadRequestException(
+              'CSI_CFG SENSITIVITY must be LOW, MEDIUM, HIGH, 0 or 0.005-20.',
+            );
+          }
+        }
+        break;
+      case 'MIN_MOTION':
+        intIn(2, 60);
+        break;
+      case 'CLEAR_AFTER':
+        intIn(1, 120);
+        break;
+      case 'SPOTS':
+        intIn(1, 12);
+        break;
+      case 'CH':
+        intIn(0, 14);
+        break;
+      case 'BROADCAST':
+      case 'REQUIRE_CE':
+      case 'ALLOW_RANDOM':
+        if (!CSI_ONOFF.has(value))
+          throw new BadRequestException(`CSI_CFG ${key} must be ON or OFF.`);
+        break;
+      default:
+        throw new BadRequestException(`Unsupported CSI_CFG key: ${key}`);
+    }
+    return `${key}=${value}`;
+  });
 }
 
 function normalizeTargetReference(value: string): string {
