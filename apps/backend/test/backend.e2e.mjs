@@ -400,6 +400,24 @@ try {
     JSON.stringify(analystSend),
   );
 
+  console.log('disabled accounts');
+  check(
+    'analyst session valid before disable',
+    (await call('GET', '/auth/me', null, analystToken)).status === 200,
+  );
+  const disable = await call('DELETE', `/users/${analystMe.json.user.id}`, null, adminToken);
+  check('admin disables analyst', disable.status === 200, JSON.stringify(disable));
+  const afterDisable = await call('GET', '/auth/me', null, analystToken);
+  check(
+    'disabled user session rejected',
+    afterDisable.status === 401,
+    JSON.stringify(afterDisable),
+  );
+  check(
+    'disabled user cannot log in',
+    (await login(inviteEmail, 'InviteePass789!')).status === 401,
+  );
+
   console.log('rate limit');
   let limited = false;
   for (let i = 0; i < 35 && !limited; i += 1) {
