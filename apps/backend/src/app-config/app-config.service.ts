@@ -20,6 +20,50 @@ export class AppConfigService {
     return this.toResponse(config);
   }
 
+  async getDatabaseStats(): Promise<Record<string, number>> {
+    const [
+      nodes,
+      nodePositions,
+      drones,
+      targets,
+      inventory,
+      alertRules,
+      alertEvents,
+      commands,
+      geofences,
+      webhooks,
+      users,
+      auditLog,
+    ] = await Promise.all([
+      this.prisma.node.count(),
+      this.prisma.nodePosition.count(),
+      this.prisma.drone.count(),
+      this.prisma.target.count(),
+      this.prisma.inventoryDevice.count(),
+      this.prisma.alertRule.count(),
+      this.prisma.alertEvent.count(),
+      this.prisma.commandLog.count(),
+      this.prisma.geofence.count(),
+      this.prisma.webhook.count(),
+      this.prisma.user.count(),
+      this.prisma.auditLog.count(),
+    ]);
+    return {
+      nodes,
+      nodePositions,
+      drones,
+      targets,
+      inventory,
+      alertRules,
+      alertEvents,
+      commands,
+      geofences,
+      webhooks,
+      users,
+      auditLog,
+    };
+  }
+
   async updateSettings(dto: UpdateAppSettingsDto, actorId?: string): Promise<AppConfigResponse> {
     const existing = await this.ensureExists();
     const {
