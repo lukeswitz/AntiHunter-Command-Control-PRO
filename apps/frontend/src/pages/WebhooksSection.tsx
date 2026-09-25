@@ -147,7 +147,12 @@ export function PushNotificationsCard() {
                   type="button"
                   className="control-chip"
                   disabled={busy}
-                  onClick={() => run(sendTestPush, 'Test sent.')}
+                  onClick={() =>
+                    run(
+                      sendTestPush,
+                      'Test sent. If nothing appears, allow notifications for the browser in system settings and turn off Focus/Do Not Disturb.',
+                    )
+                  }
                 >
                   Send test
                 </button>
