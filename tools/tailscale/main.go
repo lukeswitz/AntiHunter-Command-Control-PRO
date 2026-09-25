@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -99,11 +98,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	dnsName := ""
 	if st, err := lc.StatusWithoutPeers(context.Background()); err == nil && st.Self != nil {
-		dnsName = strings.TrimSuffix(st.Self.DNSName, ".")
 		status("running", map[string]any{
-			"dnsName": dnsName,
+			"dnsName": strings.TrimSuffix(st.Self.DNSName, "."),
 			"tailnet": st.CurrentTailnet.Name,
 			"allowed": len(allowed),
 		})
@@ -151,21 +148,12 @@ func main() {
 		}
 	}()
 
-	tlsCfg := &tls.Config{
-		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			if hello.ServerName == "" && dnsName != "" {
-				hello.ServerName = dnsName
-			}
-			return lc.GetCertificate(hello)
-		},
-	}
-	raw, err := srv.Listen("tcp", ":443")
+	ln, err := srv.ListenTLS("tcp", ":443")
 	for err != nil {
 		running(false)
 		time.Sleep(15 * time.Second)
-		raw, err = srv.Listen("tcp", ":443")
+		ln, err = srv.ListenTLS("tcp", ":443")
 	}
-	ln := tls.NewListener(raw, tlsCfg)
 	running(true)
 	defer ln.Close()
 
