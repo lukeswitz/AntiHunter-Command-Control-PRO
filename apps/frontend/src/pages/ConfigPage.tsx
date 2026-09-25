@@ -523,6 +523,9 @@ export function ConfigPage() {
   const [appSettingsState, setAppSettings] = useState<AppSettings | null>(null);
   const [serialConfigState, setSerialConfig] = useState<SerialConfig | null>(null);
   const [siteSettings, setSiteSettings] = useState<SiteSummary[]>([]);
+  const [siteDeleteError, setSiteDeleteError] = useState<{ id: string; message: string } | null>(
+    null,
+  );
   const [mqttConfigs, setMqttConfigs] = useState<MqttSiteConfig[]>([]);
   const [mqttPasswords, setMqttPasswords] = useState<Record<string, string>>({});
   const [mqttNotices, setMqttNotices] = useState<Record<string, MqttNotice>>({});
@@ -1211,6 +1214,22 @@ export function ConfigPage() {
       );
       setSiteSettings((prev) => prev.map((site) => (site.id === data.id ? data : site)));
       updateNodeSiteMeta(data.id, { name: data.name, color: data.color });
+    },
+  });
+  const deleteSiteMutation = useMutation({
+    mutationFn: (siteId: string) => apiClient.delete(`/sites/${siteId}`),
+    onSuccess: (_data, siteId) => {
+      queryClient.setQueryData(['sites'], (existing: SiteSummary[] | undefined) =>
+        existing ? existing.filter((site) => site.id !== siteId) : [],
+      );
+      setSiteSettings((prev) => prev.filter((site) => site.id !== siteId));
+      setSiteDeleteError(null);
+    },
+    onError: (error: unknown, siteId) => {
+      setSiteDeleteError({
+        id: siteId,
+        message: error instanceof Error ? error.message : 'Delete failed',
+      });
     },
   });
   const updateMqttConfigMutation = useMutation<
@@ -3039,6 +3058,32 @@ export function ConfigPage() {
                           }
                         />
                       </div>
+                      <div className="config-row config-row--actions">
+                        <button
+                          type="button"
+                          className="control-chip control-chip--danger"
+                          disabled={site.id === runtimeSiteId || deleteSiteMutation.isPending}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Delete site "${site.name || site.id}"? This cannot be undone.`,
+                              )
+                            ) {
+                              deleteSiteMutation.mutate(site.id);
+                            }
+                          }}
+                        >
+                          Delete site
+                        </button>
+                        {site.id === runtimeSiteId ? (
+                          <span className="config-hint">This is the local runtime site.</span>
+                        ) : null}
+                        {siteDeleteError?.id === site.id ? (
+                          <span className="config-hint config-hint--warn">
+                            {siteDeleteError.message}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   );
                 })
@@ -3184,6 +3229,61 @@ export function ConfigPage() {
                 </span>
               </div>
               <div className="config-row">
+                    <span className="config-label">Send Mode</span>
+                    <select
+                      value={serialConfig.sendMode ?? 'protobuf'}
+                      onChange={(event) => updateSerialSetting({ sendMode: event.target.value })}
+                    >
+                      <option value="protobuf">Protobuf packet</option>
+                      <option value="protobuf-ack">Protobuf packet + ack</option>
+                      <option value="plain">Plain text line</option>
+                    </select>
+                  </div>
+                  <p className="config-hint">
+                    How mesh commands are written to the radio. Applies on the next connect. Fleet
+                    security always uses encrypted protobuf.
+                  </p>
+                  <div className="config-row">
+                    <span className="config-label">Hop Limit</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={7}
+                      value={serialConfig.hopLimit ?? ''}
+                      onChange={(event) => {
+                        const raw = event.target.value;
+                        if (raw === '') {
+                          updateSerialSetting({ hopLimit: null });
+                          return;
+                        }
+                        const value = Number(raw);
+                        if (!Number.isFinite(value)) return;
+                        updateSerialSetting({ hopLimit: value });
+                      }}
+                    />
+                  </div>
+                  <div className="config-row">
+                    <span className="config-label">Command Channel</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={7}
+                      value={serialConfig.sendChannel ?? ''}
+                      onChange={(event) => {
+                        const raw = event.target.value;
+                        if (raw === '') {
+                          updateSerialSetting({ sendChannel: null });
+                          return;
+                        }
+                        const value = Number(raw);
+                        if (!Number.isFinite(value)) return;
+                        updateSerialSetting({ sendChannel: value });
+                      }}
+                    />
+                  </div>
+                </>
+              ) : null}
+              <div className="config-row">
                 <span className="config-label">Data Bits</span>
                 <input
                   type="number"
@@ -3328,59 +3428,6 @@ export function ConfigPage() {
                     const value = Number(raw);
                     if (!Number.isFinite(value)) return;
                     updateSerialSetting({ reconnectMaxAttempts: value });
-                  }}
-                />
-              </div>
-              <div className="config-row">
-                <span className="config-label">Send Mode</span>
-                <select
-                  value={serialConfig.sendMode ?? 'protobuf'}
-                  onChange={(event) => updateSerialSetting({ sendMode: event.target.value })}
-                >
-                  <option value="protobuf">Protobuf packet</option>
-                  <option value="protobuf-ack">Protobuf packet + ack</option>
-                  <option value="plain">Plain text line</option>
-                </select>
-              </div>
-              <p className="config-hint">
-                How mesh commands are written to the radio. Applies on the next connect. Fleet
-                security always uses encrypted protobuf.
-              </p>
-              <div className="config-row">
-                <span className="config-label">Hop Limit</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={7}
-                  value={serialConfig.hopLimit ?? ''}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    if (raw === '') {
-                      updateSerialSetting({ hopLimit: null });
-                      return;
-                    }
-                    const value = Number(raw);
-                    if (!Number.isFinite(value)) return;
-                    updateSerialSetting({ hopLimit: value });
-                  }}
-                />
-              </div>
-              <div className="config-row">
-                <span className="config-label">Command Channel</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={7}
-                  value={serialConfig.sendChannel ?? ''}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    if (raw === '') {
-                      updateSerialSetting({ sendChannel: null });
-                      return;
-                    }
-                    const value = Number(raw);
-                    if (!Number.isFinite(value)) return;
-                    updateSerialSetting({ sendChannel: value });
                   }}
                 />
               </div>

@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Put } from '@nestjs/common';
+import { Role } from '@prisma/client';
 
 import { UpdateSiteDto } from './dto/update-site.dto';
 import { SitesService } from './sites.service';
+import { Roles } from '../auth/auth.decorators';
 
 @Controller('sites')
 export class SitesController {
@@ -20,5 +22,11 @@ export class SitesController {
   @Put(':siteId')
   update(@Param('siteId') siteId: string, @Body() dto: UpdateSiteDto) {
     return this.sitesService.update(siteId, dto);
+  }
+
+  @Delete(':siteId')
+  @Roles(Role.ADMIN)
+  remove(@Param('siteId') siteId: string) {
+    return this.sitesService.remove(siteId);
   }
 }
