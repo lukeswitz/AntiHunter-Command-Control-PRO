@@ -138,9 +138,7 @@ export function FleetSecurityPage() {
         </header>
         <div className="config-card__body">
           {identity.isError ? (
-            <p className="config-hint">
-              Radio not reachable yet. Connect the radio and open the Radio card.
-            </p>
+            <p className="config-hint config-hint--warn">{errorText(identity.error)}</p>
           ) : identity.data ? (
             <div className="config-row">
               <span className="config-label">This radio</span>
