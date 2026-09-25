@@ -3242,8 +3242,8 @@ export function ConfigPage() {
                   <option value="plain">Plain text line</option>
                 </select>
                 <span className="config-hint">
-                  How commands are written out the serial port. Protobuf wraps them for a Meshtastic
-                  radio; plain writes the raw text line.
+                  Outbound command format: protobuf sends a Meshtastic packet frame, protobuf + ack
+                  also requests delivery confirmation, plain sends the raw text line.
                 </span>
               </div>
               <div className="config-row">
