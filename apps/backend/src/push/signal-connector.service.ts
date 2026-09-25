@@ -10,6 +10,7 @@ import { ChildProcess, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync } from 'node:fs';
 import { chmod, mkdir, rm, stat } from 'node:fs/promises';
+import { createConnection } from 'node:net';
 import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -59,6 +60,8 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
   private lastLinkUri: string | null = null;
 
   private receiveTimer: NodeJS.Timeout | null = null;
+  private readonly gate = process.env.AHCC_SIGNAL_GATE?.trim() || null;
+  private gateLinking = false;
 
   constructor(
     private readonly config: RemoteAlertConfigService,
@@ -83,7 +86,13 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     try {
-      await this.run(['receive', '-t', '5', '--ignore-attachments', '--ignore-stories'], 120_000);
+      if (this.gate) {
+        if (!(await this.linkedNumber())) {
+          throw new Error('the ahcc-signal service reports no linked account');
+        }
+      } else {
+        await this.run(['receive', '-t', '5', '--ignore-attachments', '--ignore-stories'], 120_000);
+      }
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Signal receive failed: ${reason}`);
@@ -98,7 +107,7 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
   }
 
   isSupported(): boolean {
-    return process.platform === 'linux' && process.arch === 'x64';
+    return Boolean(this.gate) || (process.platform === 'linux' && process.arch === 'x64');
   }
 
   usesNativeCli(config: RemoteAlertConfig): boolean {
@@ -107,7 +116,7 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
 
   async binaryReady(): Promise<boolean> {
     try {
-      await stat(this.binPath);
+      await stat(this.gate ?? this.binPath);
       return true;
     } catch {
       return false;
@@ -159,7 +168,13 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
         platform,
         arch,
         supported,
-        steps: [{ text: 'AHCC installs and runs signal-cli itself. Click Link Signal.' }],
+        steps: [
+          {
+            text: this.gate
+              ? 'signal-cli runs as the isolated ahcc-signal service. Click Link Signal.'
+              : 'AHCC installs and runs signal-cli itself. Click Link Signal.',
+          },
+        ],
         controls: null,
       };
     }
@@ -208,6 +223,11 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
   private async ensureReady(): Promise<void> {
     if (await this.binaryReady()) {
       return;
+    }
+    if (this.gate) {
+      throw new BadRequestException(
+        `AHCC_SIGNAL_GATE ${this.gate} not found. Run scripts/signal/install-signal-host.sh.`,
+      );
     }
     if (!this.isSupported()) {
       throw new BadRequestException(
@@ -272,7 +292,64 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private run(args: string[], timeoutMs = 30_000): Promise<string> {
+  private gateRequest(
+    request: Record<string, string>,
+    timeoutMs: number,
+    onLine?: (line: Record<string, unknown>) => void,
+  ): Promise<Record<string, unknown>> {
+    return new Promise((resolve, reject) => {
+      const socket = createConnection(this.gate!);
+      let buffer = '';
+      let last: Record<string, unknown> | null = null;
+      const timer = setTimeout(() => {
+        socket.destroy();
+        reject(new Error(`Signal gate ${request.op} timed out`));
+      }, timeoutMs);
+      socket.on('connect', () => socket.write(`${JSON.stringify(request)}\n`));
+      socket.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString('utf8');
+        let newline: number;
+        while ((newline = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, newline);
+          buffer = buffer.slice(newline + 1);
+          try {
+            last = JSON.parse(line) as Record<string, unknown>;
+          } catch {
+            this.logger.warn(`Signal gate sent a malformed line for ${request.op}`);
+            continue;
+          }
+          onLine?.(last);
+        }
+      });
+      socket.on('error', (error) => {
+        clearTimeout(timer);
+        reject(new Error(`Signal gate ${request.op}: ${error.message}`));
+      });
+      socket.on('close', () => {
+        clearTimeout(timer);
+        if (last?.ok === true) {
+          resolve(last);
+        } else {
+          reject(new Error(`Signal gate ${request.op}: ${String(last?.error ?? 'no response')}`));
+        }
+      });
+    });
+  }
+
+  private async runGate(args: string[], timeoutMs: number, input?: string): Promise<string> {
+    const request: Record<string, string> = { op: args[0] };
+    if (args[0] === 'send') {
+      request.groupId = args[1];
+      request.message = input ?? '';
+    }
+    const { ok: _ok, ...result } = await this.gateRequest(request, timeoutMs);
+    return JSON.stringify(result);
+  }
+
+  private run(args: string[], timeoutMs = 30_000, input?: string): Promise<string> {
+    if (this.gate) {
+      return this.runGate(args, timeoutMs, input);
+    }
     return new Promise((resolve, reject) => {
       const child = spawn(this.binPath, ['--config', this.configDir, ...args], {
         env: { PATH: process.env.PATH, HOME: this.home, TMPDIR: process.env.TMPDIR },
@@ -302,8 +379,34 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
 
   async linkUri(): Promise<string> {
     await this.ensureReady();
-    if (this.linkChild && this.lastLinkUri) {
+    if ((this.linkChild || this.gateLinking) && this.lastLinkUri) {
       return this.lastLinkUri;
+    }
+    if (this.gate) {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        this.gateLinking = true;
+        this.gateRequest({ op: 'link' }, 330_000, (line) => {
+          if (!settled && typeof line.uri === 'string' && line.uri.startsWith('sgnl://linkdevice?')) {
+            settled = true;
+            this.lastLinkUri = line.uri;
+            resolve(line.uri);
+          }
+        })
+          .then(() => this.onLinked())
+          .catch((error: unknown) => {
+            if (!settled) {
+              settled = true;
+              reject(error instanceof Error ? error : new Error(String(error)));
+            } else {
+              this.logger.warn(`Signal link did not finish: ${String(error)}`);
+            }
+          })
+          .finally(() => {
+            this.gateLinking = false;
+            this.lastLinkUri = null;
+          });
+      });
     }
     return new Promise((resolve, reject) => {
       const child = spawn(this.binPath, ['--config', this.configDir, 'link', '-n', 'AntiHunter'], {
@@ -349,9 +452,11 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async onLinked(): Promise<void> {
-    await chmod(this.configDir, 0o700).catch((error: unknown) =>
-      this.logger.warn(`Could not restrict ${this.configDir}: ${String(error)}`),
-    );
+    if (!this.gate) {
+      await chmod(this.configDir, 0o700).catch((error: unknown) =>
+        this.logger.warn(`Could not restrict ${this.configDir}: ${String(error)}`),
+      );
+    }
     const number = await this.linkedNumber();
     if (number) {
       await this.config.update({ signalNumber: number, signalEnabled: true });
@@ -364,6 +469,11 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
       return null;
     }
     try {
+      if (this.gate) {
+        const status = JSON.parse(await this.run(['status'], 10_000)) as { accounts?: unknown };
+        const first = Array.isArray(status.accounts) ? status.accounts[0] : null;
+        return typeof first === 'string' ? first : null;
+      }
       const out = await this.run(['--output', 'json', 'listAccounts'], 10_000);
       const accounts = JSON.parse(out) as Array<{ number?: unknown }>;
       const first = accounts.find((account) => typeof account.number === 'string');
@@ -375,7 +485,9 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
 
   async createGroup(): Promise<string> {
     await this.ensureReady();
-    const out = await this.run([
+    const out = this.gate
+      ? await this.run(['create-group'])
+      : await this.run([
       '--output',
       'json',
       'updateGroup',
@@ -397,6 +509,10 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
 
   async send(groupId: string, message: string): Promise<void> {
     await this.ensureReady();
+    if (this.gate) {
+      await this.run(['send', groupId], 30_000, message);
+      return;
+    }
     await this.run(['send', `--group-id=${groupId}`, `--message=${message}`]);
   }
 }
