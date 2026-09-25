@@ -670,6 +670,9 @@ model SerialConfig {
   reconnectMaxMs       Int?
   reconnectJitter      Float?
   reconnectMaxAttempts Int?
+  sendMode             String?
+  hopLimit             Int?
+  sendChannel          Int?
   enabled              Boolean  @default(true)
   updatedAt            DateTime @updatedAt
 }

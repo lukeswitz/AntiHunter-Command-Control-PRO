@@ -622,6 +622,9 @@ export interface SerialConfig {
   reconnectMaxMs?: number | null;
   reconnectJitter?: number | null;
   reconnectMaxAttempts?: number | null;
+  sendMode?: string | null;
+  hopLimit?: number | null;
+  sendChannel?: number | null;
   enabled: boolean;
   updatedAt: string;
 }

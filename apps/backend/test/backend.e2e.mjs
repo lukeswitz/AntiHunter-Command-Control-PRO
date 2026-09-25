@@ -567,6 +567,33 @@ try {
   );
   check('analyst cannot change policy', analystPolicy.status === 403);
 
+  console.log('serial send settings');
+  const serialCfgDefault = await call('GET', '/serial/config', null, adminToken);
+  check(
+    'serial config exposes send mode / hop limit / channel (env fallback applied)',
+    serialCfgDefault.status === 200 &&
+      ['plain', 'protobuf', 'protobuf-ack'].includes(serialCfgDefault.json?.sendMode) &&
+      serialCfgDefault.json?.hopLimit === 3 &&
+      serialCfgDefault.json?.sendChannel === 0,
+    JSON.stringify(serialCfgDefault.json),
+  );
+  const serialSave = await call(
+    'PUT',
+    '/serial/config',
+    { sendMode: 'protobuf-ack', hopLimit: 5, sendChannel: 2 },
+    adminToken,
+  );
+  check(
+    'serial send settings persist',
+    serialSave.status === 200 &&
+      serialSave.json?.sendMode === 'protobuf-ack' &&
+      serialSave.json?.hopLimit === 5 &&
+      serialSave.json?.sendChannel === 2,
+    JSON.stringify(serialSave.json),
+  );
+  const badSendMode = await call('PUT', '/serial/config', { sendMode: 'nope' }, adminToken);
+  check('invalid send mode rejected', badSendMode.status === 400);
+
   console.log('database stats');
   const dbStats = await call('GET', '/config/app/database-stats', null, adminToken);
   check(

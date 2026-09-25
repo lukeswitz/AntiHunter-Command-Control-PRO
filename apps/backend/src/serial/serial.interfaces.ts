@@ -8,6 +8,9 @@ export interface SerialConnectionOptions {
   rawDelimiter?: string;
   autoDetectDelimiter?: boolean;
   writeDelimiters: string[];
+  sendMode?: string;
+  hopLimit?: number;
+  sendChannel?: number;
 }
 
 export interface SerialState {

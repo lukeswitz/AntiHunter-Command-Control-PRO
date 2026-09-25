@@ -394,6 +394,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       delimiter: storedConfig.delimiter ?? this.configService.get<string>('serial.delimiter', '\n'),
       protocol: (this.configService.get<string>('serial.protocol', 'meshtastic-rewrite') ??
         'meshtastic-rewrite') as ProtocolKey,
+      sendMode: storedConfig.sendMode,
+      hopLimit: storedConfig.hopLimit ?? undefined,
+      sendChannel: storedConfig.sendChannel ?? undefined,
     });
   }
 
@@ -1095,6 +1098,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           writeDelimiters,
           autoDetectDelimiter: autoDetect,
           rawDelimiter: delimiterToken,
+          sendMode: options?.sendMode,
+          hopLimit: options?.hopLimit,
+          sendChannel: options?.sendChannel,
         };
         await this.serialConfigService.updateConfig({
           devicePath: candidatePath,
@@ -1193,9 +1199,13 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         this.consumeRate(this.getTargetCounter(built.target), this.perTargetRateLimit);
       }
       const protocol = this.connectionOptions?.protocol ?? 'meshtastic-rewrite';
-      const sendMode =
-        this.configService.get<string>('serial.sendMode')?.toLowerCase() ?? 'protobuf';
-      const hopLimit = this.configService.get<number>('serial.hopLimit');
+      const sendMode = (
+        this.connectionOptions?.sendMode ??
+        this.configService.get<string>('serial.sendMode') ??
+        'protobuf'
+      ).toLowerCase();
+      const hopLimit =
+        this.connectionOptions?.hopLimit ?? this.configService.get<number>('serial.hopLimit');
 
       if (protocol === 'meshtastic-rewrite') {
         if (sendMode === 'plain') {
@@ -1361,6 +1371,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     const { Mesh, Portnums } = await loadMeshModule();
 
     const channelConfig =
+      this.connectionOptions?.sendChannel ??
       this.configService.get<number>('serial.commandChannel') ??
       this.configService.get<number>('serial.sendChannel') ??
       0;

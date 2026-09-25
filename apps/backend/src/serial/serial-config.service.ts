@@ -100,6 +100,9 @@ export class SerialConfigService {
       reconnectJitter: config.reconnectJitter ?? env.reconnectJitter ?? null,
       reconnectMaxAttempts: config.reconnectMaxAttempts ?? env.reconnectMaxAttempts ?? null,
       delimiter: config.delimiter ?? env.delimiter ?? DEFAULT_SERIAL_DELIMITER,
+      sendMode: config.sendMode ?? env.sendMode ?? 'protobuf',
+      hopLimit: config.hopLimit ?? env.hopLimit ?? 3,
+      sendChannel: config.sendChannel ?? env.sendChannel ?? 0,
     };
   }
 
@@ -114,6 +117,9 @@ export class SerialConfigService {
     reconnectMaxMs?: number | null;
     reconnectJitter?: number | null;
     reconnectMaxAttempts?: number | null;
+    sendMode?: string | null;
+    hopLimit?: number | null;
+    sendChannel?: number | null;
   } {
     const serialConfig = this.configService.get<{
       device?: string;
@@ -126,6 +132,9 @@ export class SerialConfigService {
       reconnectMaxMs?: number;
       reconnectJitter?: number;
       reconnectMaxAttempts?: number;
+      sendMode?: string;
+      hopLimit?: number;
+      commandChannel?: number;
     }>('serial');
 
     return serialConfig
@@ -140,6 +149,9 @@ export class SerialConfigService {
           reconnectMaxMs: serialConfig.reconnectMaxMs,
           reconnectJitter: serialConfig.reconnectJitter,
           reconnectMaxAttempts: serialConfig.reconnectMaxAttempts,
+          sendMode: serialConfig.sendMode,
+          hopLimit: serialConfig.hopLimit,
+          sendChannel: serialConfig.commandChannel,
         }
       : {};
   }
