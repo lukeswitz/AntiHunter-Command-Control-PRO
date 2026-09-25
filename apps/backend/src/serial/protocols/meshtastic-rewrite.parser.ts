@@ -7,15 +7,15 @@ import { SerialParseResult, SerialProtocolParser, SerialProbeHit } from '../seri
 const ANSI_REGEX = /\u001b\[[0-9;]*[A-Za-z]/g;
 
 const STATUS_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+)?:?\s*STATUS:\s*Mode:(?<mode>\S+)\s+Scan:(?<scan>\S+)\s+Hits:(?<hits>\d+)\s+(?:Targets:(?<targets>\d+)\s+)?Temp:(?:(?<tempC>-?\d+(?:\.\d+)?)|\?)[cC](?:\/(?<tempF>-?\d+(?:\.\d+)?)[Ff])?\s+Up:(?<up>[0-9:]+)(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+HDOP[:=](?<hdop>-?\d+(?:\.\d+)?))?/i;
-const STARTUP_REGEX = /^(?<id>[A-Za-z0-9_.:-]+)?:?\s*STARTUP:\s*(?<msg>.+)$/i;
+  /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*STATUS:\s*Mode:(?<mode>\S+)\s+Scan:(?<scan>\S+)\s+Hits:(?<hits>\d+)\s+(?:Targets:(?<targets>\d+)\s+)?Temp:(?:(?<tempC>-?\d+(?:\.\d+)?)|\?)[cC](?:\/(?<tempF>-?\d+(?:\.\d+)?)[Ff])?\s+Up:(?<up>[0-9:]+)(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+HDOP[:=](?<hdop>-?\d+(?:\.\d+)?))?/i;
+const STARTUP_REGEX = /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*STARTUP:\s*(?<msg>.+)$/i;
 const GPS_LOCK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+)?:?\s*GPS:\s*LOCKED\s+Location[=:](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)(?:\s+Satellites[=:](?<sats>\d+))?(?:\s+HDOP[=:](?<hdop>-?\d+(?:\.\d+)?))?/i;
-const GPS_LOST_REGEX = /^(?<id>[A-Za-z0-9_.:-]+)?:?\s*GPS:\s*LOST/i;
+  /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*GPS:\s*LOCKED\s+Location[=:](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)(?:\s+Satellites[=:](?<sats>\d+))?(?:\s+HDOP[=:](?<hdop>-?\d+(?:\.\d+)?))?/i;
+const GPS_LOST_REGEX = /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*GPS:\s*LOST/i;
 const NODE_HB_REGEX =
   /^\[NODE_HB\]\s*(?<id>[A-Za-z0-9_.:-]+)\s+Time:(?<time>[^ ]+)\s+Temp:(?<tempC>-?\d+(?:\.\d+)?)(?:[cCfF])?(?:\/(?<tempF>-?\d+(?:\.\d+)?)[fF])?(?:\s+GPS:(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 const NODE_HB_INLINE_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):?\s*Time:(?<time>[^ ]+)\s+Temp:(?<tempC>-?\d+(?:\.\d+)?)(?:[cCfF])?(?:\/(?<tempF>-?\d+(?:\.\d+)?)[fF])?(?:\s+GPS:(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
+  /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-]):?\s*Time:(?<time>[^ ]+)\s+Temp:(?<tempC>-?\d+(?:\.\d+)?)(?:[cCfF])?(?:\/(?<tempF>-?\d+(?:\.\d+)?)[fF])?(?:\s+GPS:(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 
 const TARGET_REGEX_TYPE_FIRST =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*Target:\s*(?<type>\w+)\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)(?:\s+Name:(?<name>[^ ]+))?(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
@@ -185,7 +185,7 @@ const CSI_ACK_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<kind>CSI_ACK|CSI_CFG_ACK|CSI_RECAL_ACK|CSI_EXCLUDE_ACK):(?<status>.+)$/i;
 const CSI_LEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*CSI_(?<kind>STATUS|JSON)_LEN:(?<len>\d+)/i;
 
-const NODE_ID_FALLBACK = /^([A-Za-z0-9_.:-]+)/;
+const NODE_ID_FALLBACK = /^([A-Za-z0-9_.:-]*[A-Za-z0-9_.-])/;
 
 export class MeshtasticRewriteParser implements SerialProtocolParser {
   parseLine(rawLine: string): SerialParseResult[] {

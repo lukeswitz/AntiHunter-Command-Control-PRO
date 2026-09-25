@@ -61,7 +61,7 @@ async function main() {
     );
     const telemetry = events.find((event) => event.kind === 'node-telemetry');
     assert.ok(telemetry, JSON.stringify(events));
-    assert.match((telemetry as { nodeId: string }).nodeId, /^CMD1:?$/);
+    assert.equal((telemetry as { nodeId: string }).nodeId, 'CMD1');
     assert.equal((telemetry as { lat?: number }).lat, 1.5);
     assert.equal((telemetry as { temperatureC?: number }).temperatureC, 40);
   });
