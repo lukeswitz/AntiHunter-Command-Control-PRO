@@ -295,7 +295,7 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
         title="ntfy"
         on={config.ntfyEnabled && Boolean(config.ntfyUrl)}
         status={config.ntfyEnabled ? 'On' : 'Off'}
-        hint="Publishes alerts to an ntfy topic. Anyone who runs that server or subscribes to the topic can read them."
+        hint="Publishes alerts to an ntfy topic."
       >
         <label className="control-checkbox">
           <input
@@ -322,7 +322,9 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
               type="password"
               autoComplete="off"
               value={form.ntfyToken}
-              placeholder={config.hasNtfyToken ? 'Saved (leave blank to keep)' : 'Only for protected topics'}
+              placeholder={
+                config.hasNtfyToken ? 'Saved (leave blank to keep)' : 'Only for protected topics'
+              }
               onChange={(event) => set('ntfyToken', event.target.value)}
             />
           </label>
