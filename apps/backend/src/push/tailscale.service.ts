@@ -95,7 +95,7 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
       AHCC_TS_STATE: join(process.cwd(), '.tailscale'),
       AHCC_TS_ALLOWED: allowed.join(','),
     };
-    const child = spawn(binary, [], { env, stdio: ['ignore', 'pipe', 'inherit'] });
+    const child = spawn(binary, [], { env, stdio: ['pipe', 'pipe', 'inherit'], detached: true });
     this.helper = child;
     this.helperStatus = { type: 'connecting' };
     this.stopping = false;

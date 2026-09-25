@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"tailscale.com/tsnet"
@@ -64,6 +67,21 @@ func main() {
 		AuthKey:  authKey,
 	}
 	defer srv.Close()
+
+	shutdown := func() {
+		srv.Close()
+		os.Exit(0)
+	}
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		<-sig
+		shutdown()
+	}()
+	go func() {
+		io.Copy(io.Discard, os.Stdin)
+		shutdown()
+	}()
 
 	status("connecting", map[string]any{"hostname": hostname})
 
