@@ -567,6 +567,20 @@ try {
   );
   check('analyst cannot change policy', analystPolicy.status === 403);
 
+  console.log('database stats');
+  const dbStats = await call('GET', '/config/app/database-stats', null, adminToken);
+  check(
+    'admin reads database stats with row counts',
+    dbStats.status === 200 && typeof dbStats.json?.users === 'number' && dbStats.json.users >= 1,
+    JSON.stringify(dbStats.json),
+  );
+  const analystStats = await call('GET', '/config/app/database-stats', null, analystToken);
+  check(
+    'analyst cannot read database stats',
+    analystStats.status === 403 && JSON.stringify(analystStats.json).includes('INSUFFICIENT_ROLE'),
+    JSON.stringify(analystStats),
+  );
+
   console.log('disabled accounts');
   check(
     'analyst session valid before disable',
