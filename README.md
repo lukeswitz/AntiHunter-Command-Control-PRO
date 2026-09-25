@@ -113,6 +113,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Secure runtime**: webhook dispatchers let you disable TLS validation for lab setups or enforce full-chain verification in production. Client certificates and private keys are stored encrypted in the database, and Prisma migrations now cover inventory update events plus serial/raw tap targets.
 - **Remote access & phone alerts**: Tailscale access, encrypted phone push, Signal, ntfy, Matrix, and Apple/Google Home sensors, set in **Config → Remote Access & Alerts**. Setup: [Remote Connections](docs/INTERNET-CONNECTIVITY.md).
 - **Operator UX**: the Alerts, Config, and Addons pages now share the same shell (sidebar buttons outside the card, stacked sections within) so the experience is consistent no matter which subsystem you configure.
+- **Database panel**: **Config → System Updates** shows live row counts for the stored operational data (nodes, positions, drones, targets, inventory, alerts, commands, geofences, webhooks, users, audit log). Read-only, admin-only.
 
 ### Sentinel Command Console & Attack Telemetry
 
@@ -560,7 +561,7 @@ Install system dependencies, clone, set up PostgreSQL, then [configure](#configu
 
 - **Node.js** 20 or newer (ships with Corepack for pnpm)
 
-- **pnpm** 9 or newer (`corepack enable` sets it up automatically)
+- **pnpm** — pinned to 12.4.2 via `packageManager`; `corepack enable` activates it automatically
 
 - **PostgreSQL** 14+ (local or managed)
 
@@ -1027,7 +1028,7 @@ pnpm dev     # http://localhost:5173
 
 ```
 
-Prefer a single command? From the repo root run `pnpm AHCC` to start both workspaces in parallel (single backend process).
+Prefer a single command? From the repo root run `pnpm AHCC` to start both workspaces in parallel (single backend process). A single Ctrl-C stops both cleanly — the backend, serial helper, and Matter helper shut down before the shell returns.
 
 **Silent mode (suppress non-critical output):** Add `:silent` to any dev command to minimize console output, showing only critical errors:
 
