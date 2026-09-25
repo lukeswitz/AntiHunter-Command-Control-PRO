@@ -48,6 +48,25 @@ Your first admin password was printed once at install: by the setup script, or f
 
 **Check:** sign out, sign back in. You are asked for a 6-digit code.
 
+4. Turn on the firewall: **Config** → **Firewall**.
+
+   | Setting | Set to |
+   | ------- | ------ |
+   | Status | Enabled |
+   | Default policy | Allow (the IP allow list does the restricting; Deny with an empty list locks everyone out) |
+   | Geo policy | Allow list |
+   | Allowed countries | your country code, e.g. `US` (local and tailnet addresses have no country and pass) |
+   | Blocked countries | empty |
+   | IP allow list | `127.0.0.1` and `::1`, then every IP you see for your own sign-ins (below) |
+   | IP block list | empty; add attackers from the log |
+   | Failed attempts | `5` |
+   | Failure window | `900` |
+   | Ban duration | `900` |
+
+   Sign in from each device you use (the AHCC computer, the phone over Tailscale, a Cloudflare login). Open **Recent firewall activity** at the bottom of the card, find each `AUTH SUCCESS` entry, and add its IP to **IP allow list**. Docker and proxied logins can show a proxy address (a Docker bridge like `172.17.0.1`, or your reverse proxy) instead of your device, because AHCC trusts a forwarded client IP only from a loopback proxy by default. Either add the address the log shows, or set `TRUST_PROXY` (to the number of proxy hops, or the proxy's address/CIDR) so the log records the real client IP. Save, then sign in again from each device.
+
+**Check:** every device still reaches the login page. A browser on an address not in the list gets `Access denied by firewall (allow list)`.
+
 --------------------------------------------------------------------------------
 <a id="tailscale"></a>
 1. Tailscale: open AHCC from your phone (recommended)
@@ -130,6 +149,8 @@ Restart AHCC (`Ctrl+C`, then `pnpm dev`). Docker installs skip this step.
 
 **Check:** on the phone, `https://...ts.net` still loads. The AHCC computer's row on the Machines page shows `tag:ahcc`.
 
+**Firewall:** add `100.64.0.0/10` and `fd7a:115c:a1e0::/48` (Tailscale's address ranges) to **IP allow list** — this covers every device on your tailnet. To allow one device instead of the whole range, find its `100.x` address in the Tailscale admin console (**Machines**) or in **Recent firewall activity**. Keep the rest as in [step 0](#prep).
+
 **Turn it off:** `tailscale serve reset`.
 
 Security: no port is open to the internet. Tailscale encrypts traffic between your devices, and only devices signed in to your tailnet can connect. AHCC's login and 2FA still apply.
@@ -155,6 +176,8 @@ Do the steps in this order. If you add the tunnel route before the Access app, A
 Click **Add route**.
 
 **Check:** open `https://ahcc.yourdomain.com` in a private browser window. You see Cloudflare's email-code page first, not AHCC. An email that is not on the list never gets a code.
+
+**Firewall:** Cloudflare users' home and mobile IPs change, so an IP allow list will lock them out. Either add each user's IP from **Recent firewall activity** after they sign in, or empty **IP allow list** and rely on **Geo policy** (your country) plus the lockout values from [step 0](#prep).
 
 Security: the tunnel dials out from the AHCC computer, so no port opens on your router. Cloudflare checks the email code before any traffic reaches AHCC. Cloudflare decrypts the traffic at its edge; use Tailscale if you do not want a third party to see it.
 
