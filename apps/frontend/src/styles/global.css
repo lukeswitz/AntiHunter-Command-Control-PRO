@@ -2962,6 +2962,11 @@ body.theme-dark .control-chip[disabled] {
   font-weight: 400;
   line-height: 1.45;
 }
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
 .checkbox-label {
   display: inline-flex;
   align-items: center;
