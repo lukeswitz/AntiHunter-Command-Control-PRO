@@ -71,6 +71,7 @@ import { WsModule } from './ws/ws.module';
                 }
               : undefined,
             base: undefined,
+            redact: ['req.headers.authorization', 'req.headers.cookie'],
           },
         };
       },
