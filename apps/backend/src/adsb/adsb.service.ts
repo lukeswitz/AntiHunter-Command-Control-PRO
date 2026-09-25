@@ -1687,36 +1687,31 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       { skipBus: false },
     );
 
-    if (rule.webhookIds && rule.webhookIds.length > 0) {
-      await this.webhookDispatcher.dispatchAlert(
-        rule.webhookIds.map((webhookId) => ({ webhookId }) as never),
-        {
-          eventType: WebhookEventType.ALERT_TRIGGERED,
-          event: 'alert.triggered',
-          ruleId: rule.id,
-          ruleName: rule.name,
-          severity: rule.severity,
-          message,
-          lat: lat ?? null,
-          lon: lon ?? null,
-          payload: {
-            callsign,
-            icao,
-            reg,
-            dep,
-            dest,
-            speed,
-            alt,
-            label,
-            freq,
-            signal,
-            noise,
-            kind,
-          },
-          timestamp: new Date(),
-        },
-      );
-    }
+    await this.webhookDispatcher.dispatchAlert({
+      eventType: WebhookEventType.ALERT_TRIGGERED,
+      event: 'alert.triggered',
+      ruleId: rule.id,
+      ruleName: rule.name,
+      severity: rule.severity,
+      message,
+      lat: lat ?? null,
+      lon: lon ?? null,
+      payload: {
+        callsign,
+        icao,
+        reg,
+        dep,
+        dest,
+        speed,
+        alt,
+        label,
+        freq,
+        signal,
+        noise,
+        kind,
+      },
+      timestamp: new Date(),
+    });
 
     if (rule.notifyEmail && rule.emailRecipients && rule.emailRecipients.length > 0) {
       const bodyLines = [

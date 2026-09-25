@@ -17,10 +17,6 @@ import {
   SerialTargetDetected,
 } from '../serial/serial.types';
 
-type RuleWebhookLink = Prisma.AlertRuleWebhookGetPayload<{
-  include: { webhook: true };
-}>;
-
 interface WebhookDispatchContext {
   event: string;
   eventType: WebhookEventType;
@@ -124,21 +120,9 @@ export class WebhookDispatcherService {
       });
   }
 
-  async dispatchAlert(links: RuleWebhookLink[], context: WebhookDispatchContext): Promise<void> {
-    const ruleId = context.ruleId ?? links?.[0]?.ruleId;
-    this.pushAlert(context, ruleId ? `rule:${ruleId}` : 'rule:unknown');
-    if (!links?.length) {
-      return;
-    }
-    await Promise.all(
-      links.map((link) =>
-        this.deliver(link.webhook, {
-          ...context,
-          ruleId: link.ruleId,
-          eventType: WebhookEventType.ALERT_TRIGGERED,
-        }),
-      ),
-    );
+  async dispatchAlert(context: WebhookDispatchContext): Promise<void> {
+    this.pushAlert(context, context.ruleId ? `rule:${context.ruleId}` : 'rule:unknown');
+    await this.dispatchToSubscribers(WebhookEventType.ALERT_TRIGGERED, context);
   }
 
   async dispatchExternalAlert(context: WebhookDispatchContext): Promise<void> {

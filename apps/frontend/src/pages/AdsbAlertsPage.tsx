@@ -9,8 +9,7 @@ import {
   listAdsbAlertRules,
   updateAdsbAlertRule,
 } from '../api/adsb';
-import type { AdsbAlertRule, AdsbAlertTarget, AlarmLevel, Webhook } from '../api/types';
-import { listWebhooks } from '../api/webhooks';
+import type { AdsbAlertRule, AdsbAlertTarget, AlarmLevel } from '../api/types';
 
 type FormMode = 'create' | 'edit';
 
@@ -30,7 +29,6 @@ const emptyRule: Omit<AdsbAlertRule, 'id' | 'createdAt' | 'updatedAt'> = {
   mapColor: '#22c55e',
   mapLabel: '',
   blink: false,
-  webhookIds: [],
   messageTemplate: '',
   conditions: {},
 };
@@ -46,11 +44,6 @@ export function AdsbAlertsPage() {
   const rulesQuery = useQuery({
     queryKey: ['adsb-alert-rules'],
     queryFn: () => listAdsbAlertRules(),
-  });
-  const webhooksQuery = useQuery({
-    queryKey: ['webhooks'],
-    queryFn: listWebhooks,
-    staleTime: 30_000,
   });
 
   const createMutation = useMutation({
@@ -101,7 +94,6 @@ export function AdsbAlertsPage() {
       mapColor: rule.mapColor ?? '#22c55e',
       mapLabel: rule.mapLabel ?? '',
       blink: rule.blink ?? false,
-      webhookIds: rule.webhookIds ?? [],
       messageTemplate: rule.messageTemplate ?? '',
       conditions: { ...rule.conditions },
     });
@@ -687,43 +679,6 @@ export function AdsbAlertsPage() {
                           setForm((prev) => ({ ...prev, messageTemplate: e.target.value }))
                         }
                       />
-                    </div>
-
-                    <div className="alerts-webhook-picker">
-                      <span>Webhook notifications</span>
-                      {webhooksQuery.isLoading ? (
-                        <p className="empty-state">Loading webhooks...</p>
-                      ) : webhooksQuery.data?.length ? (
-                        <div className="alerts-webhook-picker__list">
-                          {webhooksQuery.data.map((hook: Webhook) => (
-                            <label
-                              key={hook.id}
-                              className="checkbox-row"
-                              aria-label={`Toggle webhook ${hook.name}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={(form.webhookIds ?? []).includes(hook.id)}
-                                onChange={(e) => {
-                                  const current = new Set(form.webhookIds ?? []);
-                                  if (e.target.checked) {
-                                    current.add(hook.id);
-                                  } else {
-                                    current.delete(hook.id);
-                                  }
-                                  setForm((prev) => ({ ...prev, webhookIds: Array.from(current) }));
-                                }}
-                              />
-                              <span>
-                                <strong>{hook.name}</strong>
-                                <div className="muted">{hook.url}</div>
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="empty-state">No webhooks configured.</p>
-                      )}
                     </div>
                   </div>
                 </article>
