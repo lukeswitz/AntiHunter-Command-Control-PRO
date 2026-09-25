@@ -1226,7 +1226,6 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         this.consumeRate(this.globalRate, this.globalRateLimit);
         this.consumeRate(this.getTargetCounter(built.target), this.perTargetRateLimit);
       }
-      const protocol = this.connectionOptions?.protocol ?? 'meshtastic-rewrite';
       const sendMode = (
         this.connectionOptions?.sendMode ??
         this.configService.get<string>('serial.sendMode') ??
@@ -1235,12 +1234,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       const hopLimit =
         this.connectionOptions?.hopLimit ?? this.configService.get<number>('serial.hopLimit');
 
-      if (protocol === 'meshtastic-rewrite') {
-        if (sendMode === 'plain') {
-          await this.writeLine(line);
-          return;
-        }
-
+      const isMeshtasticRadio = this.localRadio.num !== undefined;
+      if (isMeshtasticRadio && sendMode !== 'plain') {
         const wantAck = sendMode === 'protobuf-ack';
         await this.sendMeshtasticCommand(line, {
           wantAck,
@@ -1605,50 +1600,27 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     this.protocolParser = createParser(options.protocol);
     this.protocolParser.reset();
 
-    if (options.protocol === 'meshtastic-rewrite') {
-      this.frameParser = new MeshtasticFrameParser();
-      this.port.pipe(this.frameParser);
+    // Always frame + handshake so a Meshtastic radio is detected regardless of protocol; text falls through to the protocol parser.
+    this.frameParser = new MeshtasticFrameParser();
+    this.port.pipe(this.frameParser);
 
-      this.frameParser.on('data', (event: MeshtasticFrameEvent) => {
-        if (event.type === 'frame') {
-          this.logger.log(`[FRAME] protobuf ${(event.data as Buffer).length}B`);
-          void this.handleMeshtasticFrame(event.data);
-        } else if (event.type === 'text') {
-          const line = (event.data as string).trim();
-          if (!line) return;
-          this.logger.log(`[TEXT] ${line.slice(0, 200)}`);
-          this.processIncomingLine(line, 'serial');
-        }
-      });
-
-      this.frameParser.on('error', (err: Error) => {
-        this.logger.error(`Frame parser error: ${err.message}`, err.stack);
-      });
-
-      void this.identifyRadioWithRetry();
-    } else {
-      const readDelimiter = options.autoDetectDelimiter ? '\n' : options.delimiter;
-      this.lineParser = this.port.pipe(
-        new ReadlineParser({
-          delimiter: readDelimiter,
-        }),
-      );
-
-      this.lineParser.on('data', (data: string | Buffer) => {
-        const line = data
-          .toString()
-          .replace(/[\r\n]+$/, '')
-          .trim();
-        if (!line) {
-          return;
-        }
+    this.frameParser.on('data', (event: MeshtasticFrameEvent) => {
+      if (event.type === 'frame') {
+        this.logger.log(`[FRAME] protobuf ${(event.data as Buffer).length}B`);
+        void this.handleMeshtasticFrame(event.data);
+      } else if (event.type === 'text') {
+        const line = (event.data as string).trim();
+        if (!line) return;
+        this.logger.log(`[TEXT] ${line.slice(0, 200)}`);
         this.processIncomingLine(line, 'serial');
-      });
+      }
+    });
 
-      this.lineParser.on('error', (err) => {
-        this.logger.error(`Serial parser error: ${err.message}`, err.stack);
-      });
-    }
+    this.frameParser.on('error', (err: Error) => {
+      this.logger.error(`Frame parser error: ${err.message}`, err.stack);
+    });
+
+    void this.identifyRadioWithRetry();
 
     this.port.on('error', (err) => {
       this.lastError = err.message;
