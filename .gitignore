@@ -58,6 +58,9 @@ apps/backend/bin/
 apps/backend/.matter/
 apps/backend/.signal-cli/
 apps/backend/.tailscale/
+apps/backend/data/tiles/
 **/.secrets/
+.parity-todo.md
+.diginode-findings.md
 
 *.tsbuildinfo

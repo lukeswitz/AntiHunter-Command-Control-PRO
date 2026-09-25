@@ -300,6 +300,63 @@ try {
   });
   check('unknown invitation rejected', badInvite.status === 400);
 
+  console.log('tiles');
+  const adminToken = admin.json.token;
+  psql(testUrl, `UPDATE "User" SET "legalAcceptedAt"=now() WHERE email='${inviteEmail}'`);
+  const analystToken = (await login(inviteEmail, 'InviteePass789!')).json.token;
+  const analystMe = await call('GET', '/auth/me', null, analystToken);
+  check('analyst session fully accepted', analystMe.json?.legalAccepted === true);
+  const noKey = await fetch(`${api}/tiles/osm/1/0/0`);
+  check('tile without key rejected', noKey.status === 401, String(noKey.status));
+  const forged = await fetch(`${api}/tiles/osm/1/0/0?k=someone.20000.abc`);
+  check('tile with forged key rejected', forged.status === 401, String(forged.status));
+  const keyReply = await call('GET', '/tiles/key', null, adminToken);
+  check('logged-in user gets tile key', keyReply.status === 200 && Boolean(keyReply.json?.key));
+  const keyAnon = await call('GET', '/tiles/key');
+  check('tile key needs login', keyAnon.status === 401);
+  const tileKey = encodeURIComponent(keyReply.json?.key ?? '');
+  const outOfRange = await fetch(`${api}/tiles/osm/2/9/0?k=${tileKey}`);
+  check('out-of-range tile rejected', outOfRange.status === 400, String(outOfRange.status));
+  const unknownSource = await fetch(`${api}/tiles/nope/1/0/0?k=${tileKey}`);
+  check('unknown map source rejected', unknownSource.status === 400, String(unknownSource.status));
+  const tileStatus = await call('GET', '/tiles/status', null, adminToken);
+  check(
+    'status lists download-allowed sources',
+    tileStatus.status === 200 &&
+      tileStatus.json.providers.find((p) => p.id === 'osm')?.preload === false &&
+      tileStatus.json.providers.find((p) => p.id === 'usgs-topo')?.preload === true,
+    JSON.stringify(tileStatus.json?.providers),
+  );
+  check('status needs login', (await call('GET', '/tiles/status')).status === 401);
+  const area = { lat: 40.713, lng: -74.006, radiusKm: 1, minZoom: 10, maxZoom: 11 };
+  const osmPreload = await call('POST', '/tiles/preload', { ...area, provider: 'osm' }, adminToken);
+  check('OSM offline download refused', osmPreload.status === 400, JSON.stringify(osmPreload));
+  const analystPreload = await call(
+    'POST',
+    '/tiles/preload',
+    { ...area, provider: 'usgs-topo' },
+    analystToken,
+  );
+  check(
+    'analyst cannot start download',
+    analystPreload.status === 403 &&
+      JSON.stringify(analystPreload.json).includes('INSUFFICIENT_ROLE'),
+    JSON.stringify(analystPreload),
+  );
+  const badArea = await call(
+    'POST',
+    '/tiles/preload',
+    { ...area, provider: 'usgs-topo', radiusKm: 500 },
+    adminToken,
+  );
+  check('oversized area rejected', badArea.status === 400);
+  const analystClear = await call('DELETE', '/tiles/cache', null, analystToken);
+  check(
+    'analyst cannot clear cache',
+    analystClear.status === 403 && JSON.stringify(analystClear.json).includes('INSUFFICIENT_ROLE'),
+    JSON.stringify(analystClear),
+  );
+
   console.log('rate limit');
   let limited = false;
   for (let i = 0; i < 35 && !limited; i += 1) {
