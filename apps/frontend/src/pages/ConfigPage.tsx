@@ -3331,6 +3331,59 @@ export function ConfigPage() {
                   }}
                 />
               </div>
+              <div className="config-row">
+                <span className="config-label">Send Mode</span>
+                <select
+                  value={serialConfig.sendMode ?? 'protobuf'}
+                  onChange={(event) => updateSerialSetting({ sendMode: event.target.value })}
+                >
+                  <option value="protobuf">Protobuf packet</option>
+                  <option value="protobuf-ack">Protobuf packet + ack</option>
+                  <option value="plain">Plain text line</option>
+                </select>
+              </div>
+              <p className="config-hint">
+                How mesh commands are written to the radio. Applies on the next connect. Fleet
+                security always uses encrypted protobuf.
+              </p>
+              <div className="config-row">
+                <span className="config-label">Hop Limit</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={7}
+                  value={serialConfig.hopLimit ?? ''}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    if (raw === '') {
+                      updateSerialSetting({ hopLimit: null });
+                      return;
+                    }
+                    const value = Number(raw);
+                    if (!Number.isFinite(value)) return;
+                    updateSerialSetting({ hopLimit: value });
+                  }}
+                />
+              </div>
+              <div className="config-row">
+                <span className="config-label">Command Channel</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={7}
+                  value={serialConfig.sendChannel ?? ''}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    if (raw === '') {
+                      updateSerialSetting({ sendChannel: null });
+                      return;
+                    }
+                    const value = Number(raw);
+                    if (!Number.isFinite(value)) return;
+                    updateSerialSetting({ sendChannel: value });
+                  }}
+                />
+              </div>
             </div>
           </section>
 

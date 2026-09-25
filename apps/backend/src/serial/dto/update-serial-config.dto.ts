@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class UpdateSerialConfigDto {
   @IsOptional()
@@ -51,6 +51,22 @@ export class UpdateSerialConfigDto {
   @IsInt()
   @Min(0)
   reconnectMaxAttempts?: number | null;
+
+  @IsOptional()
+  @IsIn(['plain', 'protobuf', 'protobuf-ack'])
+  sendMode?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(7)
+  hopLimit?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(7)
+  sendChannel?: number | null;
 
   @IsOptional()
   @IsBoolean()
