@@ -69,6 +69,46 @@ function loadFromKeychain(legacyPath: string): Buffer {
   return decodeKey(value, 'the macOS Keychain');
 }
 
+const DPAPI_PROTECT =
+  "$ErrorActionPreference='Stop';Add-Type -AssemblyName System.Security;" +
+  "$i=[Console]::In.ReadToEnd().Trim();$b=[Convert]::FromBase64String($i);" +
+  "$p=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,'CurrentUser');" +
+  '[Convert]::ToBase64String($p)';
+const DPAPI_UNPROTECT =
+  "$ErrorActionPreference='Stop';Add-Type -AssemblyName System.Security;" +
+  "$i=[Console]::In.ReadToEnd().Trim();$b=[Convert]::FromBase64String($i);" +
+  "$u=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,'CurrentUser');" +
+  '[Convert]::ToBase64String($u)';
+
+function dpapi(script: string, input: string): string {
+  return execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    input,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'ignore'],
+  }).trim();
+}
+
+function loadFromDpapi(legacyPath: string): Buffer {
+  const blobPath = join(dirname(legacyPath), 'remote-alerts.key.dpapi');
+  mkdirSync(dirname(blobPath), { recursive: true });
+  if (existsSync(blobPath)) {
+    return decodeKey(dpapi(DPAPI_UNPROTECT, readFileSync(blobPath, 'utf8').trim()), 'Windows DPAPI');
+  }
+  const value = existsSync(legacyPath)
+    ? readFileSync(legacyPath, 'utf8').trim()
+    : randomBytes(32).toString('base64');
+  decodeKey(value, existsSync(legacyPath) ? legacyPath : 'a new key');
+  const blob = dpapi(DPAPI_PROTECT, value);
+  writeFileSync(blobPath, blob, { mode: 0o600 });
+  if (dpapi(DPAPI_UNPROTECT, blob) !== value) {
+    throw new Error('Windows DPAPI round-trip failed for the remote alerts key');
+  }
+  if (existsSync(legacyPath)) {
+    unlinkSync(legacyPath);
+  }
+  return decodeKey(value, 'Windows DPAPI');
+}
+
 function loadKey(): Buffer {
   const fromEnv = process.env.REMOTE_ALERTS_SECRET_KEY?.trim();
   if (fromEnv) {
@@ -86,6 +126,9 @@ function loadKey(): Buffer {
     join(process.cwd(), '.secrets', 'remote-alerts.key');
   if (process.platform === 'darwin' && !process.env.REMOTE_ALERTS_KEY_FILE) {
     return loadFromKeychain(path);
+  }
+  if (process.platform === 'win32' && !process.env.REMOTE_ALERTS_KEY_FILE) {
+    return loadFromDpapi(path);
   }
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   chmodSync(dirname(path), 0o700);
