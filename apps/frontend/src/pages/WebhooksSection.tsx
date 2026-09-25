@@ -127,11 +127,11 @@ export function PushNotificationsCard() {
     <section className="remote-subsection">
       <div className="channel-row__head">
         <h3>Alerts on this device</h3>
+        <span className={subscribed ? 'badge badge--active' : 'badge'}>
+          {subscribed ? 'On' : supported ? 'Off' : 'Unavailable'}
+        </span>
       </div>
-      <p className="field-hint">
-        End-to-end encrypted push to this browser. Works in-browser on Android and desktop; on
-        iPhone, add to Home Screen first.
-      </p>
+      <p className="field-hint">Encrypted push alerts to this browser, even when it is closed.</p>
       <div>
         {!supported ? (
           <p className="empty-state">
