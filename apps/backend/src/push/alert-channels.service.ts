@@ -93,9 +93,13 @@ export class AlertChannelsService {
     try {
       await action();
     } catch (error) {
-      this.logger.warn(
-        `${channel} delivery failed: ${error instanceof Error ? error.message : error}`,
-      );
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`${channel} delivery failed: ${reason}`);
+      if (channel !== 'push') {
+        await this.push
+          .notify(`${channel} alert delivery failed`, reason.slice(0, 300))
+          .catch(() => undefined);
+      }
     }
   }
 
@@ -139,6 +143,10 @@ export class AlertChannelsService {
     return url;
   }
 
+  private signalAuth(): Record<string, string> {
+    return { Authorization: `Bearer ${this.config.signalProxyToken()}` };
+  }
+
   async signalStatus(): Promise<{
     reachable: boolean;
     linkedNumber: string | null;
@@ -157,6 +165,7 @@ export class AlertChannelsService {
     const supported = this.connector.isSupported();
     try {
       const response = await fetch(new URL('/v1/accounts', this.signalBase(config)), {
+        headers: this.signalAuth(),
         redirect: 'error',
         signal: AbortSignal.timeout(5_000),
       });
@@ -182,7 +191,7 @@ export class AlertChannelsService {
     }
     const response = await fetch(
       new URL('/v1/qrcodelink?device_name=AntiHunter', this.signalBase(config)),
-      { redirect: 'error', signal: AbortSignal.timeout(60_000) },
+      { headers: this.signalAuth(), redirect: 'error', signal: AbortSignal.timeout(60_000) },
     );
     if (!response.ok || !response.headers.get('content-type')?.startsWith('image/png')) {
       throw new BadRequestException(
@@ -209,7 +218,7 @@ export class AlertChannelsService {
         new URL(`/v1/groups/${encodeURIComponent(config.signalNumber!)}`, this.signalBase(config)),
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...this.signalAuth() },
           body: JSON.stringify({
             name: 'AntiHunter Alerts',
             members: [config.signalNumber],
@@ -247,7 +256,7 @@ export class AlertChannelsService {
     }
     await this.post(new URL('/v2/send', this.signalBase(config)), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this.signalAuth() },
       body: JSON.stringify({ message, number: config.signalNumber, recipients: [groupId] }),
     });
   }

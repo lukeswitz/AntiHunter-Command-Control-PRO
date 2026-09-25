@@ -1,14 +1,24 @@
-import { BadRequestException, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { RemoteAlertConfig } from '@prisma/client';
 import { ChildProcess, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, existsSync } from 'node:fs';
 import { chmod, mkdir, rm, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
+import { PushService } from './push.service';
 import { RemoteAlertConfigService } from './remote-alert-config.service';
+
+const RECEIVE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const RECEIVE_SCHEDULE = '0 */6 * * *';
 
 const VERSION = '0.14.8';
 const ASSET = `signal-cli-${VERSION}-Linux-native.tar.gz`;
@@ -17,9 +27,28 @@ const SHA256 = '36569af20c709e0c5e6e677b74f50f147b21f3740620b8a7affde70f6027f82a
 const SIZE = 113821552;
 const LATEST_URL = 'https://api.github.com/repos/AsamK/signal-cli/releases/latest';
 const SIGNAL_CONTAINER = 'cc_signal';
+const SIGNAL_API_CONTAINER = 'cc_signal_api';
+const SIGNAL_PROXY_CONTAINER = 'cc_signal_proxy';
+const SIGNAL_NET = 'ahcc-signal';
+const SIGNAL_NET_INTERNAL = 'ahcc-signal-internal';
+const SIGNAL_IMAGE =
+  'bbernhard/signal-cli-rest-api:0.100@sha256:2399d449123cdad56c4d859277e3b9127e1a00c4d2ab4601c239882609286cf8';
+const PROXY_IMAGE = 'node:20-bookworm-slim';
+
+function findProxyScript(): string | null {
+  let dir = process.cwd();
+  for (let i = 0; i < 6; i += 1) {
+    const candidate = join(dir, 'docker', 'signal-proxy', 'proxy.mjs');
+    if (existsSync(candidate)) {
+      return /^[\w./ -]+$/.test(candidate) ? candidate : null;
+    }
+    dir = dirname(dir);
+  }
+  return null;
+}
 
 @Injectable()
-export class SignalConnectorService implements OnModuleDestroy {
+export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SignalConnectorService.name);
   private readonly home =
     process.env.AHCC_SIGNAL_HOME?.trim() || join(process.cwd(), '.signal-cli');
@@ -29,10 +58,39 @@ export class SignalConnectorService implements OnModuleDestroy {
   private linkChild: ChildProcess | null = null;
   private lastLinkUri: string | null = null;
 
-  constructor(private readonly config: RemoteAlertConfigService) {}
+  private receiveTimer: NodeJS.Timeout | null = null;
+
+  constructor(
+    private readonly config: RemoteAlertConfigService,
+    private readonly push: PushService,
+  ) {}
+
+  onModuleInit(): void {
+    this.receiveTimer = setInterval(() => void this.receivePending(), RECEIVE_INTERVAL_MS);
+    this.receiveTimer.unref();
+  }
 
   async onModuleDestroy(): Promise<void> {
+    if (this.receiveTimer) {
+      clearInterval(this.receiveTimer);
+    }
     this.linkChild?.kill('SIGTERM');
+  }
+
+  private async receivePending(): Promise<void> {
+    const config = await this.config.get();
+    if (!config.signalEnabled || !this.usesNativeCli(config) || !(await this.binaryReady())) {
+      return;
+    }
+    try {
+      await this.run(['receive', '-t', '5', '--ignore-attachments', '--ignore-stories'], 120_000);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Signal receive failed: ${reason}`);
+      await this.push
+        .notify('Signal alerts may be broken', `signal-cli receive failed: ${reason.slice(0, 300)}`)
+        .catch(() => undefined);
+    }
   }
 
   usesNative(config: RemoteAlertConfig): boolean {
@@ -115,7 +173,18 @@ export class SignalConnectorService implements OnModuleDestroy {
     } else if (colimaFound) {
       steps.push({ text: 'Start the Docker VM', cmd: 'colima start' });
     }
-    const startCmd = `docker start ${SIGNAL_CONTAINER} 2>/dev/null || docker run -d --name ${SIGNAL_CONTAINER} -p 127.0.0.1:8079:8080 -e MODE=native -v ${SIGNAL_CONTAINER}:/home/.local/share/signal-cli bbernhard/signal-cli-rest-api`;
+    const proxyScript = findProxyScript();
+    if (!proxyScript) {
+      steps.push({
+        text: 'docker/signal-proxy/proxy.mjs was not found above the backend directory. Run AHCC from the repository checkout.',
+      });
+      return { platform, arch, supported, steps, controls: null };
+    }
+    const legacy = `docker port ${SIGNAL_CONTAINER} 8080 2>/dev/null | grep -q ':8079' && docker rm -f ${SIGNAL_CONTAINER}`;
+    const networks = `(docker network inspect ${SIGNAL_NET_INTERNAL} >/dev/null 2>&1 || docker network create ${SIGNAL_NET_INTERNAL}) && (docker network inspect ${SIGNAL_NET} >/dev/null 2>&1 || docker network create ${SIGNAL_NET})`;
+    const createApi = `docker run -d --name ${SIGNAL_API_CONTAINER} --restart unless-stopped --network ${SIGNAL_NET_INTERNAL} --network-alias signal-api -e MODE=native -e 'AUTO_RECEIVE_SCHEDULE=${RECEIVE_SCHEDULE}' -v ${SIGNAL_CONTAINER}:/home/.local/share/signal-cli ${SIGNAL_IMAGE}`;
+    const createProxy = `docker run -d --name ${SIGNAL_PROXY_CONTAINER} --restart unless-stopped --network ${SIGNAL_NET} -p 127.0.0.1:8079:8080 -e SIGNAL_UPSTREAM=http://signal-api:8080 -e SIGNAL_PROXY_TOKEN=${this.config.signalProxyToken()} -v '${proxyScript}:/app/proxy.mjs:ro' ${PROXY_IMAGE} node /app/proxy.mjs && docker network connect ${SIGNAL_NET_INTERNAL} ${SIGNAL_PROXY_CONTAINER}`;
+    const startCmd = `{ ${legacy}; true; } && ${networks} && (docker start ${SIGNAL_API_CONTAINER} 2>/dev/null || (docker rm -f ${SIGNAL_API_CONTAINER} >/dev/null 2>&1; ${createApi})) && { docker rm -f ${SIGNAL_PROXY_CONTAINER} >/dev/null 2>&1; true; } && ${createProxy}`;
     steps.push({
       text: 'Start the Signal connector on loopback (creates it the first time, starts it after)',
       cmd: startCmd,
@@ -130,8 +199,8 @@ export class SignalConnectorService implements OnModuleDestroy {
       steps,
       controls: {
         start: startCmd,
-        stop: `docker stop ${SIGNAL_CONTAINER}`,
-        restart: `docker restart ${SIGNAL_CONTAINER}`,
+        stop: `docker stop ${SIGNAL_PROXY_CONTAINER} ${SIGNAL_API_CONTAINER}`,
+        restart: `docker restart ${SIGNAL_API_CONTAINER} ${SIGNAL_PROXY_CONTAINER}`,
       },
     };
   }
@@ -280,6 +349,9 @@ export class SignalConnectorService implements OnModuleDestroy {
   }
 
   private async onLinked(): Promise<void> {
+    await chmod(this.configDir, 0o700).catch((error: unknown) =>
+      this.logger.warn(`Could not restrict ${this.configDir}: ${String(error)}`),
+    );
     const number = await this.linkedNumber();
     if (number) {
       await this.config.update({ signalNumber: number, signalEnabled: true });
@@ -325,6 +397,6 @@ export class SignalConnectorService implements OnModuleDestroy {
 
   async send(groupId: string, message: string): Promise<void> {
     await this.ensureReady();
-    await this.run(['send', '-g', groupId, '-m', message]);
+    await this.run(['send', `--group-id=${groupId}`, `--message=${message}`]);
   }
 }

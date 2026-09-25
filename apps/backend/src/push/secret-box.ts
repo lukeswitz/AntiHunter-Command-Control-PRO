@@ -1,4 +1,10 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+} from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -31,6 +37,10 @@ export class SecretBox {
   private getKey(): Buffer {
     this.key ??= loadKey();
     return this.key;
+  }
+
+  derive(label: string): string {
+    return createHmac('sha256', this.getKey()).update(label, 'utf8').digest('base64url');
   }
 
   isSealed(value: string): boolean {
