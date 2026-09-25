@@ -18,7 +18,6 @@ import type {
   AlertRuleScope,
   InventoryDevice,
 } from '../api/types';
-import { listWebhooks } from '../api/webhooks';
 import { useAuthStore } from '../stores/auth-store';
 
 type FormMode = 'create' | 'edit';
@@ -55,7 +54,6 @@ interface AlertRuleFormState {
   mapColor: string;
   blink: boolean;
   mapLabel: string;
-  webhookIds: string[];
 }
 
 const BASE_FORM_STATE: Omit<AlertRuleFormState, 'inventoryMacs' | 'inventorySelections'> = {
@@ -80,7 +78,6 @@ const BASE_FORM_STATE: Omit<AlertRuleFormState, 'inventoryMacs' | 'inventorySele
   mapColor: '#f97316',
   blink: false,
   mapLabel: '',
-  webhookIds: [],
 };
 
 const SEVERITY_OPTIONS: AlarmLevel[] = ['INFO', 'NOTICE', 'ALERT', 'CRITICAL'];
@@ -109,12 +106,6 @@ export function AlertsPage() {
     queryKey: ['alert-rules', search],
     queryFn: () => listAlertRules(search.trim() ? { search: search.trim() } : {}),
     staleTime: 15_000,
-  });
-
-  const webhooksQuery = useQuery({
-    queryKey: ['webhooks'],
-    queryFn: listWebhooks,
-    staleTime: 30_000,
   });
 
   const inventorySearchQuery = useQuery({
@@ -241,15 +232,6 @@ export function AlertsPage() {
         inventoryMacs: prev.inventoryMacs.filter((item) => item !== mac),
         inventorySelections: nextSelections,
       };
-    });
-  };
-
-  const handleToggleWebhook = (webhookId: string) => {
-    setFormState((prev) => {
-      if (prev.webhookIds.includes(webhookId)) {
-        return { ...prev, webhookIds: prev.webhookIds.filter((id) => id !== webhookId) };
-      }
-      return { ...prev, webhookIds: [...prev.webhookIds, webhookId] };
     });
   };
 
@@ -775,30 +757,6 @@ export function AlertsPage() {
                       disabled={!canEdit}
                     />
                   </label>
-                  <div className="alerts-webhook-picker">
-                    <span>Webhook notifications</span>
-                    {webhooksQuery.isLoading ? (
-                      <p className="empty-state">Loading webhooks...</p>
-                    ) : webhooksQuery.data && webhooksQuery.data.length > 0 ? (
-                      <div className="alerts-webhook-picker__list">
-                        {webhooksQuery.data.map((webhook) => (
-                          <label key={webhook.id}>
-                            <input
-                              type="checkbox"
-                              checked={formState.webhookIds.includes(webhook.id)}
-                              onChange={() => handleToggleWebhook(webhook.id)}
-                              disabled={!canEdit}
-                            />
-                            <span>{webhook.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="empty-state">
-                        No webhook endpoints configured. Set them up in Configuration ? Webhooks.
-                      </p>
-                    )}
-                  </div>
                 </div>
               </article>
 
@@ -939,7 +897,6 @@ function buildFormState(rule: AlertRule): AlertRuleFormState {
     mapColor: rule.mapStyle?.color ?? '#f97316',
     blink: rule.mapStyle?.blink ?? false,
     mapLabel: rule.mapStyle?.label ?? '',
-    webhookIds: [...(rule.webhookIds ?? [])],
   };
 }
 
@@ -969,7 +926,6 @@ function buildPayload(state: AlertRuleFormState): AlertRulePayload {
       blink: state.blink,
       label: state.mapLabel.trim() || undefined,
     },
-    webhookIds: state.webhookIds,
   };
 }
 

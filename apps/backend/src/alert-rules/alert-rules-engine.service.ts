@@ -172,7 +172,7 @@ export class AlertRulesEngineService {
       mapStyle: this.parseMapStyle(rule.mapStyle),
     });
 
-    await this.webhookDispatcher.dispatchAlert(rule.webhooks, {
+    await this.webhookDispatcher.dispatchAlert({
       eventType: WebhookEventType.ALERT_TRIGGERED,
       event: 'alert.triggered',
       ruleId: rule.id,
