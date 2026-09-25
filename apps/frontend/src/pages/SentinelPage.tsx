@@ -313,6 +313,89 @@ export function SentinelPage() {
 
       <article className="config-card">
         <div className="panel__header">
+          <h2 className="panel__title">Live Detections ({detections.length})</h2>
+          <div className="sentinel-controls">
+            <button
+              type="button"
+              className="control-chip control-chip--ghost"
+              onClick={() => clearDetections()}
+            >
+              Clear View
+            </button>
+            <button
+              type="button"
+              className="control-chip control-chip--danger"
+              disabled={!canSend || busy}
+              onClick={() => send('INCIDENTS_CLEAR')}
+            >
+              <MdDeleteSweep /> Clear Node Log
+            </button>
+          </div>
+        </div>
+
+        <div className="sentinel-chips">
+          <button
+            type="button"
+            className={`control-chip${typeFilter === 'ALL' ? ' is-active' : ''}`}
+            onClick={() => setTypeFilter('ALL')}
+          >
+            All ({detections.length})
+          </button>
+          {typeCounts.map((entry) => (
+            <button
+              key={entry.type}
+              type="button"
+              className={`control-chip${typeFilter === entry.type ? ' is-active' : ''}`}
+              onClick={() => setTypeFilter(entry.type)}
+            >
+              {entry.label} ({entry.count})
+            </button>
+          ))}
+        </div>
+
+        {visibleDetections.length === 0 ? (
+          <p className="form-hint">
+            No detections received. Detections stream in live once a node’s sentinel is running and
+            broadcasting.
+          </p>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table sentinel-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Node</th>
+                  <th>Detection</th>
+                  <th>MAC</th>
+                  <th>RSSI</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleDetections.slice(0, 200).map((detection) => (
+                  <tr key={detection.id}>
+                    <td>{formatTime(detection.timestamp)}</td>
+                    <td>{detection.nodeId}</td>
+                    <td>
+                      <span
+                        className={`status-pill${detection.category === 'mesh-guard' ? ' status-pill--danger' : ''}`}
+                      >
+                        {detection.label}
+                      </span>
+                    </td>
+                    <td>{detection.mac ?? '—'}</td>
+                    <td>{typeof detection.rssi === 'number' ? `${detection.rssi} dBm` : '—'}</td>
+                    <td className="sentinel-detail">{detection.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
+
+      <article className="config-card">
+        <div className="panel__header">
           <h2 className="panel__title">CSI Motion</h2>
         </div>
         <p className="form-hint">
@@ -529,89 +612,6 @@ export function SentinelPage() {
             </div>
           ))}
         </div>
-      </article>
-
-      <article className="config-card">
-        <div className="panel__header">
-          <h2 className="panel__title">Live Detections ({detections.length})</h2>
-          <div className="sentinel-controls">
-            <button
-              type="button"
-              className="control-chip control-chip--ghost"
-              onClick={() => clearDetections()}
-            >
-              Clear View
-            </button>
-            <button
-              type="button"
-              className="control-chip control-chip--danger"
-              disabled={!canSend || busy}
-              onClick={() => send('INCIDENTS_CLEAR')}
-            >
-              <MdDeleteSweep /> Clear Node Log
-            </button>
-          </div>
-        </div>
-
-        <div className="sentinel-chips">
-          <button
-            type="button"
-            className={`control-chip${typeFilter === 'ALL' ? ' is-active' : ''}`}
-            onClick={() => setTypeFilter('ALL')}
-          >
-            All ({detections.length})
-          </button>
-          {typeCounts.map((entry) => (
-            <button
-              key={entry.type}
-              type="button"
-              className={`control-chip${typeFilter === entry.type ? ' is-active' : ''}`}
-              onClick={() => setTypeFilter(entry.type)}
-            >
-              {entry.label} ({entry.count})
-            </button>
-          ))}
-        </div>
-
-        {visibleDetections.length === 0 ? (
-          <p className="form-hint">
-            No detections received. Detections stream in live once a node’s sentinel is running and
-            broadcasting.
-          </p>
-        ) : (
-          <div className="table-wrap">
-            <table className="data-table sentinel-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Node</th>
-                  <th>Detection</th>
-                  <th>MAC</th>
-                  <th>RSSI</th>
-                  <th>Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDetections.slice(0, 200).map((detection) => (
-                  <tr key={detection.id}>
-                    <td>{formatTime(detection.timestamp)}</td>
-                    <td>{detection.nodeId}</td>
-                    <td>
-                      <span
-                        className={`status-pill${detection.category === 'mesh-guard' ? ' status-pill--danger' : ''}`}
-                      >
-                        {detection.label}
-                      </span>
-                    </td>
-                    <td>{detection.mac ?? '—'}</td>
-                    <td>{typeof detection.rssi === 'number' ? `${detection.rssi} dBm` : '—'}</td>
-                    <td className="sentinel-detail">{detection.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </article>
     </div>
   );

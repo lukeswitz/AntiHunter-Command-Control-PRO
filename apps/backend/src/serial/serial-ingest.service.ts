@@ -364,6 +364,16 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
               }),
             });
           }
+          if (event.nodeId && !this.nodesService.getSnapshotById(event.nodeId)) {
+            await this.nodesService.upsert({
+              id: event.nodeId,
+              name: event.nodeId,
+              lastMessage: sanitizedMessage ?? event.message,
+              ts: timestamp,
+              lastSeen: timestamp,
+              siteId,
+            });
+          }
           if (event.nodeId && (event.message || sanitizedMessage)) {
             await this.nodesService.updateLastMessage(
               event.nodeId,
