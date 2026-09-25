@@ -135,7 +135,7 @@ export function PushNotificationsCard() {
       <div>
         {!supported ? (
           <p className="empty-state">
-            Device push isn't available here. It needs a secure page (HTTPS or localhost) and a
+            Device push is not available here. It needs a secure page (HTTPS or localhost) and a
             browser that supports web push. If you opened AHCC by http:// IP, switch to HTTPS or
             MagicDNS and this button appears.
           </p>
