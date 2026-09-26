@@ -77,6 +77,28 @@ const lines = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const PAIRING_CODE_STYLE = {
+  fontSize: '1.6rem',
+  fontFamily: 'ui-monospace, monospace',
+  letterSpacing: '0.08em',
+  padding: '0.4rem 0.6rem',
+};
+
+function groupDigits(value: string | null | undefined, groups: number[]): string {
+  const digits = (value ?? '').replace(/\D/g, '');
+  const total = groups.reduce((sum, size) => sum + size, 0);
+  if (digits.length !== total) {
+    return value ?? '';
+  }
+  const parts: string[] = [];
+  let index = 0;
+  for (const size of groups) {
+    parts.push(digits.slice(index, index + size));
+    index += size;
+  }
+  return parts.join('-');
+}
+
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export function RemoteAlertsSection({ view = 'alerts' }: { view?: 'alerts' | 'access' }) {
@@ -991,6 +1013,7 @@ function MatterCard(props: {
           <button
             type="button"
             className="control-chip control-chip--ghost"
+            style={{ margin: '0.5rem 0' }}
             onClick={() => setShowPairing(true)}
           >
             Show pairing code
@@ -1001,17 +1024,35 @@ function MatterCard(props: {
             {qrDataUrl && (
               <>
                 <img src={qrDataUrl} alt="Matter pairing QR code" width={200} height={200} />
-                <p className="config-hint">Home app → + → Add Accessory → scan.</p>
+                <details className="config-hint">
+                  <summary>How to pair</summary>
+                  Home app → + → Add Accessory → scan (or More options… → AntiHunter → enter the
+                  setup code) → accept the uncertified accessory → assign the AntiHunter alert
+                  sensors and bridge.
+                </details>
               </>
             )}
             <div className="form-grid">
               <label>
                 <span>Setup code</span>
-                <input className="control-input" readOnly value={status.manualPairingCode ?? ''} />
+                <input
+                  className="control-input"
+                  style={PAIRING_CODE_STYLE}
+                  readOnly
+                  value={groupDigits(status.manualPairingCode, [4, 3, 4])}
+                />
               </label>
               <label>
                 <span>Passcode</span>
-                <input className="control-input" readOnly value={status.passcode ?? ''} />
+                <input
+                  className="control-input"
+                  style={PAIRING_CODE_STYLE}
+                  readOnly
+                  value={groupDigits(
+                    status.passcode == null ? null : String(status.passcode).padStart(8, '0'),
+                    [3, 2, 3],
+                  )}
+                />
               </label>
             </div>
           </div>

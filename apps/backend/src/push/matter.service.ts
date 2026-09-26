@@ -87,7 +87,16 @@ export class MatterService implements OnModuleInit, OnModuleDestroy {
   }
 
   private runtime(): string {
-    return process.env.AHCC_MATTER_BIN?.trim() || 'matter-helper.js on node';
+    return this.binary() || 'matter-helper.js on node';
+  }
+
+  private binary(): string | undefined {
+    const configured = process.env.AHCC_MATTER_BIN?.trim();
+    if (configured) {
+      return configured;
+    }
+    const bundled = join(process.cwd(), 'bin', 'matter', 'ahcc-matter');
+    return process.platform === 'darwin' && existsSync(bundled) ? bundled : undefined;
   }
 
   private async sync(): Promise<void> {
@@ -108,7 +117,7 @@ export class MatterService implements OnModuleInit, OnModuleDestroy {
         env[key] = process.env[key];
       }
     }
-    const binary = process.env.AHCC_MATTER_BIN?.trim();
+    const binary = this.binary();
     const stdio: ['pipe', 'pipe', 'inherit'] = ['pipe', 'pipe', 'inherit'];
     const jsHelper = join(__dirname, 'matter-helper.js');
     let helper: ChildProcess;
