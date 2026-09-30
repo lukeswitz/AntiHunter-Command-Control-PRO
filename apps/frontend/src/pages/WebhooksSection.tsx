@@ -21,22 +21,6 @@ import { useAuthStore } from '../stores/auth-store';
 
 type WebhookFormMode = 'create' | 'edit';
 
-const WEBHOOK_EVENT_OPTIONS = [
-  { value: 'ALERT_TRIGGERED', label: 'Alert triggered' },
-  { value: 'INVENTORY_UPDATED', label: 'Inventory updated' },
-  { value: 'NODE_TELEMETRY', label: 'Node telemetry' },
-  { value: 'TARGET_DETECTED', label: 'Target detected' },
-  { value: 'NODE_ALERT', label: 'Node alerts & status' },
-  { value: 'DRONE_TELEMETRY', label: 'Drone telemetry' },
-  { value: 'COMMAND_ACK', label: 'Command acknowledgements' },
-  { value: 'COMMAND_RESULT', label: 'Command results' },
-  { value: 'SERIAL_RAW', label: 'Raw serial lines' },
-] as const;
-const WEBHOOK_EVENT_LABELS = WEBHOOK_EVENT_OPTIONS.reduce<Record<string, string>>((acc, option) => {
-  acc[option.value] = option.label;
-  return acc;
-}, {});
-
 interface WebhookFormState {
   id?: string;
   presetKey: string;
@@ -302,25 +286,6 @@ export function WebhooksSection() {
     setFormState({ ...DEFAULT_FORM_STATE });
   };
 
-  const formatEvents = (events: string[]) =>
-    events.length === 0
-      ? 'None selected'
-      : events.map((value) => WEBHOOK_EVENT_LABELS[value] ?? value).join(', ');
-
-  const handleToggleEvent = (eventValue: string) => {
-    setFormState((prev) => {
-      if (prev.subscribedEvents.includes(eventValue)) {
-        return {
-          ...prev,
-          subscribedEvents:
-            prev.subscribedEvents.length === 1
-              ? prev.subscribedEvents
-              : prev.subscribedEvents.filter((value) => value !== eventValue),
-        };
-      }
-      return { ...prev, subscribedEvents: [...prev.subscribedEvents, eventValue] };
-    });
-  };
 
   const handleDelete = () => {
     if (formState.id) {
@@ -373,8 +338,6 @@ export function WebhooksSection() {
                     <th>Name</th>
                     <th>URL</th>
                     <th>Status</th>
-                    <th>Events</th>
-                    <th>Linked rules</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -384,10 +347,6 @@ export function WebhooksSection() {
                       <td>{webhook.name}</td>
                       <td>{webhook.url}</td>
                       <td>{webhook.enabled ? 'Enabled' : 'Disabled'}</td>
-                      <td className="webhook-events-cell">
-                        {formatEvents(webhook.subscribedEvents)}
-                      </td>
-                      <td>{webhook.linkedRuleIds.length}</td>
                       <td className="table-actions">
                         <button
                           type="button"
@@ -569,21 +528,9 @@ export function WebhooksSection() {
               Leave certificate fields empty to use the system trust store without mutual TLS.
             </p>
           </details>
-          <div className="webhook-event-picker">
-            <span>Deliver these events</span>
-            <div className="webhook-event-picker__list">
-              {WEBHOOK_EVENT_OPTIONS.map((option) => (
-                <label key={option.value} className="control-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={formState.subscribedEvents.includes(option.value)}
-                    onChange={() => handleToggleEvent(option.value)}
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-          </div>
+          <p className="field-hint">
+            Fires on every source set to Notify in Alert sources. Choose what sends there.
+          </p>
           <div className="controls-row">
             <button
               type="submit"

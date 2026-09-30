@@ -10,7 +10,6 @@ import {
   updateAlertRule,
 } from '../api/alert-rules';
 import { apiClient } from '../api/client';
-import { listWebhooks } from '../api/webhooks';
 import type {
   AlarmLevel,
   AlertRule,
@@ -48,7 +47,6 @@ interface AlertRuleFormState {
   notifyAudible: boolean;
   notifyEmail: boolean;
   emailInput: string;
-  webhookIds: string[];
   minRssi: string;
   maxRssi: string;
   messageTemplate: string;
@@ -73,7 +71,6 @@ const BASE_FORM_STATE: Omit<AlertRuleFormState, 'inventoryMacs' | 'inventorySele
   notifyAudible: true,
   notifyEmail: false,
   emailInput: '',
-  webhookIds: [],
   minRssi: '',
   maxRssi: '',
   messageTemplate: '',
@@ -109,12 +106,6 @@ export function AlertsPage() {
     queryKey: ['alert-rules', search],
     queryFn: () => listAlertRules(search.trim() ? { search: search.trim() } : {}),
     staleTime: 15_000,
-  });
-
-  const webhooksQuery = useQuery({
-    queryKey: ['webhooks'],
-    queryFn: listWebhooks,
-    staleTime: 30_000,
   });
 
   const inventorySearchQuery = useQuery({
@@ -705,85 +696,13 @@ export function AlertsPage() {
             <div className="config-grid alerts-stack">
               <article className="config-card">
                 <header>
-                  <h2>Notifications & routing</h2>
-                  <p>Choose how this alert notifies operators and where messages are delivered.</p>
+                  <h2>Alert message</h2>
+                  <p>
+                    Delivery is set by this rule&rsquo;s row in Remote alerts &rarr; Alert sources.
+                    Customize the alert text below.
+                  </p>
                 </header>
                 <div className="config-card__body">
-                  <div className="toggle-row">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={formState.notifyVisual}
-                        onChange={(event) =>
-                          setFormState((prev) => ({ ...prev, notifyVisual: event.target.checked }))
-                        }
-                        disabled={!canEdit}
-                      />
-                      Visual notification
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={formState.notifyAudible}
-                        onChange={(event) =>
-                          setFormState((prev) => ({ ...prev, notifyAudible: event.target.checked }))
-                        }
-                        disabled={!canEdit}
-                      />
-                      Audible alarm
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={formState.notifyEmail}
-                        onChange={(event) =>
-                          setFormState((prev) => ({ ...prev, notifyEmail: event.target.checked }))
-                        }
-                        disabled={!canEdit}
-                      />
-                      Send email
-                    </label>
-                  </div>
-                  <label className="form-field">
-                    <span>Email recipients</span>
-                    <textarea
-                      rows={2}
-                      placeholder="operator@example.com"
-                      value={formState.emailInput}
-                      onChange={(event) =>
-                        setFormState((prev) => ({ ...prev, emailInput: event.target.value }))
-                      }
-                      disabled={!canEdit}
-                    />
-                    <small>One address per line.</small>
-                  </label>
-                  <div className="form-field">
-                    <span>Send to webhooks</span>
-                    {(webhooksQuery.data ?? []).length === 0 ? (
-                      <small>No webhooks yet. Create one under Remote alerts → Webhooks.</small>
-                    ) : (
-                      <div className="toggle-row" style={{ flexWrap: 'wrap' }}>
-                        {(webhooksQuery.data ?? []).map((hook) => (
-                          <label key={hook.id}>
-                            <input
-                              type="checkbox"
-                              checked={formState.webhookIds.includes(hook.id)}
-                              disabled={!canEdit}
-                              onChange={(event) =>
-                                setFormState((prev) => ({
-                                  ...prev,
-                                  webhookIds: event.target.checked
-                                    ? [...prev.webhookIds, hook.id]
-                                    : prev.webhookIds.filter((id) => id !== hook.id),
-                                }))
-                              }
-                            />
-                            {hook.name}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                   <label className="form-field">
                     <span>Custom message template</span>
                     <textarea
@@ -929,7 +848,6 @@ function buildFormState(rule: AlertRule): AlertRuleFormState {
     notifyAudible: rule.notifyAudible,
     notifyEmail: rule.notifyEmail,
     emailInput: rule.emailRecipients.join('\n'),
-    webhookIds: [...(rule.webhookIds ?? [])],
     minRssi: typeof rule.minRssi === 'number' ? String(rule.minRssi) : '',
     maxRssi: typeof rule.maxRssi === 'number' ? String(rule.maxRssi) : '',
     messageTemplate: rule.messageTemplate ?? '',
@@ -957,7 +875,6 @@ function buildPayload(state: AlertRuleFormState): AlertRulePayload {
     notifyAudible: state.notifyAudible,
     notifyEmail: state.notifyEmail,
     emailRecipients: parseStringList(state.emailInput),
-    webhookIds: state.webhookIds,
     messageTemplate: state.messageTemplate.trim() || undefined,
     minRssi: state.minRssi.trim() ? Number(state.minRssi) : null,
     maxRssi: state.maxRssi.trim() ? Number(state.maxRssi) : null,

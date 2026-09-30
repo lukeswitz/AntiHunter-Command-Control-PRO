@@ -114,7 +114,6 @@ export interface AlertRule {
   notifyAudible: boolean;
   notifyEmail: boolean;
   emailRecipients: string[];
-  webhookIds: string[];
   messageTemplate?: string | null;
   mapStyle?: AlertRuleMapStyle | null;
   createdAt: string;
@@ -141,7 +140,6 @@ export interface AlertRulePayload {
   notifyAudible?: boolean;
   notifyEmail?: boolean;
   emailRecipients?: string[];
-  webhookIds?: string[];
   messageTemplate?: string | null;
   mapStyle?: AlertRuleMapStyle | null;
 }
