@@ -22,6 +22,7 @@ import { AdsbAlertsPage } from './pages/AdsbAlertsPage';
 import { AdsbPage } from './pages/AdsbPage';
 import { AlertsEventLogPage } from './pages/AlertsEventLogPage';
 import { AlertsPage } from './pages/AlertsPage';
+import { RemoteAlertsPage } from './pages/RemoteAlertsPage';
 import { BaselinePage } from './pages/BaselinePage';
 import { ChatPage } from './pages/ChatPage';
 import { CommandConsolePage } from './pages/CommandConsolePage';
@@ -147,6 +148,7 @@ export default function App() {
               <Route path="/alerts/custom" element={<AlertsPage />} />
               <Route path="/alerts/adsb" element={<AdsbAlertsPage />} />
               <Route path="/alerts/events" element={<AlertsEventLogPage />} />
+              <Route path="/alerts/remote" element={<RemoteAlertsPage />} />
               <Route path="/console" element={<CommandConsolePage />} />
               {chatEnabled ? <Route path="/chat" element={<ChatPage />} /> : null}
               {sentinelEnabled ? <Route path="/sentinel" element={<SentinelPage />} /> : null}

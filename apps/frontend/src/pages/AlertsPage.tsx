@@ -10,6 +10,7 @@ import {
   updateAlertRule,
 } from '../api/alert-rules';
 import { apiClient } from '../api/client';
+import { AlertsRail } from '../components/AlertsRail';
 import type {
   AlarmLevel,
   AlertRule,
@@ -263,53 +264,7 @@ export function AlertsPage() {
 
   return (
     <div className="config-shell alerts-shell">
-      <aside className="config-rail alerts-rail">
-        <div className="config-rail__title">
-          <h2 className="config-rail__heading">Alerts</h2>
-          <p className="config-rail__copy">
-            {isAdsbAlerts
-              ? 'Manage ADS-B and ACARS alert rules, notification routing, and monitoring.'
-              : 'Manage custom alert rules, notification routing, and alert event monitoring.'}
-          </p>
-        </div>
-        <nav className="config-menu" aria-label="Alert pages">
-          <NavLink
-            to="/alerts/custom"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-            end
-          >
-            <span className="config-menu__label">DIGI node Alerts</span>
-            <span className="config-menu__description">
-              Vendor, SSID, channel, and device-based rules.
-            </span>
-          </NavLink>
-          <NavLink
-            to="/alerts/adsb"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-            end
-          >
-            <span className="config-menu__label">ADS-B &amp; ACARS Alerts</span>
-            <span className="config-menu__description">
-              Rules for aviation tracks and ACARS message activity.
-            </span>
-          </NavLink>
-          <NavLink
-            to="/alerts/events"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-          >
-            <span className="config-menu__label">Event log</span>
-            <span className="config-menu__description">
-              Recent alert events and operator notifications.
-            </span>
-          </NavLink>
-        </nav>
-      </aside>
+      <AlertsRail />
 
       <section className="panel alerts-panel">
         <header className="panel-header alerts-header">
@@ -332,7 +287,7 @@ export function AlertsPage() {
               />
             </label>
             <div className="alerts-header__actions">
-              <NavLink to="/config?section=remote" className="control-chip control-chip--ghost">
+              <NavLink to="/alerts/remote" className="control-chip control-chip--ghost">
                 Remote alerts
               </NavLink>
               <button

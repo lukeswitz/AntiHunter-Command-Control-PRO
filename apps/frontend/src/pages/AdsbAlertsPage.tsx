@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { MdRefresh, MdSearch } from 'react-icons/md';
-import { NavLink } from 'react-router-dom';
+import { AlertsRail } from '../components/AlertsRail';
 
 import {
   createAdsbAlertRule,
@@ -357,52 +357,7 @@ export function AdsbAlertsPage() {
 
   return (
     <div className="config-shell alerts-shell">
-      <aside className="config-rail alerts-rail">
-        <div className="config-rail__title">
-          <h2 className="config-rail__heading">ADS-B &amp; ACARS Alerts</h2>
-          <p className="config-rail__copy">
-            Create alert rules for aviation tracks and ACARS messages.
-          </p>
-        </div>
-        <nav className="config-menu" aria-label="Alert pages">
-          <NavLink
-            to="/alerts/custom"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-            end
-          >
-            <span className="config-menu__label">DIGI node Alerts</span>
-            <span className="config-menu__description">
-              Vendor, SSID, channel, and device-based rules.
-            </span>
-          </NavLink>
-          <NavLink
-            to="/alerts/adsb"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-            end
-          >
-            <span className="config-menu__label">ADS-B &amp; ACARS Alerts</span>
-            <span className="config-menu__description">
-              Aviation and ACARS alerting with custom conditions.
-            </span>
-          </NavLink>
-          <NavLink
-            to="/alerts/events"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-            end
-          >
-            <span className="config-menu__label">Event log</span>
-            <span className="config-menu__description">
-              Recent alert events and operator notifications.
-            </span>
-          </NavLink>
-        </nav>
-      </aside>
+      <AlertsRail />
 
       <section className="panel alerts-panel">
         <header className="panel-header alerts-header">
