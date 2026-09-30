@@ -1769,8 +1769,8 @@ export function ConfigPage() {
     if (serialConfig.delimiter ?? '') {
       payload.delimiter = serialConfig.delimiter ?? undefined;
     }
-    payload.protocol = isValidSerialProtocol(appSettings.protocol)
-      ? appSettings.protocol
+    payload.protocol = isValidSerialProtocol(serialConfig.protocol ?? '')
+      ? (serialConfig.protocol as SerialConnectPayload['protocol'])
       : 'meshtastic-rewrite';
     return payload;
   };
@@ -3241,6 +3241,18 @@ export function ConfigPage() {
                 <span className="config-hint">
                   Select the parser that matches the incoming frame format on the wire.
                 </span>
+              </div>
+              <div className="config-row">
+                <span className="config-label">Protocol</span>
+                <select
+                  value={serialConfig.protocol ?? 'meshtastic-rewrite'}
+                  onChange={(event) => updateSerialSetting({ protocol: event.target.value })}
+                >
+                  <option value="meshtastic-rewrite">Meshtastic</option>
+                  <option value="raw-lines">Raw lines</option>
+                  <option value="nmea-like">NMEA-like</option>
+                </select>
+                <span className="config-hint">Wire protocol for the attached device.</span>
               </div>
               <div className="config-row">
                 <span className="config-label">Send Mode</span>

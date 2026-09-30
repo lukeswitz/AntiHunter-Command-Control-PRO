@@ -32,6 +32,10 @@ export class UpdateSerialConfigDto {
   delimiter?: string | null;
 
   @IsOptional()
+  @IsIn(['meshtastic-rewrite', 'raw-lines', 'nmea-like'])
+  protocol?: string | null;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   reconnectBaseMs?: number | null;

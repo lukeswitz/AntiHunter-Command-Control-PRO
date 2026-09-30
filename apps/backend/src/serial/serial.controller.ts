@@ -40,13 +40,17 @@ export class SerialController {
   }
 
   @Put('config')
-  updateConfig(@Body() dto: UpdateSerialConfigDto) {
-    return this.serialConfigService.updateConfig(dto);
+  async updateConfig(@Body() dto: UpdateSerialConfigDto) {
+    const updated = await this.serialConfigService.updateConfig(dto);
+    await this.serialService.reconnectFromStoredConfig();
+    return updated;
   }
 
   @Post('config/reset')
-  resetConfig() {
-    return this.serialConfigService.resetConfig();
+  async resetConfig() {
+    const reset = await this.serialConfigService.resetConfig();
+    await this.serialService.reconnectFromStoredConfig();
+    return reset;
   }
 
   @Post('connect')

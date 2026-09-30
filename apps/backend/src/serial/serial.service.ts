@@ -394,7 +394,8 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       path: storedConfig.devicePath ?? this.configService.get<string>('serial.device'),
       baudRate: storedConfig.baud ?? this.configService.get<number>('serial.baudRate', 115200),
       delimiter: storedConfig.delimiter ?? this.configService.get<string>('serial.delimiter', '\n'),
-      protocol: (this.configService.get<string>('serial.protocol', 'meshtastic-rewrite') ??
+      protocol: (storedConfig.protocol ??
+        this.configService.get<string>('serial.protocol', 'meshtastic-rewrite') ??
         'meshtastic-rewrite') as ProtocolKey,
       sendMode: storedConfig.sendMode,
       hopLimit: storedConfig.hopLimit ?? undefined,
@@ -1051,6 +1052,20 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     await this.connectInternal(options);
+    this.broadcastState();
+  }
+
+  async reconnectFromStoredConfig(): Promise<void> {
+    if (this.clusterRole === 'replica') {
+      return;
+    }
+    await this.performDisconnect();
+    this.manualDisconnect = false;
+    try {
+      await this.autoConnect();
+    } catch (error) {
+      this.handleAutoConnectFailure(error);
+    }
     this.broadcastState();
   }
 
@@ -1867,6 +1882,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           if (lat === 0 && lon === 0) return;
           if (fromNode && fromNode === this.localRadio.num) {
             this.updateLocalPosition(position.latitudeI, position.longitudeI, position.time);
+            return;
           }
 
           const raw = `${nodeName} GPS:${lat.toFixed(6)},${lon.toFixed(6)}`;
@@ -1934,6 +1950,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
             const dm = variant.value;
             if (fromNode && fromNode === this.localRadio.num) {
               this.updateLocalBattery(dm.batteryLevel);
+              return;
             }
             const raw = `${nodeName} battery:${dm.batteryLevel ?? '?'}% voltage:${dm.voltage?.toFixed(2) ?? '?'}V uptime:${dm.uptimeSeconds ?? 0}s`;
             this.incoming$.next(raw);
@@ -1948,6 +1965,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
           }
 
           if (variant.case === 'environmentMetrics' && variant.value) {
+            if (fromNode && fromNode === this.localRadio.num) return;
             const em = variant.value;
             const tempC = em.temperature;
             const raw = `${nodeName} temp:${tempC?.toFixed(1) ?? '?'}°C humidity:${em.relativeHumidity?.toFixed(0) ?? '?'}%`;
