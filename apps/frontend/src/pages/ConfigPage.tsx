@@ -304,11 +304,6 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: 
   { id: 'chat', label: 'Chat', description: 'Encrypted operator chat keys' },
   { id: 'detection', label: 'Detection Defaults', description: 'Scan and alert presets' },
   {
-    id: 'remote',
-    label: 'Remote Alerts',
-    description: 'Phone, Signal, webhooks, Home',
-  },
-  {
     id: 'remote-access',
     label: 'Remote Access',
     description: 'Tailscale tailnet access',
@@ -4383,13 +4378,6 @@ export function ConfigPage() {
                 Permit operators to schedule indefinite tasks (requires explicit STOP to end).
               </span>
             </div>
-          </section>
-
-          <section className={cardClass('remote')}>
-            <header>
-              <h2>Remote Alerts</h2>
-            </header>
-            <RemoteAlertsSection view="alerts" />
           </section>
 
           <section className={cardClass('remote-access')}>
