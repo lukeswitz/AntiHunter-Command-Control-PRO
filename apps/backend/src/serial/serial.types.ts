@@ -1,6 +1,7 @@
 export type SerialParseResult =
   | SerialNodeTelemetry
   | SerialTargetDetected
+  | SerialDeviceSeen
   | SerialAlertEvent
   | SerialDroneTelemetry
   | SerialProbeHit
@@ -19,6 +20,17 @@ export interface SerialNodeTelemetry {
   temperatureC?: number;
   temperatureF?: number;
   temperatureUpdatedAt?: Date;
+}
+
+export interface SerialDeviceSeen {
+  kind: 'device-seen';
+  nodeId?: string;
+  mac: string;
+  rssi?: number;
+  type?: string;
+  name?: string;
+  channel?: number;
+  raw?: string;
 }
 
 export interface SerialTargetDetected {
