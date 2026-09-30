@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AlertRuleMatchMode, Prisma, WebhookEventType } from '@prisma/client';
+import { AlertRuleMatchMode, Prisma } from '@prisma/client';
+
+import { WebhookEventType } from '../webhooks/webhook-event-type';
 import type { AlertRule } from '@prisma/client';
 
 import { MailService } from '../mail/mail.service';

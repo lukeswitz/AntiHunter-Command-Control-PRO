@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AlarmLevel, Prisma, WebhookEventType } from '@prisma/client';
+import { AlarmLevel, Prisma } from '@prisma/client';
+
+import { WebhookEventType } from '../webhooks/webhook-event-type';
 import { randomUUID } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';

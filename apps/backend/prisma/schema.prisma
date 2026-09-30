@@ -414,7 +414,6 @@ model Webhook {
   clientCert        String?
   clientKey         String?
   caBundle          String?
-  subscribedEvents  WebhookEventType[] @default([])
   enabled           Boolean            @default(true)
   ownerId           String?
   lastSuccessAt     DateTime?

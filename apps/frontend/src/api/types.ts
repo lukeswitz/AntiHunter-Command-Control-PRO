@@ -175,7 +175,6 @@ export interface Webhook {
   url: string;
   enabled: boolean;
   verifyTls: boolean;
-  subscribedEvents: string[];
   shared: boolean;
   clientCertificate?: string | null;
   clientKey?: string | null;
@@ -183,7 +182,6 @@ export interface Webhook {
   lastSuccessAt?: string | null;
   lastFailureAt?: string | null;
   owner?: AlertRuleOwnerSummary | null;
-  linkedRuleIds: string[];
   recentDeliveries: WebhookDelivery[];
 }
 
