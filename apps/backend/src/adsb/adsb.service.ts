@@ -330,7 +330,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       mapColor: payload.mapColor ?? null,
       mapLabel: payload.mapLabel ?? null,
       blink: payload.blink ?? false,
-      webhookIds: payload.webhookIds ?? [],
       messageTemplate: payload.messageTemplate ?? null,
     };
     rule.alertRuleId = await this.syncAlertRuleToDb(rule).catch((error) => {
@@ -360,7 +359,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       mapColor: patch.mapColor ?? this.alertRules[idx].mapColor ?? null,
       mapLabel: patch.mapLabel ?? this.alertRules[idx].mapLabel ?? null,
       blink: patch.blink ?? this.alertRules[idx].blink ?? false,
-      webhookIds: patch.webhookIds ?? this.alertRules[idx].webhookIds ?? [],
       messageTemplate: patch.messageTemplate ?? this.alertRules[idx].messageTemplate ?? null,
       id,
       updatedAt: new Date().toISOString(),
@@ -1868,13 +1866,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
           emailRecipients: rule.emailRecipients ?? [],
           messageTemplate: rule.messageTemplate ?? null,
           mapStyle: mapStyle ? (mapStyle as Prisma.InputJsonValue) : Prisma.JsonNull,
-          webhooks: rule.webhookIds?.length
-            ? {
-                create: rule.webhookIds.map((webhookId) => ({
-                  webhook: { connect: { id: webhookId } },
-                })),
-              }
-            : undefined,
         },
         update: {
           name: rule.name,
@@ -1887,16 +1878,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
           emailRecipients: rule.emailRecipients ?? [],
           messageTemplate: rule.messageTemplate ?? null,
           mapStyle: mapStyle ? (mapStyle as Prisma.InputJsonValue) : Prisma.JsonNull,
-          webhooks: {
-            deleteMany: {},
-            ...(rule.webhookIds?.length
-              ? {
-                  create: rule.webhookIds.map((webhookId) => ({
-                    webhook: { connect: { id: webhookId } },
-                  })),
-                }
-              : {}),
-          },
         },
       });
       return result.id;
