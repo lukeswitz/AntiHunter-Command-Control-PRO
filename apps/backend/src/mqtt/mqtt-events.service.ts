@@ -56,6 +56,8 @@ const EVENT_TOPIC_PATTERN = 'ahcc/+/events/+';
 const FEDERATED_EVENT_TYPES = new Set([
   'event.alert',
   'event.target',
+  'event.probe-hit',
+  'node.telemetry',
   'command.ack',
   'command.result',
   'drone.telemetry',
