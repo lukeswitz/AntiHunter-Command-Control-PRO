@@ -65,7 +65,7 @@ const ACK_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<kind>(?:SCAN|DEVICE_SCAN|DRONE|DEAUTH|RANDOMIZATION|BASELINE|CONFIG|TRIANGULATE(?:_STOP)?|TRI_START|STOP|REBOOT|BATTERY_SAVER(?:_START|_STOP)?|VIBRATION_(?:ON|OFF)|PROBE|PCAP(?:_STOP)?|HB)_ACK):?(?<status>[A-Z_]*)/i;
 
 const PROBE_HIT_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*PROBE_HIT:?\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+(?<vendor>\S+)\s+RSSI[=:](?<rssi>-?\d+)(?:\s+CH[=:](?<channel>\d+))?(?:\s+SSID[=:"]*(?<ssid>[^"\s]+)"?)?(?:\s+(?<ghost>GHOST))?(?:\s+(?<dst>DST))?(?:\s+GPS[=:](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*PROBE_HIT:?\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})(?:\s+(?<vendor>.+?))?\s+RSSI[=:](?<rssi>-?\d+)(?:\s+CH[=:](?<channel>\d+))?(?:\s+SSID[=:"]*(?<ssid>[^"\s]+)"?)?(?:\s+(?<ghost>GHOST))?(?:\s+(?<dst>DST))?(?:\s+GPS[=:](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 const HB_ACK_INTERVAL_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*HB_ACK:INTERVAL\s+(?<minutes>\d+)min/i;
 const WIPE_TOKEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*WIPE_TOKEN:(?<token>[A-Za-z0-9_:-]+)/i;
 const ERASE_TOKEN_REGEX =
