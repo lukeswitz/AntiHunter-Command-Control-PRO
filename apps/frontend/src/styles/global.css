@@ -3928,6 +3928,20 @@ body.theme-dark .control-chip[disabled] {
 .data-table tr.is-inactive {
   opacity: 0.55;
 }
+.alert-sources-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+.alert-sources-table th:not(:first-child),
+.alert-sources-table td:not(:first-child) {
+  width: 5.5rem;
+  text-align: center;
+}
+.alert-sources-table th:first-child,
+.alert-sources-table td:first-child {
+  width: auto;
+  overflow-wrap: anywhere;
+}
 .admin-create-user {
   margin-top: 1rem;
 }

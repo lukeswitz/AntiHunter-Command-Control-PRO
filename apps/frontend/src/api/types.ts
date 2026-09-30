@@ -114,6 +114,7 @@ export interface AlertRule {
   notifyAudible: boolean;
   notifyEmail: boolean;
   emailRecipients: string[];
+  webhookIds: string[];
   messageTemplate?: string | null;
   mapStyle?: AlertRuleMapStyle | null;
   createdAt: string;
@@ -140,6 +141,7 @@ export interface AlertRulePayload {
   notifyAudible?: boolean;
   notifyEmail?: boolean;
   emailRecipients?: string[];
+  webhookIds?: string[];
   messageTemplate?: string | null;
   mapStyle?: AlertRuleMapStyle | null;
 }
@@ -615,6 +617,7 @@ export interface SerialConfig {
   parity?: string | null;
   stopBits?: number | null;
   delimiter?: string | null;
+  protocol?: string | null;
   reconnectBaseMs?: number | null;
   reconnectMaxMs?: number | null;
   reconnectJitter?: number | null;

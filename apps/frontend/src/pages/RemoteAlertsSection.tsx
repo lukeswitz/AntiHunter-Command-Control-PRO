@@ -764,7 +764,8 @@ function AlertLevelsCard(props: {
         <h3>Alert sources</h3>
       </div>
       <p className="field-hint">
-        Notify sends to your channels. Critical also lights the Home critical sensor.
+        Notify: send this detection to your alert channels (push, ntfy, Signal). Critical:
+        escalate it and trigger the Home critical sensor.
       </p>
       <div>
         <div className="table-scroll">

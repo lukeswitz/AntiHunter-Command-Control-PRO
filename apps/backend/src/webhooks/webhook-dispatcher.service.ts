@@ -17,6 +17,8 @@ import {
   SerialTargetDetected,
 } from '../serial/serial.types';
 
+type WebhookSubscriber = Webhook & { ruleIds: string[] };
+
 interface WebhookDispatchContext {
   event: string;
   eventType: WebhookEventType;
@@ -103,7 +105,7 @@ export class WebhookDispatcherService {
   private readonly logger = new Logger(WebhookDispatcherService.name);
   private readonly subscriberCache = new Map<
     WebhookEventType,
-    { expiresAt: number; webhooks: Webhook[] }
+    { expiresAt: number; webhooks: WebhookSubscriber[] }
   >();
   private readonly subscriberCacheTtlMs = 5_000;
 
@@ -249,6 +251,9 @@ export class WebhookDispatcherService {
       typeof value === 'number' && Number.isFinite(value) ? value : null;
     const source = nodeAlertSource(event.category, event.level, event.data);
     if (source) {
+      if (await this.channels.isSourceMuted(source)) {
+        return;
+      }
       this.pushAlert(
         {
           event: 'node.alert',
@@ -588,25 +593,37 @@ export class WebhookDispatcherService {
     context: WebhookDispatchContext,
   ): Promise<void> {
     const subscribers = await this.getSubscribers(eventType);
-    if (subscribers.length === 0) {
+    const scoped =
+      eventType === WebhookEventType.ALERT_TRIGGERED && context.ruleId
+        ? subscribers.filter(
+            (webhook) =>
+              webhook.ruleIds.length === 0 || webhook.ruleIds.includes(context.ruleId as string),
+          )
+        : subscribers;
+    if (scoped.length === 0) {
       return;
     }
     const enriched: WebhookDispatchContext = { ...context, eventType };
-    await Promise.all(subscribers.map((webhook) => this.deliver(webhook, enriched)));
+    await Promise.all(scoped.map((webhook) => this.deliver(webhook, enriched)));
   }
 
-  private async getSubscribers(eventType: WebhookEventType): Promise<Webhook[]> {
+  private async getSubscribers(eventType: WebhookEventType): Promise<WebhookSubscriber[]> {
     const cached = this.subscriberCache.get(eventType);
     const now = Date.now();
     if (cached && cached.expiresAt > now) {
       return cached.webhooks;
     }
-    const webhooks = await this.prisma.webhook.findMany({
+    const rows = await this.prisma.webhook.findMany({
       where: {
         enabled: true,
         subscribedEvents: { has: eventType },
       },
+      include: { rules: { select: { ruleId: true } } },
     });
+    const webhooks: WebhookSubscriber[] = rows.map(({ rules, ...webhook }) => ({
+      ...webhook,
+      ruleIds: rules.map((rule) => rule.ruleId),
+    }));
     this.subscriberCache.set(eventType, { webhooks, expiresAt: now + this.subscriberCacheTtlMs });
     return webhooks;
   }

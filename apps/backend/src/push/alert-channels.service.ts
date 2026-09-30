@@ -70,6 +70,11 @@ export class AlertChannelsService {
     ]);
   }
 
+  async isSourceMuted(source: string): Promise<boolean> {
+    const config = await this.config.get();
+    return tierFor(config, source) === 'off';
+  }
+
   async test(channel: AlertChannel): Promise<void> {
     const config = await this.config.get();
     const title = 'AntiHunter test';
