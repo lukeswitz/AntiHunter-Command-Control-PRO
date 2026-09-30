@@ -1,5 +1,7 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
-import { AlarmLevel, InventoryDevice, Prisma, Webhook, WebhookEventType } from '@prisma/client';
+import { AlarmLevel, InventoryDevice, Prisma, Webhook } from '@prisma/client';
+
+import { WebhookEventType } from './webhook-event-type';
 import { createHmac } from 'node:crypto';
 import type { ConnectionOptions as TlsConnectionOptions } from 'node:tls';
 import { Agent, request } from 'undici';
@@ -394,12 +396,6 @@ export class WebhookDispatcherService {
 
   private async deliver(webhook: Webhook, context: WebhookDispatchContext): Promise<void> {
     if (!webhook?.enabled) {
-      return;
-    }
-    if (
-      webhook.subscribedEvents.length > 0 &&
-      !webhook.subscribedEvents.includes(context.eventType)
-    ) {
       return;
     }
 

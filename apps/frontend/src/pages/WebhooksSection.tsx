@@ -29,7 +29,6 @@ interface WebhookFormState {
   secret: string;
   enabled: boolean;
   shareWithEveryone: boolean;
-  subscribedEvents: string[];
   verifyTls: boolean;
   clientCertificate: string;
   clientKey: string;
@@ -43,7 +42,6 @@ const DEFAULT_FORM_STATE: WebhookFormState = {
   secret: '',
   enabled: true,
   shareWithEveryone: false,
-  subscribedEvents: ['ALERT_TRIGGERED'],
   verifyTls: true,
   clientCertificate: '',
   clientKey: '',
@@ -237,9 +235,6 @@ export function WebhooksSection() {
       secret: '',
       enabled: webhook.enabled,
       shareWithEveryone: webhook.shared,
-      subscribedEvents: webhook.subscribedEvents.length
-        ? webhook.subscribedEvents
-        : ['ALERT_TRIGGERED'],
       verifyTls: webhook.verifyTls ?? true,
       clientCertificate: webhook.clientCertificate ?? '',
       clientKey: webhook.clientKey ?? '',
@@ -256,7 +251,6 @@ export function WebhooksSection() {
         secret: formState.secret || undefined,
         enabled: formState.enabled,
         shareWithEveryone: formState.shareWithEveryone,
-        subscribedEvents: formState.subscribedEvents,
         verifyTls: formState.verifyTls,
         clientCertificate: formState.clientCertificate,
         clientKey: formState.clientKey,
@@ -271,7 +265,6 @@ export function WebhooksSection() {
           secret: formState.secret || undefined,
           enabled: formState.enabled,
           shareWithEveryone: formState.shareWithEveryone,
-          subscribedEvents: formState.subscribedEvents,
           verifyTls: formState.verifyTls,
           clientCertificate: formState.clientCertificate,
           clientKey: formState.clientKey,
@@ -306,7 +299,6 @@ export function WebhooksSection() {
             presetKey: key,
             name: preset.label,
             url: preset.url,
-            subscribedEvents: ['ALERT_TRIGGERED', 'NODE_ALERT'],
           }
         : { ...prev, presetKey: '', url: '' },
     );
