@@ -19,11 +19,38 @@ export const DEVICE_SOURCES: AlertSource[] = [
   { key: 'node:erase', label: 'Erase', group: 'Node security', defaultTier: 'alert' },
   { key: 'node:mesh-guard', label: 'Mesh guard', group: 'Node security', defaultTier: 'alert' },
   { key: 'mqtt', label: 'Linked MQTT sites', group: 'Other sites', defaultTier: 'alert' },
+  { key: 'event:inventory', label: 'Inventory updated', group: 'Data streams', defaultTier: 'off' },
+  {
+    key: 'event:node-telemetry',
+    label: 'Node telemetry',
+    group: 'Data streams',
+    defaultTier: 'off',
+  },
+  {
+    key: 'event:drone-telemetry',
+    label: 'Drone telemetry',
+    group: 'Data streams',
+    defaultTier: 'off',
+  },
+  {
+    key: 'event:command-ack',
+    label: 'Command acknowledgements',
+    group: 'Data streams',
+    defaultTier: 'off',
+  },
+  {
+    key: 'event:command-result',
+    label: 'Command results',
+    group: 'Data streams',
+    defaultTier: 'off',
+  },
+  { key: 'event:serial-raw', label: 'Raw serial lines', group: 'Data streams', defaultTier: 'off' },
 ];
 
 const DEFAULTS = new Map(DEVICE_SOURCES.map((source) => [source.key, source.defaultTier]));
 
-export const SOURCE_KEY = /^(rule:[A-Za-z0-9_-]{1,64}|sentinel|node:[a-z-]{2,32}|target|mqtt)$/;
+export const SOURCE_KEY =
+  /^(rule:[A-Za-z0-9_-]{1,64}|sentinel|node:[a-z-]{2,32}|target|mqtt|event:[a-z-]{2,32})$/;
 
 export function defaultTier(key: string): AlertTier {
   if (key.startsWith('rule:')) {

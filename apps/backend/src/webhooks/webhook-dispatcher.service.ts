@@ -17,13 +17,12 @@ import {
   SerialTargetDetected,
 } from '../serial/serial.types';
 
-type WebhookSubscriber = Webhook & { ruleIds: string[] };
-
 interface WebhookDispatchContext {
   event: string;
   eventType: WebhookEventType;
   timestamp: Date;
   ruleId?: string;
+  source?: string;
   ruleName?: string;
   severity?: AlarmLevel;
   message?: string;
@@ -103,10 +102,7 @@ const DISCORD_COLORS: Record<AlarmLevel, number> = {
 @Injectable()
 export class WebhookDispatcherService {
   private readonly logger = new Logger(WebhookDispatcherService.name);
-  private readonly subscriberCache = new Map<
-    WebhookEventType,
-    { expiresAt: number; webhooks: WebhookSubscriber[] }
-  >();
+  private subscriberCache: { expiresAt: number; webhooks: Webhook[] } | null = null;
   private readonly subscriberCacheTtlMs = 5_000;
 
   constructor(
@@ -123,11 +119,14 @@ export class WebhookDispatcherService {
   }
 
   async dispatchAlert(context: WebhookDispatchContext): Promise<void> {
-    this.pushAlert(context, context.ruleId ? `rule:${context.ruleId}` : 'rule:unknown');
+    const source = context.ruleId ? `rule:${context.ruleId}` : 'rule:unknown';
+    context.source = source;
+    this.pushAlert(context, source);
     await this.dispatchToSubscribers(WebhookEventType.ALERT_TRIGGERED, context);
   }
 
   async dispatchExternalAlert(context: WebhookDispatchContext): Promise<void> {
+    context.source = 'mqtt';
     this.pushAlert(context, 'mqtt');
     await this.dispatchToSubscribers(WebhookEventType.ALERT_TRIGGERED, context);
   }
@@ -156,6 +155,7 @@ export class WebhookDispatcherService {
     const context: WebhookDispatchContext = {
       event: 'inventory.updated',
       eventType: WebhookEventType.INVENTORY_UPDATED,
+      source: 'event:inventory',
       timestamp: new Date(),
       message: `Inventory updated for ${device.mac}`,
       mac: device.mac,
@@ -176,6 +176,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.NODE_TELEMETRY, {
       event: 'node.telemetry',
       eventType: WebhookEventType.NODE_TELEMETRY,
+      source: 'event:node-telemetry',
       timestamp,
       nodeId: event.nodeId,
       nodeName: event.nodeId,
@@ -218,6 +219,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.TARGET_DETECTED, {
       event: 'event.target',
       eventType: WebhookEventType.TARGET_DETECTED,
+      source: 'target',
       timestamp,
       nodeId: event.nodeId ?? null,
       mac: event.mac,
@@ -251,9 +253,6 @@ export class WebhookDispatcherService {
       typeof value === 'number' && Number.isFinite(value) ? value : null;
     const source = nodeAlertSource(event.category, event.level, event.data);
     if (source) {
-      if (await this.channels.isSourceMuted(source)) {
-        return;
-      }
       this.pushAlert(
         {
           event: 'node.alert',
@@ -275,6 +274,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.NODE_ALERT, {
       event: 'node.alert',
       eventType: WebhookEventType.NODE_ALERT,
+      source: source ?? undefined,
       timestamp,
       nodeId: event.nodeId ?? null,
       nodeName: event.nodeId ?? null,
@@ -303,6 +303,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.DRONE_TELEMETRY, {
       event: 'drone.telemetry',
       eventType: WebhookEventType.DRONE_TELEMETRY,
+      source: 'event:drone-telemetry',
       timestamp,
       nodeId: options.nodeId ?? event.nodeId ?? null,
       siteId: options.siteId ?? null,
@@ -330,6 +331,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.COMMAND_ACK, {
       event: 'command.ack',
       eventType: WebhookEventType.COMMAND_ACK,
+      source: 'event:command-ack',
       timestamp,
       nodeId: event.nodeId,
       siteId: siteId ?? null,
@@ -350,6 +352,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.COMMAND_RESULT, {
       event: 'command.result',
       eventType: WebhookEventType.COMMAND_RESULT,
+      source: 'event:command-result',
       timestamp,
       nodeId: event.nodeId,
       siteId: siteId ?? null,
@@ -366,6 +369,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.SERIAL_RAW, {
       event: 'serial.raw',
       eventType: WebhookEventType.SERIAL_RAW,
+      source: 'event:serial-raw',
       timestamp: new Date(),
       siteId: siteId ?? null,
       message: 'Raw serial line received',
@@ -580,51 +584,32 @@ export class WebhookDispatcherService {
     return new Agent(options);
   }
 
-  invalidateSubscriberCache(eventType?: WebhookEventType): void {
-    if (eventType) {
-      this.subscriberCache.delete(eventType);
-      return;
-    }
-    this.subscriberCache.clear();
+  invalidateSubscriberCache(): void {
+    this.subscriberCache = null;
   }
 
   private async dispatchToSubscribers(
     eventType: WebhookEventType,
     context: WebhookDispatchContext,
   ): Promise<void> {
-    const subscribers = await this.getSubscribers(eventType);
-    const scoped =
-      eventType === WebhookEventType.ALERT_TRIGGERED && context.ruleId
-        ? subscribers.filter(
-            (webhook) =>
-              webhook.ruleIds.length === 0 || webhook.ruleIds.includes(context.ruleId as string),
-          )
-        : subscribers;
-    if (scoped.length === 0) {
+    if (context.source && (await this.channels.isSourceMuted(context.source))) {
+      return;
+    }
+    const subscribers = await this.getSubscribers();
+    if (subscribers.length === 0) {
       return;
     }
     const enriched: WebhookDispatchContext = { ...context, eventType };
-    await Promise.all(scoped.map((webhook) => this.deliver(webhook, enriched)));
+    await Promise.all(subscribers.map((webhook) => this.deliver(webhook, enriched)));
   }
 
-  private async getSubscribers(eventType: WebhookEventType): Promise<WebhookSubscriber[]> {
-    const cached = this.subscriberCache.get(eventType);
+  private async getSubscribers(): Promise<Webhook[]> {
     const now = Date.now();
-    if (cached && cached.expiresAt > now) {
-      return cached.webhooks;
+    if (this.subscriberCache && this.subscriberCache.expiresAt > now) {
+      return this.subscriberCache.webhooks;
     }
-    const rows = await this.prisma.webhook.findMany({
-      where: {
-        enabled: true,
-        subscribedEvents: { has: eventType },
-      },
-      include: { rules: { select: { ruleId: true } } },
-    });
-    const webhooks: WebhookSubscriber[] = rows.map(({ rules, ...webhook }) => ({
-      ...webhook,
-      ruleIds: rules.map((rule) => rule.ruleId),
-    }));
-    this.subscriberCache.set(eventType, { webhooks, expiresAt: now + this.subscriberCacheTtlMs });
+    const webhooks = await this.prisma.webhook.findMany({ where: { enabled: true } });
+    this.subscriberCache = { webhooks, expiresAt: now + this.subscriberCacheTtlMs };
     return webhooks;
   }
 }
