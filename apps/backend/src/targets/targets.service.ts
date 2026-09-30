@@ -1,8 +1,20 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, TargetStatus, Target } from '@prisma/client';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { AlarmLevel, Prisma, TargetStatus, Target } from '@prisma/client';
 import { Observable, Subject } from 'rxjs';
 
+import {
+  GeofenceCrossing,
+  GeofenceCrossingService,
+} from '../geofences/geofence-crossing.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CommandCenterGateway } from '../ws/command-center.gateway';
 import { CreateTargetDto } from './dto/create-target.dto';
 import { ListTargetsDto } from './dto/list-targets.dto';
 import { UpdateTargetDto } from './dto/update-target.dto';
@@ -33,7 +45,49 @@ export class TargetsService {
   private readonly logger = new Logger(TargetsService.name);
   private readonly changes$ = new Subject<TargetEvent>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => CommandCenterGateway))
+    private readonly gateway: CommandCenterGateway,
+    private readonly geofenceCrossing: GeofenceCrossingService,
+  ) {}
+
+  private emitGeofenceCrossing(
+    target: Target,
+    lat: number,
+    lon: number,
+    crossing: GeofenceCrossing,
+  ): void {
+    const label = target.name ?? target.mac ?? target.id;
+    try {
+      this.gateway.emitEvent({
+        type: 'event.alert',
+        category: 'geofence',
+        level: (crossing.geofence.alarm.level as AlarmLevel) ?? 'NOTICE',
+        geofenceId: crossing.geofence.id,
+        geofenceName: crossing.geofence.name,
+        nodeId: label,
+        siteId: target.siteId ?? crossing.geofence.siteId ?? undefined,
+        message: crossing.message,
+        lat,
+        lon,
+        timestamp: new Date().toISOString(),
+        data: {
+          geofenceId: crossing.geofence.id,
+          geofenceName: crossing.geofence.name,
+          entity: label,
+          kind: 'target',
+          event: crossing.transition,
+        },
+      });
+    } catch (error) {
+      this.logger.debug(
+        `Failed to emit target geofence crossing for ${target.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    }
+  }
 
   getChangesStream(): Observable<TargetEvent> {
     return this.changes$.asObservable();
@@ -251,7 +305,12 @@ export class TargetsService {
       });
       if (result.count > 0) {
         const updatedTargets = await this.prisma.target.findMany({ where });
-        updatedTargets.forEach((target) => this.changes$.next({ type: 'upsert', target }));
+        updatedTargets.forEach((target) => {
+          this.changes$.next({ type: 'upsert', target });
+          this.geofenceCrossing
+            .evaluate('target', target.id, target.name ?? target.mac ?? target.id, lat, lon)
+            .forEach((crossing) => this.emitGeofenceCrossing(target, lat, lon, crossing));
+        });
 
         // Also update inventory location
         try {
