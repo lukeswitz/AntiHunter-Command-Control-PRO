@@ -11,15 +11,7 @@ import { extractOui, normalizeMac } from '../utils/mac';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
-type AlertRuleWithHooks = Prisma.AlertRuleGetPayload<{
-  include: {
-    webhooks: {
-      include: {
-        webhook: true;
-      };
-    };
-  };
-}>;
+type AlertRuleWithHooks = Prisma.AlertRuleGetPayload<Record<string, never>>;
 
 interface TargetDetectionContext {
   event: SerialTargetDetected;
@@ -365,13 +357,6 @@ export class AlertRulesEngineService {
     }
     const rules = await this.prisma.alertRule.findMany({
       where: { isActive: true },
-      include: {
-        webhooks: {
-          include: {
-            webhook: true,
-          },
-        },
-      },
     });
     this.cachedRules = rules;
     this.cacheExpiresAt = now + this.cacheTtlMs;

@@ -377,7 +377,6 @@ model AlertRule {
 
   owner      User?              @relation(fields: [ownerId], references: [id])
   events     AlertEvent[]
-  webhooks   AlertRuleWebhook[]
   deliveries WebhookDelivery[]
 
   @@index([ownerId])
@@ -422,24 +421,10 @@ model Webhook {
   updatedAt         DateTime           @updatedAt
 
   owner      User?               @relation(fields: [ownerId], references: [id])
-  rules      AlertRuleWebhook[]
   deliveries WebhookDelivery[]
 
   @@index([ownerId])
   @@index([enabled])
-}
-
-model AlertRuleWebhook {
-  id        String   @id @default(cuid())
-  ruleId    String
-  webhookId String
-  createdAt DateTime @default(now())
-
-  rule    AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  webhook Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-
-  @@unique([ruleId, webhookId])
-  @@index([webhookId])
 }
 
 model WebhookDelivery {
