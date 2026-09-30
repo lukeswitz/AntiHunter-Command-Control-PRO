@@ -316,7 +316,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     if (!m?.groups) return null;
     return [
       {
-        kind: 'target-detected',
+        kind: 'device-seen',
         nodeId: nodeId ?? m.groups.id,
         mac: m.groups.mac.toUpperCase(),
         rssi: Number(m.groups.rssi),
