@@ -18,6 +18,7 @@ export const DEVICE_SOURCES: AlertSource[] = [
   { key: 'node:vibration', label: 'Vibration', group: 'Node security', defaultTier: 'alert' },
   { key: 'node:erase', label: 'Erase', group: 'Node security', defaultTier: 'alert' },
   { key: 'node:mesh-guard', label: 'Mesh guard', group: 'Node security', defaultTier: 'alert' },
+  { key: 'node:status', label: 'Node status', group: 'Node security', defaultTier: 'off' },
   { key: 'mqtt', label: 'Linked MQTT sites', group: 'Other sites', defaultTier: 'alert' },
   { key: 'event:inventory', label: 'Inventory updated', group: 'Data streams', defaultTier: 'off' },
   {
@@ -77,6 +78,9 @@ export function nodeAlertSource(
   }
   if (['tamper', 'vibration', 'erase', 'mesh-guard'].includes(cat) && level === 'ALERT') {
     return `node:${cat}`;
+  }
+  if (['heartbeat', 'startup', 'gps', 'time-sync', 'battery-saver', 'setup'].includes(cat)) {
+    return 'node:status';
   }
   return null;
 }
