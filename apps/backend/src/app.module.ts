@@ -47,7 +47,7 @@ import { WsModule } from './ws/ws.module';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      envFilePath: [join(__dirname, '..', '.env'), join(__dirname, '..', '..', '..', '.env')],
+      envFilePath: join(__dirname, '..', '.env'),
       load: [configuration],
       validate: validateEnvironment,
       expandVariables: true,

@@ -666,6 +666,7 @@ model SerialConfig {
   parity               String?
   stopBits             Int?
   delimiter            String?
+  protocol             String?
   reconnectBaseMs      Int?
   reconnectMaxMs       Int?
   reconnectJitter      Float?

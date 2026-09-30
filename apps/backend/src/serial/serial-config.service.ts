@@ -71,6 +71,9 @@ export class SerialConfigService {
     if (defaults.delimiter != null) {
       payload.delimiter = defaults.delimiter;
     }
+    if (defaults.protocol != null) {
+      payload.protocol = defaults.protocol;
+    }
     if (defaults.reconnectBaseMs != null) {
       payload.reconnectBaseMs = defaults.reconnectBaseMs;
     }
@@ -100,6 +103,7 @@ export class SerialConfigService {
       reconnectJitter: config.reconnectJitter ?? env.reconnectJitter ?? null,
       reconnectMaxAttempts: config.reconnectMaxAttempts ?? env.reconnectMaxAttempts ?? null,
       delimiter: config.delimiter ?? env.delimiter ?? DEFAULT_SERIAL_DELIMITER,
+      protocol: config.protocol ?? env.protocol ?? 'meshtastic-rewrite',
       sendMode: config.sendMode ?? env.sendMode ?? 'protobuf',
       hopLimit: config.hopLimit ?? env.hopLimit ?? 3,
       sendChannel: config.sendChannel ?? env.sendChannel ?? 0,
@@ -120,6 +124,7 @@ export class SerialConfigService {
     sendMode?: string | null;
     hopLimit?: number | null;
     sendChannel?: number | null;
+    protocol?: string | null;
   } {
     const serialConfig = this.configService.get<{
       device?: string;
@@ -128,6 +133,7 @@ export class SerialConfigService {
       parity?: string;
       stopBits?: number;
       delimiter?: string;
+      protocol?: string;
       reconnectBaseMs?: number;
       reconnectMaxMs?: number;
       reconnectJitter?: number;
@@ -145,6 +151,7 @@ export class SerialConfigService {
           parity: serialConfig.parity,
           stopBits: serialConfig.stopBits,
           delimiter: serialConfig.delimiter,
+          protocol: serialConfig.protocol,
           reconnectBaseMs: serialConfig.reconnectBaseMs,
           reconnectMaxMs: serialConfig.reconnectMaxMs,
           reconnectJitter: serialConfig.reconnectJitter,
