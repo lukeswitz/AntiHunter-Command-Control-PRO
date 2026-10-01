@@ -24,6 +24,7 @@ export interface RemoteAlertConfig {
   matterLayout: 'bridge' | 'flat';
   matterInterface: string | null;
   alertTiers: Record<string, AlertTier>;
+  coordsUnencrypted: boolean;
   updatedAt: string;
 }
 
@@ -50,6 +51,7 @@ export type RemoteAlertConfigUpdate = Partial<{
   matterLayout: 'bridge' | 'flat';
   matterInterface: string;
   alertTiers: Record<string, AlertTier>;
+  coordsUnencrypted: boolean;
 }>;
 
 export interface MatterStatus {

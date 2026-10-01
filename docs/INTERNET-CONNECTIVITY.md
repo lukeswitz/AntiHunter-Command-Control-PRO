@@ -192,6 +192,8 @@ Everything in this section is on **Alerts** → **Remote alerts**: phone push, S
 
 **Alert sources** decides what is sent. Each row (an alert rule, a node event type, linked MQTT sites, data streams) has a **Notify** and a **Critical** tick; untick both to send nothing for that source. Click **Save levels**. The same choice applies to every channel, webhooks included. Data streams (inventory, telemetry, command results, raw serial lines) start unticked.
 
+GPS coordinates go only to end-to-end encrypted channels (phone push, Signal). ntfy, Matrix and webhooks get the alert without coordinates unless **Include GPS coordinates in ntfy, Matrix and webhooks (not encrypted)** is ticked under **Alert sources** and saved with **Save levels**.
+
 Tokens and the push signing key are encrypted in the database (AES-256-GCM). The key is `REMOTE_ALERTS_SECRET_KEY` when set; otherwise a random key stored at rest per OS: the macOS Keychain, Windows DPAPI (bound to the account AHCC runs as), or, for the `deploy-production.sh` service on Linux, a `systemd-creds` credential (sealed to the TPM when present). Without those it falls back to `apps/backend/.secrets/remote-alerts.key` (Docker: the `remote-secrets` volume). A database dump alone does not reveal the tokens. Back up the key with the database; without it, re-enter the tokens and press **Reset keys** on the **Phone push** card. Discord, Slack, IFTTT and Home Assistant are webhooks, in the **Webhooks** card on the same page.
 
 | Channel | Who can read the alert text | Setup |

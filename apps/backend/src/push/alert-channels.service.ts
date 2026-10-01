@@ -41,8 +41,10 @@ export class AlertChannelsService {
     body: string,
     severity: AlarmLevel | null | undefined,
     source: string,
+    bodyWithoutCoords: string = body,
   ): Promise<void> {
     const config = await this.config.get();
+    const openBody = config.coordsUnencrypted ? body : bodyWithoutCoords;
     const tier = tierFor(config, source);
     if (tier === 'off') {
       return;
@@ -59,15 +61,20 @@ export class AlertChannelsService {
         await this.push.notify(title, body);
       }),
       config.ntfyEnabled
-        ? this.run('ntfy', () => this.sendNtfy(config, title, body, severity))
+        ? this.run('ntfy', () => this.sendNtfy(config, title, openBody, severity))
         : null,
       config.signalEnabled
         ? this.run('signal', () => this.sendSignal(config, `${title}\n${body}`))
         : null,
       config.matrixEnabled
-        ? this.run('matrix', () => this.sendMatrix(config, `${title}\n${body}`))
+        ? this.run('matrix', () => this.sendMatrix(config, `${title}\n${openBody}`))
         : null,
     ]);
+  }
+
+  async coordsUnencrypted(): Promise<boolean> {
+    const config = await this.config.get();
+    return config.coordsUnencrypted;
   }
 
   async isSourceMuted(source: string): Promise<boolean> {

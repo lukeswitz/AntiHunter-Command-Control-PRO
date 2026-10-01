@@ -76,6 +76,7 @@ model RemoteAlertConfig {
   matterLayout        String   @default("bridge")
   matterInterface     String?
   alertTiers         Json     @default("{}")
+  coordsUnencrypted   Boolean  @default(false)
   updatedAt           DateTime @updatedAt
 }
 
