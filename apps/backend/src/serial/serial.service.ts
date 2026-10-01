@@ -291,6 +291,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private readonly reconnectMaxAttempts: number;
   private reconnectAttempts = 0;
   private reconnectTimer?: NodeJS.Timeout;
+  private radioHeartbeatTimer?: NodeJS.Timeout;
   private manualDisconnect = false;
   private readonly clusterRole: SerialClusterRole;
   private readonly clusterMessagingEnabled: boolean;
@@ -1264,6 +1265,10 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   }
 
   private cleanup(): void {
+    if (this.radioHeartbeatTimer) {
+      clearInterval(this.radioHeartbeatTimer);
+      this.radioHeartbeatTimer = undefined;
+    }
     if (this.lineParser) {
       this.lineParser.removeAllListeners();
       this.lineParser = undefined;
@@ -1639,6 +1644,15 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
     void this.identifyRadioWithRetry();
 
+    this.radioHeartbeatTimer = setInterval(
+      () => {
+        void this.sendRadioHeartbeat().catch((err) =>
+          this.logger.warn(`Meshtastic heartbeat: ${err instanceof Error ? err.message : err}`),
+        );
+      },
+      5 * 60 * 1000,
+    );
+
     this.port.on('error', (err) => {
       this.lastError = err.message;
       this.logger.error(`Serial port error: ${err.message}`, err.stack);
@@ -1677,6 +1691,27 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
     await this.writeBuffer(frame);
     this.logger.log(`Meshtastic API handshake sent (nonce=${nonce})`);
+  }
+
+  private async sendRadioHeartbeat(): Promise<void> {
+    if (!this.port?.isOpen || this.localRadio.num === undefined) {
+      return;
+    }
+    const { Mesh } = await loadMeshModule();
+    const toRadio = create(Mesh.ToRadioSchema, {
+      payloadVariant: {
+        case: 'heartbeat',
+        value: create(Mesh.HeartbeatSchema, {}),
+      },
+    });
+    const payloadBuf = Buffer.from(toBinary(Mesh.ToRadioSchema, toRadio));
+    const frame = Buffer.alloc(4 + payloadBuf.length);
+    frame[0] = 0x94;
+    frame[1] = 0xc3;
+    frame[2] = (payloadBuf.length >> 8) & 0xff;
+    frame[3] = payloadBuf.length & 0xff;
+    payloadBuf.copy(frame, 4);
+    await this.writeBuffer(frame);
   }
 
   private async identifyRadioWithRetry(): Promise<void> {
