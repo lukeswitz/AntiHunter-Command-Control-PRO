@@ -267,8 +267,11 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
     <>
       <AlertLevelsCard
         tiers={config.alertTiers ?? {}}
+        coordsUnencrypted={config.coordsUnencrypted ?? false}
         busy={busy}
-        onSave={(alertTiers) => save('levels', { alertTiers })}
+        onSave={(alertTiers, coordsUnencrypted) =>
+          save('levels', { alertTiers, coordsUnencrypted })
+        }
         notice={notice.levels}
       />
 
@@ -746,10 +749,13 @@ function SignalUpdateCheck() {
 
 function AlertLevelsCard(props: {
   tiers: Record<string, AlertTier>;
+  coordsUnencrypted: boolean;
   busy: boolean;
-  onSave: (tiers: Record<string, AlertTier>) => void;
+  onSave: (tiers: Record<string, AlertTier>, coordsUnencrypted: boolean) => void;
   notice?: string;
 }) {
+  const [coords, setCoords] = useState(props.coordsUnencrypted);
+  useEffect(() => setCoords(props.coordsUnencrypted), [props.coordsUnencrypted]);
   const sourcesQuery = useQuery({
     queryKey: ['remote-alerts-sources', props.tiers],
     queryFn: listAlertSources,
@@ -822,12 +828,20 @@ function AlertLevelsCard(props: {
             ))}
           </table>
         </div>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={coords}
+            onChange={(event) => setCoords(event.target.checked)}
+          />
+          Include GPS coordinates in ntfy, Matrix and webhooks (not encrypted)
+        </label>
         <div className="controls-row">
           <button
             type="button"
             className="control-chip"
             disabled={props.busy}
-            onClick={() => props.onSave(draft)}
+            onClick={() => props.onSave(draft, coords)}
           >
             Save levels
           </button>

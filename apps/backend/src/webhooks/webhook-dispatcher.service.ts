@@ -40,41 +40,74 @@ interface WebhookDispatchContext {
   payload?: Record<string, unknown>;
 }
 
-function messageText(context: WebhookDispatchContext): string {
-  let text = (context.message ?? context.event).trim();
-  const node = context.nodeName ?? context.nodeId;
-  if (node && text.startsWith(`${node}:`)) {
-    text = text.slice(node.length + 1).trim();
-  }
-  if (context.lat != null && context.lon != null) {
-    text = text.replace(/\s*GPS[:=]-?\d+(?:\.\d+)?,\s*-?\d+(?:\.\d+)?/gi, '').trim();
-  }
-  return text || context.event;
+const NUM = '-?\\d+(?:\\.\\d+)?';
+const COORD_TEXT: Array<[RegExp, string]> = [
+  [new RegExp(`\\s*\\b(?:GPS|Location|OP)[:=]\\s*${NUM},\\s*${NUM}`, 'gi'), ''],
+  [new RegExp(`(RID_RX:[^:\\s]+:-?\\d+):${NUM}:${NUM}`, 'gi'), '$1'],
+  [new RegExp(`(RID_CLAIM:[^:\\s]+):${NUM}:${NUM}`, 'gi'), '$1'],
+];
+const COORD_KEY = /^(lat|lon|latitude|longitude)$|(Lat|Lon|Latitude|Longitude)$/;
+
+export function stripCoords(text: string): string {
+  return COORD_TEXT.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), text)
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
-function summarize(context: WebhookDispatchContext): string {
+export function scrubCoords(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return stripCoords(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(scrubCoords);
+  }
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !COORD_KEY.test(key))
+        .map(([key, entry]) => [key, scrubCoords(entry)]),
+    );
+  }
+  return value;
+}
+
+function messageText(context: WebhookDispatchContext, coords: boolean): string {
+  const text = (context.message ?? context.event).trim();
+  return (coords ? text : stripCoords(text)) || context.event;
+}
+
+function nodeInText(context: WebhookDispatchContext, text: string): boolean {
+  const node = context.nodeName ?? context.nodeId;
+  return Boolean(node && text.startsWith(`${node}:`));
+}
+
+function summarize(context: WebhookDispatchContext, coords: boolean): string {
+  const text = messageText(context, coords);
+  const node = context.nodeName ?? context.nodeId;
   return [
     context.severity ? `[${context.severity}]` : null,
     context.ruleName ?? null,
-    messageText(context),
+    text,
     context.mac ? `MAC ${context.mac}` : null,
-    (context.nodeName ?? context.nodeId) ? `node ${context.nodeName ?? context.nodeId}` : null,
+    node && !nodeInText(context, text) ? `node ${node}` : null,
   ]
     .filter(Boolean)
     .join(' ')
     .slice(0, 2000);
 }
 
-function alertFields(context: WebhookDispatchContext): Array<[string, string]> {
+function alertFields(context: WebhookDispatchContext, coords: boolean): Array<[string, string]> {
+  const text = messageText(context, coords);
+  const coordsInText = stripCoords(text) !== text;
   const fields: Array<[string, string | null]> = [
     ['Device', context.mac ?? null],
     ['SSID', context.ssid ?? null],
     ['RSSI', context.rssi != null ? `${context.rssi} dBm` : null],
     ['Channel', context.channel != null ? String(context.channel) : null],
-    ['Node', context.nodeName ?? context.nodeId ?? null],
+    ['Node', nodeInText(context, text) ? null : (context.nodeName ?? context.nodeId ?? null)],
     [
       'Location',
-      context.lat != null && context.lon != null
+      coords && !coordsInText && context.lat != null && context.lon != null
         ? `${context.lat.toFixed(5)}, ${context.lon.toFixed(5)}`
         : null,
     ],
@@ -90,10 +123,10 @@ function alertTitle(context: WebhookDispatchContext): string {
   return parts.join(' - ') || 'AntiHunter alert';
 }
 
-function alertBody(context: WebhookDispatchContext): string {
+function alertBody(context: WebhookDispatchContext, coords: boolean): string {
   return [
-    messageText(context),
-    ...alertFields(context).map(([name, value]) => `${name}: ${value}`),
+    messageText(context, coords),
+    ...alertFields(context, coords).map(([name, value]) => `${name}: ${value}`),
   ].join('\n');
 }
 
@@ -125,7 +158,13 @@ export class WebhookDispatcherService {
 
   private pushAlert(context: WebhookDispatchContext, source: string): void {
     void this.channels
-      .alert(alertTitle(context), alertBody(context), context.severity, source)
+      .alert(
+        alertTitle(context),
+        alertBody(context, true),
+        context.severity,
+        source,
+        alertBody(context, false),
+      )
       .catch((error) => {
         this.logger.warn(`Push notify failed: ${error instanceof Error ? error.message : error}`);
       });
@@ -410,7 +449,8 @@ export class WebhookDispatcherService {
       return;
     }
 
-    const summary = summarize(context);
+    const coords = await this.channels.coordsUnencrypted();
+    const summary = summarize(context, coords);
 
     const payload = {
       summary,
@@ -419,16 +459,16 @@ export class WebhookDispatcherService {
       value3: context.mac ?? '',
       content: discordEscape(summary).slice(0, 2000),
       allowed_mentions: { parse: [] },
-      text: `*${slackEscape(alertTitle(context))}*\n${slackEscape(alertBody(context))}`.slice(
+      text: `*${slackEscape(alertTitle(context))}*\n${slackEscape(alertBody(context, coords))}`.slice(
         0,
         3000,
       ),
       embeds: [
         {
           title: discordEscape(alertTitle(context)).slice(0, 256),
-          description: discordEscape(messageText(context)).slice(0, 4000),
+          description: discordEscape(messageText(context, coords)).slice(0, 4000),
           color: DISCORD_COLORS[context.severity ?? 'NOTICE'],
-          fields: alertFields(context).map(([name, value]) => ({
+          fields: alertFields(context, coords).map(([name, value]) => ({
             name,
             value: discordEscape(value).slice(0, 1024),
             inline: name !== 'Matched',
@@ -446,7 +486,7 @@ export class WebhookDispatcherService {
           }
         : null,
       data: {
-        message: context.message ? messageText(context) : null,
+        message: context.message ? messageText(context, coords) : null,
         matchedCriteria: context.matchedCriteria ?? [],
         mac: context.mac ?? null,
         nodeId: context.nodeId ?? null,
@@ -454,12 +494,12 @@ export class WebhookDispatcherService {
         ssid: context.ssid ?? null,
         channel: context.channel ?? null,
         rssi: context.rssi ?? null,
-        lat: context.lat ?? null,
-        lon: context.lon ?? null,
+        lat: coords ? (context.lat ?? null) : null,
+        lon: coords ? (context.lon ?? null) : null,
         siteId: context.siteId ?? null,
         timestamp: context.timestamp.toISOString(),
       },
-      payload: context.payload ?? {},
+      payload: coords ? (context.payload ?? {}) : scrubCoords(context.payload ?? {}),
     };
 
     const serialized = JSON.stringify(payload);

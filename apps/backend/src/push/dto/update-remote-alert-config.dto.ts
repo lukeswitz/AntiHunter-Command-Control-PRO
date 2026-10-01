@@ -93,4 +93,8 @@ export class UpdateRemoteAlertConfigDto {
   @IsOptional()
   @IsObject()
   alertTiers?: Record<string, string>;
+
+  @IsOptional()
+  @IsBoolean()
+  coordsUnencrypted?: boolean;
 }
