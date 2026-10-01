@@ -65,6 +65,8 @@ export interface RotationView {
 }
 
 export const getFleetIdentity = () => apiClient.get<FleetIdentityView>('/fleet-security/identity');
+export const getFleetPubkey = () =>
+  apiClient.get<{ publicKey: string; fingerprint: string }>('/fleet-security/identity/pubkey');
 export const getFleetIdentities = () =>
   apiClient.get<FleetIdentityRow[]>('/fleet-security/identities');
 export const registerFleetIdentity = (body: { label: string; publicKey: string; role: string }) =>
