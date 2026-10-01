@@ -1,9 +1,12 @@
 import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { Role } from '@prisma/client';
 
 import { UpdateMqttConfigDto } from './dto/update-mqtt-config.dto';
 import { MqttService } from './mqtt.service';
+import { Roles } from '../auth/auth.decorators';
 
 @Controller('mqtt')
+@Roles(Role.ADMIN)
 export class MqttController {
   constructor(private readonly mqttService: MqttService) {}
 

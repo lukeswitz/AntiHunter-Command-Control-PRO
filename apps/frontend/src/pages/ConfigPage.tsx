@@ -359,9 +359,11 @@ export function ConfigPage() {
     queryKey: ['sites'],
     queryFn: () => apiClient.get<SiteSummary[]>('/sites'),
   });
+  const canManageMqtt = useAuthStore((state) => state.user?.role === 'ADMIN');
   const mqttSitesQuery = useQuery({
     queryKey: ['mqttSites'],
     queryFn: () => apiClient.get<MqttSiteConfig[]>('/mqtt/sites'),
+    enabled: canManageMqtt,
   });
   const chatAddonEnabled =
     useAuthStore((state) => state.user?.preferences?.notifications?.addons?.chat ?? false) ?? false;
@@ -387,6 +389,7 @@ export function ConfigPage() {
     queryKey: ['mqttStatus'],
     queryFn: () => apiClient.get<MqttSiteStatus[]>('/mqtt/sites-status'),
     refetchInterval: 15_000,
+    enabled: canManageMqtt,
   });
 
   const takConfigQuery = useQuery({
