@@ -15,7 +15,6 @@ import {
   fingerprint,
   generatePskAvoidingCollision,
   keyPairMatches,
-  randomPsk,
   validatePsk,
   validateX25519PublicKey,
 } from './fleet-crypto';
