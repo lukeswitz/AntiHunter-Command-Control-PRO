@@ -1916,6 +1916,13 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
     const data = decoded.value;
     const fromNode = packet.from ?? 0;
+    if (
+      this.localRadio.num === undefined &&
+      (data.portnum === Portnums.PortNum.POSITION_APP ||
+        data.portnum === Portnums.PortNum.TELEMETRY_APP)
+    ) {
+      return;
+    }
     const nodeName = this.meshNodeNames.get(fromNode) ?? `!${fromNode.toString(16)}`;
     const rssi = packet.rxRssi;
 
