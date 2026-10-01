@@ -6,6 +6,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
 } from 'class-validator';
 
@@ -82,6 +83,12 @@ export class UpdateRemoteAlertConfigDto {
   @IsOptional()
   @IsIn(['bridge', 'flat'])
   matterLayout?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^[A-Za-z0-9_.:-]*$/)
+  matterInterface?: string;
 
   @IsOptional()
   @IsObject()

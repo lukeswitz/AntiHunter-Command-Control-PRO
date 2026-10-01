@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Prisma, RemoteAlertConfig } from '@prisma/client';
+import { networkInterfaces } from 'node:os';
 
 import { AlertTier, defaultTier, SOURCE_KEY } from './alert-sources';
 import { SecretBox } from './secret-box';
@@ -167,6 +168,7 @@ export class RemoteAlertConfigService {
           matrixRoomId: env('MATRIX_ROOM_ID'),
           matterEnabled: env('AHCC_MATTER_ENABLED') === 'true',
           matterLayout: env('AHCC_MATTER_LAYOUT') === 'flat' ? 'flat' : 'bridge',
+          matterInterface: env('AHCC_MATTER_INTERFACE'),
         }),
       }));
     const { config, legacy } = this.open(row);
@@ -206,6 +208,13 @@ export class RemoteAlertConfigService {
     }
     if (data.matterLayout && !['bridge', 'flat'].includes(data.matterLayout)) {
       throw new BadRequestException('matterLayout must be bridge or flat');
+    }
+    if (data.matterInterface !== undefined) {
+      const name = data.matterInterface?.trim() || null;
+      if (name && !networkInterfaces()[name]) {
+        throw new BadRequestException(`Network interface ${name} not found on this host`);
+      }
+      data.matterInterface = name;
     }
     if (data.alertTiers !== undefined) {
       data.alertTiers = validateTiers(data.alertTiers);

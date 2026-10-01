@@ -15,12 +15,9 @@ import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { DroneDiff, DroneSnapshot } from './drones.types';
 import { FaaRegistryService } from '../faa/faa.service';
 import type { FaaAircraftSummary } from '../faa/faa.types';
+import { GeofenceCrossing, GeofenceCrossingService } from '../geofences/geofence-crossing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
-import {
-  GeofenceCrossing,
-  GeofenceCrossingService,
-} from '../geofences/geofence-crossing.service';
 
 @Injectable()
 export class DronesService implements OnModuleInit, OnModuleDestroy {

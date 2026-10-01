@@ -1,8 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AlarmLevel, Prisma } from '@prisma/client';
-
-import { WebhookEventType } from '../webhooks/webhook-event-type';
 import { randomUUID } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -22,6 +20,7 @@ import {
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
+import { WebhookEventType } from '../webhooks/webhook-event-type';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
 function validateFeedUrl(urlString: string): string {

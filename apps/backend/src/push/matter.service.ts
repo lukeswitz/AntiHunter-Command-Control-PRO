@@ -36,6 +36,7 @@ export class MatterService implements OnModuleInit, OnModuleDestroy {
   private helper: ChildProcess | null = null;
   private stopping = false;
   private lastExit: string | null = null;
+  private helperInterface: string | null = null;
   private helperStatus: Omit<MatterStatus, 'running' | 'runtime' | 'lastExit'> | null = null;
 
   constructor(private readonly config: RemoteAlertConfigService) {}
@@ -102,21 +103,27 @@ export class MatterService implements OnModuleInit, OnModuleDestroy {
   private async sync(): Promise<void> {
     const config = await this.config.get();
     const layoutChanged = this.helperStatus && this.helperStatus.layout !== config.matterLayout;
-    if (!config.matterEnabled || layoutChanged) {
+    const interfaceChanged =
+      this.helper !== null && this.helperInterface !== (config.matterInterface ?? null);
+    if (!config.matterEnabled || layoutChanged || interfaceChanged) {
       await this.stop();
     }
     if (config.matterEnabled && !this.helper) {
-      this.start(config.matterLayout);
+      this.start(config.matterLayout, config.matterInterface ?? null);
     }
   }
 
-  private start(layout: string): void {
+  private start(layout: string, iface: string | null): void {
     const env: NodeJS.ProcessEnv = { AHCC_MATTER_LAYOUT: layout };
     for (const key of HELPER_ENV_KEYS) {
       if (process.env[key] !== undefined) {
         env[key] = process.env[key];
       }
     }
+    if (iface) {
+      env.AHCC_MATTER_INTERFACE = iface;
+    }
+    this.helperInterface = iface;
     const binary = this.binary();
     const stdio: ['pipe', 'pipe', 'inherit'] = ['pipe', 'pipe', 'inherit'];
     const jsHelper = join(__dirname, 'matter-helper.js');

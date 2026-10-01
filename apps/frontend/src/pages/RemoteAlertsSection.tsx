@@ -9,6 +9,7 @@ import {
   clearRemoteAlertSecret,
   eraseMatter,
   generateVapidKeys,
+  getMatterInterfaces,
   getMatterStatus,
   fetchSignalLinkQr,
   getRemoteAlertConfig,
@@ -46,6 +47,7 @@ interface FormState {
   matrixRoomId: string;
   matterEnabled: boolean;
   matterLayout: 'bridge' | 'flat';
+  matterInterface: string;
 }
 
 function toForm(config: RemoteAlertConfig): FormState {
@@ -68,6 +70,7 @@ function toForm(config: RemoteAlertConfig): FormState {
     matrixRoomId: config.matrixRoomId ?? '',
     matterEnabled: config.matterEnabled,
     matterLayout: config.matterLayout,
+    matterInterface: config.matterInterface ?? '',
   };
 }
 
@@ -483,7 +486,14 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
       <MatterCard
         enabled={form.matterEnabled}
         onEnabled={(value) => set('matterEnabled', value)}
-        onSave={() => save('matter', { matterEnabled: form.matterEnabled })}
+        networkInterface={form.matterInterface}
+        onNetworkInterface={(value) => set('matterInterface', value)}
+        onSave={() =>
+          save('matter', {
+            matterEnabled: form.matterEnabled,
+            matterInterface: form.matterInterface,
+          })
+        }
         onTest={() => testMutation.mutate('matter')}
         busy={busy}
         notice={notice.matter}
@@ -928,6 +938,8 @@ function PushAdminCard(props: {
 function MatterCard(props: {
   enabled: boolean;
   onEnabled: (value: boolean) => void;
+  networkInterface: string;
+  onNetworkInterface: (value: string) => void;
   onSave: () => void;
   onTest: () => void;
   busy: boolean;
@@ -939,6 +951,14 @@ function MatterCard(props: {
     queryFn: getMatterStatus,
     refetchInterval: 5_000,
   });
+  const interfacesQuery = useQuery({
+    queryKey: ['remote-alerts-matter-interfaces'],
+    queryFn: getMatterInterfaces,
+  });
+  const interfaces = interfacesQuery.data ?? [];
+  const savedMissing =
+    props.networkInterface !== '' &&
+    !interfaces.some((entry) => entry.name === props.networkInterface);
   const restartMutation = useMutation({
     mutationFn: restartMatter,
     onSuccess: (data) => queryClient.setQueryData(['remote-alerts-matter'], data),
@@ -991,6 +1011,24 @@ function MatterCard(props: {
             onChange={(event) => props.onEnabled(event.target.checked)}
           />
           <span>On</span>
+        </label>
+        <label className="form-field">
+          <span>Network</span>
+          <select
+            className="control-input"
+            value={props.networkInterface}
+            onChange={(event) => props.onNetworkInterface(event.target.value)}
+          >
+            <option value="">Automatic</option>
+            {savedMissing && (
+              <option value={props.networkInterface}>{props.networkInterface} (not found)</option>
+            )}
+            {interfaces.map((entry) => (
+              <option key={entry.name} value={entry.name}>
+                {entry.name} — {entry.addresses.join(', ')}
+              </option>
+            ))}
+          </select>
         </label>
         {props.enabled && state === 'stopped' && (
           <p className="config-hint">

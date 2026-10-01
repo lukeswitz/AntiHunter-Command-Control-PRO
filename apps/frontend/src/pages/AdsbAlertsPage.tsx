@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { MdRefresh, MdSearch } from 'react-icons/md';
-import { AlertsRail } from '../components/AlertsRail';
 
 import {
   createAdsbAlertRule,
@@ -10,6 +9,7 @@ import {
   updateAdsbAlertRule,
 } from '../api/adsb';
 import type { AdsbAlertRule, AdsbAlertTarget, AlarmLevel } from '../api/types';
+import { AlertsRail } from '../components/AlertsRail';
 
 type FormMode = 'create' | 'edit';
 

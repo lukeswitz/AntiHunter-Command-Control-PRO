@@ -1,19 +1,6 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  createHmac,
-  randomBytes,
-} from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const PREFIX = 'enc:v1:';
@@ -71,12 +58,12 @@ function loadFromKeychain(legacyPath: string): Buffer {
 
 const DPAPI_PROTECT =
   "$ErrorActionPreference='Stop';Add-Type -AssemblyName System.Security;" +
-  "$i=[Console]::In.ReadToEnd().Trim();$b=[Convert]::FromBase64String($i);" +
+  '$i=[Console]::In.ReadToEnd().Trim();$b=[Convert]::FromBase64String($i);' +
   "$p=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,'CurrentUser');" +
   '[Convert]::ToBase64String($p)';
 const DPAPI_UNPROTECT =
   "$ErrorActionPreference='Stop';Add-Type -AssemblyName System.Security;" +
-  "$i=[Console]::In.ReadToEnd().Trim();$b=[Convert]::FromBase64String($i);" +
+  '$i=[Console]::In.ReadToEnd().Trim();$b=[Convert]::FromBase64String($i);' +
   "$u=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,'CurrentUser');" +
   '[Convert]::ToBase64String($u)';
 
@@ -92,7 +79,10 @@ function loadFromDpapi(legacyPath: string): Buffer {
   const blobPath = join(dirname(legacyPath), 'remote-alerts.key.dpapi');
   mkdirSync(dirname(blobPath), { recursive: true });
   if (existsSync(blobPath)) {
-    return decodeKey(dpapi(DPAPI_UNPROTECT, readFileSync(blobPath, 'utf8').trim()), 'Windows DPAPI');
+    return decodeKey(
+      dpapi(DPAPI_UNPROTECT, readFileSync(blobPath, 'utf8').trim()),
+      'Windows DPAPI',
+    );
   }
   const value = existsSync(legacyPath)
     ? readFileSync(legacyPath, 'utf8').trim()
