@@ -239,6 +239,8 @@ async function main() {
   console.log('=== AntiHunter Command Center :: Database Updater ===\n');
 
   try {
+    await runPrisma(['generate'], { capture: true });
+
     let hadDuplicates = false;
     if (migrations.length > 0) {
       hadDuplicates = await resolveDuplicates();
