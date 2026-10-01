@@ -16,6 +16,7 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
 
 ## Table of Contents
 
+- [Try the feature branch](#try-the-feature-branch)
 1. [Overview](#overview)
 2. [Core Features](#core-features)
    - [Key Highlights](#key-highlights)
@@ -41,6 +42,70 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
 14. [Operations & Maintenance](#operations--maintenance)
 15. [Troubleshooting](#troubleshooting)
 16. [Legal Disclaimer](#legal-disclaimer)
+
+---
+
+## Try the feature branch
+
+This branch (`feat/remote`) adds remote access, remote alerts, protobuf serial support and inventory device classes. It changes the database:
+
+- Adds tables and columns (push subscriptions, remote alert settings, fleet security, serial send settings).
+- **Removes** each webhook's event list (`Webhook.subscribedEvents`) and the alert-rule-to-webhook links (`AlertRuleWebhook`). On this branch every enabled webhook receives the sources ticked in **Alerts → Remote alerts → Alert sources**.
+
+Main still uses the removed data. If you switch back to main, webhooks have no event list and rules have no webhook links unless you restore a backup. Back up before you switch.
+
+Docker commands below use `docker compose`; if your system has the standalone tool, type `docker-compose` instead.
+
+**1. Stop the app**
+- Started with `pnpm AHCC` or `Start-AntiHunter.cmd`: press Ctrl+C in that window, or close it.
+- Docker: `docker compose down`. Do not add `--volumes`; that deletes the database.
+
+**2. Back up the database**
+- Docker (start only the database): `docker compose up -d postgres`, then `docker compose exec -T postgres pg_dump -U command_center command_center > ahcc-backup.sql`
+- Other installs: `pg_dump "<DATABASE_URL from apps/backend/.env, without ?schema=...>" > ahcc-backup.sql`
+
+**3. Save files you edited** (for example `docker-compose.yml` with the serial lines commented out). Git refuses to switch until they are saved:
+```
+git stash
+```
+
+**4. Switch to the branch**
+```
+git remote add lukeswitz https://github.com/lukeswitz/AntiHunter-Command-Control-PRO.git
+git fetch lukeswitz
+git checkout -b feat/remote lukeswitz/feat/remote
+```
+If you ran `git stash` in step 3: `git stash pop`.
+
+**5. Install and start**
+```
+pnpm install
+pnpm AHCC
+```
+`pnpm AHCC` applies the new migrations and regenerates the database client before starting.
+- Docker: `docker compose up -d --build`
+
+Open the app at the same address as before: http://localhost:5173 (normal install) or http://localhost:8080 (Docker). Serial settings saved in the app carry over; values only in `.env` files may need setting again in **Config → Serial Connection**.
+
+### Get later updates
+
+Stop the app, then `git pull lukeswitz feat/remote`, then step 5.
+
+### Go back to main
+
+1. Stop the app (step 1).
+2. If you edited files: `git stash`.
+3. `git checkout main` and `git pull origin main`. If you stashed: `git stash pop`.
+4. Restore the backup from step 2 to get back webhook event lists and rule links:
+   - Docker: `docker compose up -d postgres`, then `docker compose exec -T postgres psql -U command_center -c "DROP DATABASE command_center WITH (FORCE);" postgres`, `docker compose exec -T postgres psql -U command_center -c "CREATE DATABASE command_center;" postgres`, `docker compose exec -T postgres psql -U command_center command_center < ahcc-backup.sql`
+   - Other installs, with `<URL>` = `DATABASE_URL` without `?schema=...` (for example `postgresql://command_center:command_center@localhost:5432/command_center`) and `<SERVER>` = the same URL ending in `/postgres` instead of the database name:
+     ```
+     psql "<SERVER>" -c "DROP DATABASE command_center WITH (FORCE);" -c "CREATE DATABASE command_center;"
+     psql "<URL>" < ahcc-backup.sql
+     ```
+5. Start the app (step 5).
+
+`git remote add` only needs to run once. To return to the branch later: `git checkout feat/remote`, `git pull lukeswitz feat/remote`, then step 5.
 
 ---
 
