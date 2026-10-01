@@ -134,8 +134,6 @@ export class AlertChannelsService {
         .replace(/[^\x20-\x7e\xa0-\xff]/g, '?')
         .slice(0, 200),
       Priority: NTFY_PRIORITY[severity ?? 'NOTICE'],
-      Tags:
-        severity === 'CRITICAL' ? 'rotating_light' : severity === 'ALERT' ? 'warning' : 'satellite',
     };
     if (config.ntfyToken) {
       headers.Authorization = `Bearer ${config.ntfyToken}`;

@@ -40,11 +40,23 @@ interface WebhookDispatchContext {
   payload?: Record<string, unknown>;
 }
 
+function messageText(context: WebhookDispatchContext): string {
+  let text = (context.message ?? context.event).trim();
+  const node = context.nodeName ?? context.nodeId;
+  if (node && text.startsWith(`${node}:`)) {
+    text = text.slice(node.length + 1).trim();
+  }
+  if (context.lat != null && context.lon != null) {
+    text = text.replace(/\s*GPS[:=]-?\d+(?:\.\d+)?,\s*-?\d+(?:\.\d+)?/gi, '').trim();
+  }
+  return text || context.event;
+}
+
 function summarize(context: WebhookDispatchContext): string {
   return [
     context.severity ? `[${context.severity}]` : null,
     context.ruleName ?? null,
-    context.message ?? context.event,
+    messageText(context),
     context.mac ? `MAC ${context.mac}` : null,
     (context.nodeName ?? context.nodeId) ? `node ${context.nodeName ?? context.nodeId}` : null,
   ]
@@ -80,7 +92,7 @@ function alertTitle(context: WebhookDispatchContext): string {
 
 function alertBody(context: WebhookDispatchContext): string {
   return [
-    context.message ?? context.event,
+    messageText(context),
     ...alertFields(context).map(([name, value]) => `${name}: ${value}`),
   ].join('\n');
 }
@@ -414,7 +426,7 @@ export class WebhookDispatcherService {
       embeds: [
         {
           title: discordEscape(alertTitle(context)).slice(0, 256),
-          description: discordEscape(context.message ?? context.event).slice(0, 4000),
+          description: discordEscape(messageText(context)).slice(0, 4000),
           color: DISCORD_COLORS[context.severity ?? 'NOTICE'],
           fields: alertFields(context).map(([name, value]) => ({
             name,
@@ -434,7 +446,7 @@ export class WebhookDispatcherService {
           }
         : null,
       data: {
-        message: context.message ?? null,
+        message: context.message ? messageText(context) : null,
         matchedCriteria: context.matchedCriteria ?? [],
         mac: context.mac ?? null,
         nodeId: context.nodeId ?? null,
