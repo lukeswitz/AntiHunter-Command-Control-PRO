@@ -461,14 +461,6 @@ export function SentinelPage() {
                 >
                   Stop
                 </button>
-                <button
-                  type="button"
-                  className="control-chip control-chip--ghost"
-                  disabled={!canSend || busy}
-                  onClick={() => send('CSI_RECAL')}
-                >
-                  <MdRefresh /> Recalibrate
-                </button>
               </div>
             </div>
 

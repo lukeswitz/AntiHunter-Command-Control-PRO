@@ -948,7 +948,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'CSI_RECAL',
     group: 'Sentinel',
-    description: 'Clear CSI calibration so links re-baseline.',
+    description: 'Reset the CSI threshold override to the firmware default.',
     defaultTarget: '@NODE_22',
     parameters: [],
     examples: [{ target: '@NODE_22', params: [] }],
