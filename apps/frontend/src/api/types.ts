@@ -15,6 +15,7 @@ export interface InventoryDevice {
   lastLat?: number | null;
   lastLon?: number | null;
   siteId?: string | null;
+  signatures?: Array<{ id: string; name: string; kind: string }>;
 }
 
 export interface CommandRequest {

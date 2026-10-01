@@ -108,6 +108,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 
 ### Alert Automation & Integrations
 
+- **Device classes**: the Inventory **Class** column labels each device (ISP router, camera, drone, law enforcement, tracker, and more) by matching its MAC prefix, locally administered Wi-Fi prefix, and name against the [Fieldwatch](https://github.com/OffGridPete/Fieldwatch) signature catalog (MIT, © Off Grid Pete LLC; `apps/backend/data/fieldwatch/`). BLE manufacturer and service-UUID rules are not applied because inventory does not store advertisement payloads.
 - **Custom Alerts module**: build rules that match MACs, OUI prefixes, SSIDs, channels, RSSI windows, or inventory devices. Each rule controls its own alarm level, optional audible, and map styling (color, icon, blink, label). Promotions from Inventory drop straight into rule criteria so analysts can set up a watch list in seconds.
 - **Alert Event log**: **Alerts → Event log** lists past alert hits, searchable by rule.
 - **Webhook engine**: alert matches, inventory updates, node telemetry, and raw serial traffic can fan out to HTTPS endpoints with optional mutual TLS (CA bundle + client cert/key) and HMAC signatures. Hooks are configured under **Config → Webhooks** with inline testing, per-event subscription toggles, and automatic delivery logging.
