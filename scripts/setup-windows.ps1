@@ -187,7 +187,7 @@ if (-not (Test-NodeOk)) {
 Ok "node $(& node --version) $(& node -p 'process.arch')"
 
 Step 2 'pnpm'
-$pm = 'pnpm@9.9.0'
+$pm = 'pnpm@12.4.2'
 try { $pj = Get-Content (Join-Path $RepoRoot 'package.json') -Raw | ConvertFrom-Json; if ($pj.packageManager) { $pm = $pj.packageManager } } catch { Warn "package.json unreadable; using $pm" }
 if (Get-Command corepack -ErrorAction SilentlyContinue) {
     & corepack enable 2>$null

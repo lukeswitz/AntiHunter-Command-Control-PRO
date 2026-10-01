@@ -72,14 +72,37 @@ export function isTileInRange(provider: TileProvider, z: number, x: number, y: n
 }
 
 export function upstreamUrl(provider: TileProvider, z: number, x: number, y: number): string {
-  const subdomain = provider.subdomains?.length
-    ? provider.subdomains[(x + y) % provider.subdomains.length]
-    : '';
-  return provider.upstream
-    .replace('{s}', subdomain)
-    .replace('{z}', String(z))
-    .replace('{x}', String(x))
-    .replace('{y}', String(y));
+  if (TILE_PROVIDERS[provider.id] !== provider || !isTileInRange(provider, z, x, y)) {
+    throw new Error('Unknown map source or tile out of range');
+  }
+  const zs = encodeURIComponent(z);
+  const xs = encodeURIComponent(x);
+  const ys = encodeURIComponent(y);
+  const path = `${zs}/${xs}/${ys}`;
+  const arcgis = `${zs}/${ys}/${xs}`;
+  switch (provider.id) {
+    case 'osm':
+      return `https://tile.openstreetmap.org/${path}.png`;
+    case 'satellite':
+      return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${arcgis}`;
+    case 'usgs-topo':
+      return `https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/${arcgis}`;
+    case 'usgs-imagery':
+      return `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/${arcgis}`;
+    case 'topography':
+      switch ((x + y) % 3) {
+        case 0:
+          return `https://a.tile.opentopomap.org/${path}.png`;
+        case 1:
+          return `https://b.tile.opentopomap.org/${path}.png`;
+        default:
+          return `https://c.tile.opentopomap.org/${path}.png`;
+      }
+    case 'dark':
+      return `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${arcgis}`;
+    default:
+      throw new Error('Unknown map source');
+  }
 }
 
 export function isImage(data: Buffer, type: TileProvider['imageType']): boolean {

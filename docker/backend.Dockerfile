@@ -51,6 +51,7 @@ RUN apt-get update  && apt-get install -y --no-install-recommends udev git  && r
 
 # Copy backend artefacts
 COPY --from=builder /app/apps/backend ./apps/backend
+COPY --from=builder /app/scripts/db-update-helper.mjs ./scripts/db-update-helper.mjs
 
 # Lightweight entrypoint handles migrations before boot
 COPY docker/backend-entrypoint.sh ./backend-entrypoint.sh

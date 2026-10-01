@@ -757,7 +757,7 @@ check_pnpm() {
     if prompt_yes_no "Install pnpm?"; then
         if command -v corepack >/dev/null 2>&1; then
             info "Installing pnpm via corepack (requires sudo)..."
-            if sudo corepack enable && sudo corepack prepare pnpm@9.9.0 --activate; then
+            if sudo corepack enable && sudo corepack prepare pnpm@12.4.2 --activate; then
                 hash -r
                 if command -v pnpm >/dev/null 2>&1; then
                     success "pnpm installed: $(pnpm --version)"
@@ -1555,20 +1555,15 @@ setup_database() {
             fi
         fi
     else
-        if pnpm prisma migrate deploy; then
+        if (cd "$REPO_DIR" && node scripts/db-update-helper.mjs); then
             success "Database migrations applied successfully"
         else
-            warn "migrate deploy failed, trying migrate reset..."
-            if pnpm prisma migrate reset --force; then
-                success "Database reset and migrated successfully"
-            else
-                error "Migration methods failed"
-                if prompt_yes_no "Continue anyway?"; then
-                    warn "Continuing - you'll need to run migrations manually"
-                    return 0
-                fi
-                return 1
+            error "Database update did not finish (see the messages above)"
+            if prompt_yes_no "Continue anyway?"; then
+                warn "Continuing - run 'pnpm update-db' from $REPO_DIR when ready"
+                return 0
             fi
+            return 1
         fi
     fi
     
