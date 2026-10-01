@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { canonicalNodeId } from './node-store';
-import type { AlarmLevel } from '../api/types';
+import type { AlarmLevel, AlertRuleMapStyle } from '../api/types';
 
 const DEFAULT_ALERT_DURATION_MS = 20_000;
 const SEVERITY_WEIGHT: Record<AlarmLevel, number> = {
@@ -19,6 +19,7 @@ export interface NodeAlert {
   message: string;
   lat?: number;
   lon?: number;
+  mapStyle?: AlertRuleMapStyle;
   triggeredAt: string;
   expiresAt: number;
 }
@@ -31,6 +32,7 @@ interface TriggerAlertInput {
   message: string;
   lat?: number;
   lon?: number;
+  mapStyle?: AlertRuleMapStyle;
   timestamp?: string;
   durationMs?: number;
 }
@@ -82,6 +84,7 @@ export const useAlertStore = create<AlertStoreState>((set, get) => ({
             message: input.message,
             lat: typeof input.lat === 'number' ? input.lat : undefined,
             lon: typeof input.lon === 'number' ? input.lon : undefined,
+            mapStyle: input.mapStyle,
             triggeredAt,
             expiresAt,
           },

@@ -22,6 +22,7 @@ import { cachedTileUrl, useTileKey } from '../../api/tiles';
 import type {
   AcarsMessage,
   AdsbTrack,
+  AlertRuleMapStyle,
   Geofence,
   GeofenceVertex,
   DroneStatus,
@@ -391,12 +392,19 @@ function createNodeIcon(
   node: NodeSummary,
   severity: IndicatorSeverity,
   colors: AlertColorConfig,
+  ruleStyle?: AlertRuleMapStyle,
 ): DivIcon {
   const wrapperClasses = ['node-marker-wrapper', `node-marker-wrapper--${severity}`];
   const markerClasses = ['node-marker', `node-marker--${severity}`];
-  const label = formatNodeLabel(node);
-  const severityColor =
-    severity === 'idle'
+  if (ruleStyle?.blink) {
+    markerClasses.push('node-marker--blink');
+  }
+  const label = ruleStyle?.label ? escapeHtml(ruleStyle.label) : formatNodeLabel(node);
+  const ruleColor =
+    ruleStyle?.color && /^#[0-9a-f]{3,8}$/i.test(ruleStyle.color) ? ruleStyle.color : null;
+  const severityColor = ruleColor
+    ? ruleColor
+    : severity === 'idle'
       ? (node.siteColor ?? colors.idle)
       : severity === 'info'
         ? colors.info
@@ -865,6 +873,7 @@ interface CommandCenterMapProps {
   drones: DroneMarker[];
   droneTrails: Record<string, DroneTrailPoint[]>;
   alertIndicators: Map<string, IndicatorSeverity>;
+  alertStyles?: Map<string, AlertRuleMapStyle>;
   alertColors: AlertColorConfig;
   defaultRadius: number;
   showRadius: boolean;
@@ -903,6 +912,7 @@ export function CommandCenterMap({
   drones,
   droneTrails,
   alertIndicators,
+  alertStyles,
   alertColors,
   defaultRadius,
   showRadius,
@@ -1167,7 +1177,15 @@ export function CommandCenterMap({
           <Marker
             key={siteScopedKey}
             position={position}
-            icon={createNodeIcon(node, indicator, alertColors)}
+            icon={createNodeIcon(
+              node,
+              indicator,
+              alertColors,
+              indicator === 'idle'
+                ? undefined
+                : (alertStyles?.get(siteScopedKey) ??
+                    alertStyles?.get(nodeKey(node.id, undefined))),
+            )}
           >
             <Tooltip direction="top" offset={[0, -12]} opacity={0.9}>
               <div className="node-tooltip">

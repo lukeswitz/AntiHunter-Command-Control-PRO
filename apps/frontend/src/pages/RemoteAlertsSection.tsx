@@ -184,7 +184,7 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
       <ChannelRow
         title="Remote access (Tailscale)"
         on={config.tailscaleEnabled}
-        hint="Reach AHCC over your private tailnet — built in, no separate client. AHCC joins the tailnet itself and only the listed logins get in."
+        hint="Reach AHCC over your tailnet. Only the listed logins can connect."
         status={config.tailscaleEnabled ? 'On' : 'Off'}
       >
         <label className="control-checkbox">
@@ -218,7 +218,6 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
           </a>{' '}
           — click “Generate auth key”, turn on <strong>Tags</strong> and pick <code>tag:ahcc</code>.
         </p>
-        <p className="config-hint">No firewall or “Allow incoming connections” changes needed.</p>
         <label className="form-field">
           <span>Hostname on the tailnet</span>
           <input
@@ -763,9 +762,7 @@ function AlertLevelsCard(props: {
       <div className="channel-row__head">
         <h3>Alert sources</h3>
       </div>
-      <p className="field-hint">
-        Pick one per source. Notify: normal alert. Critical: one alert marked critical.
-      </p>
+      <p className="field-hint">Notify: normal alert. Critical: alert marked critical.</p>
       <div>
         <div className="table-scroll">
           <table className="data-table alert-sources-table">
@@ -860,7 +857,7 @@ function PushAdminCard(props: {
       title="Phone push"
       on={Boolean(subsQuery.data?.length)}
       status={subsQuery.data?.length ? `${subsQuery.data.length} device(s)` : 'No devices'}
-      hint="Each user enables push on their own device above. Manage keys and devices here."
+      hint="Registered devices and keys."
     >
       <div>
         <div className="controls-row">

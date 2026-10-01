@@ -1,5 +1,5 @@
-import { AlertsRail } from '../components/AlertsRail';
 import { RemoteAlertsSection } from './RemoteAlertsSection';
+import { AlertsRail } from '../components/AlertsRail';
 
 export function RemoteAlertsPage() {
   return (
@@ -9,7 +9,7 @@ export function RemoteAlertsPage() {
         <header className="panel-header alerts-header">
           <div className="alerts-header__intro">
             <h1>Remote alerts</h1>
-            <p>Channels, alert sources, and webhooks. The table decides what is sent where.</p>
+            <p>Channels, alert sources, and webhooks.</p>
           </div>
         </header>
         <div className="config-content alerts-content">

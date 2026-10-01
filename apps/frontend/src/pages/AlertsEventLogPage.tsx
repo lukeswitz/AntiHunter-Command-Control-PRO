@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { MdNotificationsActive, MdRefresh } from 'react-icons/md';
-import { AlertsRail } from '../components/AlertsRail';
 
 import { clearAlertRuleEvents, listAlertRuleEvents, listAlertRules } from '../api/alert-rules';
 import type { AlertRule, AlertRuleEvent } from '../api/types';
+import { AlertsRail } from '../components/AlertsRail';
 
 export function AlertsEventLogPage() {
   const queryClient = useQueryClient();
