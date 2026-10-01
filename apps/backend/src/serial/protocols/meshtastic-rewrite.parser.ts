@@ -990,6 +990,16 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       LIST_SCAN: 'list-scan-done',
       PROBE: 'probe-done',
     };
+    const ack: SerialParseResult = {
+      kind: 'command-ack',
+      nodeId: id,
+      ackType,
+      status: 'DONE',
+      raw,
+    };
+    if (op !== 'BASELINE') {
+      return [ack];
+    }
     return [
       {
         kind: 'alert',
@@ -1000,13 +1010,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
         data,
         raw,
       },
-      {
-        kind: 'command-ack',
-        nodeId: id,
-        ackType,
-        status: 'DONE',
-        raw,
-      },
+      ack,
     ];
   }
 

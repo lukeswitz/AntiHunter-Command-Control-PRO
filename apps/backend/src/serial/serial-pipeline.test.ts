@@ -537,20 +537,17 @@ const FIRMWARE_MESSAGES: TestCase[] = [
   {
     name: 'SCAN_DONE',
     input: 'AH5: SCAN_DONE: W=42 B=18 U=60 H=125 TX=60 PEND=0',
-    expectKinds: ['alert', 'command-ack'],
-    expectCategory: 'scan-done',
+    expectKinds: ['command-ack'],
   },
   {
     name: 'DEAUTH_DONE',
     input: 'AH5: DEAUTH_DONE: Total=42 Deauth=30 Disassoc=12 TX=42 PEND=0',
-    expectKinds: ['alert', 'command-ack'],
-    expectCategory: 'deauth-done',
+    expectKinds: ['command-ack'],
   },
   {
     name: 'DRONE_DONE',
     input: 'AH5: DRONE_DONE: Detected=3 Unique=3 TX=3 PEND=0',
-    expectKinds: ['alert', 'command-ack'],
-    expectCategory: 'drone-done',
+    expectKinds: ['command-ack'],
   },
   {
     name: 'BASELINE_DONE',
@@ -561,8 +558,7 @@ const FIRMWARE_MESSAGES: TestCase[] = [
   {
     name: 'LIST_SCAN_DONE',
     input: 'AH5: LIST_SCAN_DONE: Hits=250 Unique=15 Targets=15 TX=15 PEND=0',
-    expectKinds: ['alert', 'command-ack'],
-    expectCategory: 'list-scan-done',
+    expectKinds: ['command-ack'],
   },
 
   // ─── CODES ───
