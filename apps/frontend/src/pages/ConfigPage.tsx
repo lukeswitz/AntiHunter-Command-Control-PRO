@@ -1148,17 +1148,15 @@ export function ConfigPage() {
   });
 
   const updateSerialSetting = (patch: Partial<SerialConfig>) => {
-    setSerialConfig((previous) => {
-      if (!previous) {
-        return previous;
-      }
-      const optimistic = { ...previous, ...patch };
-      updateSerialConfigMutation.mutate(patch, {
-        onError: () => {
-          setSerialConfig(previous);
-        },
-      });
-      return optimistic;
+    const previous = serialConfig;
+    if (!previous) {
+      return;
+    }
+    setSerialConfig({ ...previous, ...patch });
+    updateSerialConfigMutation.mutate(patch, {
+      onError: () => {
+        setSerialConfig(previous);
+      },
     });
   };
 
