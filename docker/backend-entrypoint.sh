@@ -13,7 +13,7 @@ cd /app/apps/backend
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   echo "Running database migrations..."
-  npx prisma migrate deploy
+  AHCC_PRISMA_CMD="npx --yes prisma@5.22.0" node /app/scripts/db-update-helper.mjs
 fi
 
 echo "Running database seed..."

@@ -99,18 +99,15 @@ check_root() {
     
     if [[ $EUID -eq 0 ]] || [[ "$(whoami)" == "root" ]]; then
         echo ""
-        echo "ERROR: This script must NOT be run as root."
+        echo "ERROR: Run this script from your own admin account (one that can use sudo), not as root."
+        echo "It creates the unprivileged service account $INSTALL_USER itself."
         echo ""
-        echo "Please create a dedicated system user with sudo privileges:"
+        exit 1
+    fi
+    if [[ "$(whoami)" == "$INSTALL_USER" ]]; then
         echo ""
-        echo "    sudo adduser --system --group --home $INSTALL_DIR --shell /bin/bash $INSTALL_USER"
-        echo "    sudo usermod -aG sudo $INSTALL_USER"  
-        echo "    sudo usermod -aG dialout $INSTALL_USER"
-        echo ""
-        echo "Then switch to that user and re-run this script:"
-        echo ""
-        echo "    sudo -u $INSTALL_USER -i"
-        echo "    bash $(basename "$0")"
+        echo "ERROR: Do not run this script as the service account $INSTALL_USER."
+        echo "$INSTALL_USER must not have sudo. Run the script from your own admin account."
         echo ""
         exit 1
     fi
@@ -351,12 +348,37 @@ setup_system_user() {
     
     if ! id "$INSTALL_USER" >/dev/null 2>&1; then
         info "Creating system user: $INSTALL_USER"
-        sudo useradd --system --create-home --home-dir "$INSTALL_DIR" --shell /bin/bash "$INSTALL_USER" || \
+        sudo useradd --system --user-group --create-home --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin "$INSTALL_USER" || \
             error_exit "Failed to create user $INSTALL_USER"
     else
         info "User $INSTALL_USER already exists"
+        sudo usermod --shell /usr/sbin/nologin "$INSTALL_USER" || warn "Could not set $INSTALL_USER shell to nologin"
     fi
-    
+
+    local admin_group
+    for admin_group in sudo admin wheel; do
+        if id -nG "$INSTALL_USER" | tr ' ' '\n' | grep -qx "$admin_group"; then
+            warn "Service account $INSTALL_USER is in the $admin_group group. Removing it; the service does not need sudo."
+            sudo gpasswd -d "$INSTALL_USER" "$admin_group" || error_exit "Could not remove $INSTALL_USER from $admin_group"
+        fi
+    done
+    local sudoers_file
+    for sudoers_file in /etc/sudoers.d/*; do
+        [[ -f "$sudoers_file" ]] || continue
+        if sudo grep -qsE "^[^#]*\b$INSTALL_USER\b" "$sudoers_file"; then
+            warn "Disabling sudoers rule for $INSTALL_USER in $sudoers_file"
+            sudo cp -p "$sudoers_file" "${sudoers_file}.ahcc-disabled"
+            sudo sed -i -E "s/^([^#]*\b$INSTALL_USER\b.*)$/# disabled by AHCC deploy: \1/" "$sudoers_file"
+            if ! sudo visudo -c >/dev/null; then
+                sudo cp -p "${sudoers_file}.ahcc-disabled" "$sudoers_file"
+                error_exit "sudoers check failed after editing $sudoers_file; restored it. Remove the $INSTALL_USER rule by hand with visudo."
+            fi
+        fi
+    done
+    if sudo grep -qsE "^[^#]*\b$INSTALL_USER\b" /etc/sudoers; then
+        warn "/etc/sudoers still has a rule for $INSTALL_USER. Remove it with 'sudo visudo'; the service does not need sudo."
+    fi
+
     sudo usermod -aG dialout "$INSTALL_USER" 2>/dev/null || warn "Could not add user to dialout group (may already be member)"
     
     sudo mkdir -p "$INSTALL_DIR" "$SCRIPTS_DIR" "$BACKUP_DIR" "$LOG_DIR" "$NGINX_ROOT"
@@ -434,7 +456,7 @@ install_pnpm() {
     fi
     
     sudo corepack enable || error_exit "Failed to enable corepack"
-    sudo corepack prepare pnpm@9.9.0 --activate || error_exit "Failed to activate pnpm"
+    sudo corepack prepare pnpm@12.4.2 --activate || error_exit "Failed to activate pnpm"
     
     pnpm --version || error_exit "pnpm installation verification failed"
     success "pnpm installed: $(pnpm --version)"
@@ -712,7 +734,8 @@ MQTT_ENABLED=false
 TAK_ENABLED=false
 EOF
     
-    chmod 640 "$env_file"
+    sudo chown "$INSTALL_USER":"$INSTALL_USER" "$env_file"
+    sudo chmod 600 "$env_file"
     
     success "Backend environment configured at $env_file"
 }
@@ -754,10 +777,10 @@ generate_prisma_client() {
 run_database_migrations() {
     step "Running database migrations..."
     
-    cd "$BACKEND_DIR"
-    
-    sudo -u "$INSTALL_USER" pnpm prisma migrate deploy || \
-        error_exit "Database migrations failed. Check DATABASE_URL and PostgreSQL logs."
+    cd "$REPO_DIR"
+
+    sudo -u "$INSTALL_USER" node scripts/db-update-helper.mjs || \
+        error_exit "Database update did not finish. See the messages above, then run: cd $REPO_DIR && pnpm update-db"
     
     success "Database migrations completed"
 }
@@ -896,8 +919,9 @@ build_frontend() {
     error_exit "Failed to deploy frontend files"
     
     # Set proper permissions
-    sudo chown -R www-data:www-data "$NGINX_ROOT"
-    sudo chmod -R 755 "$NGINX_ROOT"
+    sudo chown -R root:root "$NGINX_ROOT"
+    sudo find "$NGINX_ROOT" -type d -exec chmod 755 {} +
+    sudo find "$NGINX_ROOT" -type f -exec chmod 644 {} +
     
     # Verify deployment
     if [[ ! -f "$NGINX_ROOT/index.html" ]]; then
@@ -1108,6 +1132,20 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+UMask=0077
 ReadWritePaths=$BACKEND_DIR $LOG_DIR $BACKUP_DIR
 MemoryMax=2G
 LimitNOFILE=65536
@@ -1542,8 +1580,9 @@ find "\$BACKUP_DIR" -name "ahcc_*.sql.gz" -mtime +\$RETENTION_DAYS -delete 2>/de
 echo "\$LOG_PREFIX Backup complete"
 EOF
     
-    sudo chmod +x "$backup_script"
     sudo chown "$INSTALL_USER":"$INSTALL_USER" "$backup_script"
+    sudo chmod 700 "$backup_script"
+    sudo chmod 700 "$BACKUP_DIR"
     
     # Add cron job - handle case where no crontab exists
     local cron_entry="0 2 * * * $backup_script >> $LOG_DIR/backup.log 2>&1"
@@ -1765,8 +1804,9 @@ print_deployment_summary() {
     echo ""
     
     # Save credentials to file
-    local creds_file="$INSTALL_DIR/deployment-credentials.txt"
-    sudo -u "$INSTALL_USER" tee "$creds_file" > /dev/null <<EOF
+    local creds_file="/root/ahcc-deployment-credentials.txt"
+    sudo install -m 600 -o root -g root /dev/null "$creds_file"
+    sudo tee "$creds_file" > /dev/null <<EOF
 AntiHunter Command Center - Deployment Credentials
 Generated: $(date)
 
@@ -1796,7 +1836,7 @@ IMPORTANT: Delete this file after saving credentials securely!
 EOF
     
     sudo chmod 600 "$creds_file"
-    warn "Credentials saved to: $creds_file (delete after reading!)"
+    warn "Credentials saved to: $creds_file (root only; read with sudo, then delete it)"
 }
 
 #############################################################################
