@@ -287,7 +287,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.NODE_ALERT, {
       event: 'node.alert',
       eventType: WebhookEventType.NODE_ALERT,
-      source: source ?? undefined,
+      source: source ?? 'node:status',
       timestamp,
       nodeId: event.nodeId ?? null,
       nodeName: event.nodeId ?? null,
