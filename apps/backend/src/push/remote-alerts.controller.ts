@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { RemoteAlertConfig, Role } from '@prisma/client';
 import type { Request, Response } from 'express';
+import { networkInterfaces } from 'node:os';
 
 import { AlertChannel, AlertChannelsService } from './alert-channels.service';
 import { DEVICE_SOURCES } from './alert-sources';
@@ -174,6 +175,14 @@ export class RemoteAlertsController {
       return status;
     }
     return { ...status, manualPairingCode: null, qrPairingCode: null, passcode: null };
+  }
+
+  @Get('matter/interfaces')
+  matterInterfaces() {
+    return Object.entries(networkInterfaces()).flatMap(([name, addresses]) => {
+      const external = (addresses ?? []).filter((entry) => !entry.internal);
+      return external.length ? [{ name, addresses: external.map((entry) => entry.address) }] : [];
+    });
   }
 
   @Post('matter/restart')

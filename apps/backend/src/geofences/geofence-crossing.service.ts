@@ -52,8 +52,7 @@ export class GeofenceCrossingService implements OnModuleInit, OnModuleDestroy {
     }
     const crossings: GeofenceCrossing[] = [];
     this.geofences.forEach((geofence) => {
-      const applies =
-        kind === 'drone' ? geofence.appliesToDrones : geofence.appliesToTargets;
+      const applies = kind === 'drone' ? geofence.appliesToDrones : geofence.appliesToTargets;
       if (!geofence.alarm.enabled || geofence.polygon.length < 3 || !applies) {
         return;
       }
@@ -101,11 +100,7 @@ export class GeofenceCrossingService implements OnModuleInit, OnModuleDestroy {
       .replace(/\{event\}/gi, event);
   }
 
-  private pointInPolygon(
-    lat: number,
-    lon: number,
-    polygon: GeofenceResponse['polygon'],
-  ): boolean {
+  private pointInPolygon(lat: number, lon: number, polygon: GeofenceResponse['polygon']): boolean {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
       const xi = polygon[i].lat;

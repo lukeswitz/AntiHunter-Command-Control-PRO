@@ -398,7 +398,11 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
         let settled = false;
         this.gateLinking = true;
         this.gateRequest({ op: 'link' }, 330_000, (line) => {
-          if (!settled && typeof line.uri === 'string' && line.uri.startsWith('sgnl://linkdevice?')) {
+          if (
+            !settled &&
+            typeof line.uri === 'string' &&
+            line.uri.startsWith('sgnl://linkdevice?')
+          ) {
             settled = true;
             this.lastLinkUri = line.uri;
             resolve(line.uri);
@@ -499,18 +503,18 @@ export class SignalConnectorService implements OnModuleInit, OnModuleDestroy {
     const out = this.gate
       ? await this.run(['create-group'])
       : await this.run([
-      '--output',
-      'json',
-      'updateGroup',
-      '-n',
-      'AntiHunter Alerts',
-      '--set-permission-add-member',
-      'only-admins',
-      '--set-permission-edit-details',
-      'only-admins',
-      '--link',
-      'disabled',
-    ]);
+          '--output',
+          'json',
+          'updateGroup',
+          '-n',
+          'AntiHunter Alerts',
+          '--set-permission-add-member',
+          'only-admins',
+          '--set-permission-edit-details',
+          'only-admins',
+          '--link',
+          'disabled',
+        ]);
     const body = JSON.parse(out) as { groupId?: unknown };
     if (typeof body.groupId !== 'string') {
       throw new Error('signal-cli did not return a group id');

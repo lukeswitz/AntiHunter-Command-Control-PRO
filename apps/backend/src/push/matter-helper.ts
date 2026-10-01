@@ -3,13 +3,69 @@ import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/brid
 import { OccupancySensingServer } from '@matter/main/behaviors/occupancy-sensing';
 import { OccupancySensorDevice } from '@matter/main/devices/occupancy-sensor';
 import { AggregatorEndpoint } from '@matter/main/endpoints/aggregator';
+import { execFileSync } from 'node:child_process';
 import { randomInt } from 'node:crypto';
-import { chmodSync, mkdirSync, readdirSync } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 Logger.level = LogLevel.WARN;
+
+const IFF_POINTOPOINT = 0x10;
+
+function pointToPointInterfaces(): Set<string> {
+  const names = Object.keys(networkInterfaces());
+  if (process.platform === 'linux') {
+    return new Set(
+      names.filter((name) => {
+        try {
+          return (
+            (parseInt(readFileSync(`/sys/class/net/${name}/flags`, 'utf8'), 16) &
+              IFF_POINTOPOINT) !==
+            0
+          );
+        } catch {
+          return false;
+        }
+      }),
+    );
+  }
+  if (process.platform === 'darwin' || process.platform === 'freebsd') {
+    try {
+      const output = execFileSync('/sbin/ifconfig', ['-a'], { encoding: 'utf8' });
+      return new Set(
+        [...output.matchAll(/^([^\s:]+): flags=[0-9a-f]+<([^>]*)>/gim)]
+          .filter((match) => match[2].split(',').includes('POINTOPOINT'))
+          .map((match) => match[1]),
+      );
+    } catch {
+      return new Set();
+    }
+  }
+  return new Set();
+}
+
+function skipPointToPointMulticast() {
+  const tunnels = pointToPointInterfaces();
+  if (!tunnels.size) {
+    return;
+  }
+  const { NodeJsNetwork } = createRequire(require.resolve('@matter/main'))('@matter/nodejs') as {
+    NodeJsNetwork: {
+      getMembershipMulticastInterfaces: (
+        netInterfaceOrZone: string | undefined,
+        ipv4: boolean,
+      ) => (string | undefined)[];
+    };
+  };
+  const original = NodeJsNetwork.getMembershipMulticastInterfaces.bind(NodeJsNetwork);
+  NodeJsNetwork.getMembershipMulticastInterfaces = (netInterfaceOrZone, ipv4) =>
+    original(netInterfaceOrZone, ipv4).filter(
+      (entry) => entry === undefined || !tunnels.has(entry.replace(/^::%/, '')),
+    );
+}
 
 const SENSORS = [
   { id: 'any-alert', name: 'AntiHunter Alert', levels: ['ALERT'] },
@@ -104,6 +160,9 @@ async function main() {
     port: Number(process.env.AHCC_MATTER_PORT) || 5540,
   };
   const iface = process.env.AHCC_MATTER_INTERFACE?.trim();
+  if (!iface) {
+    skipPointToPointMulticast();
+  }
   if (iface) {
     const addresses = networkInterfaces()[iface];
     if (!addresses?.length) {

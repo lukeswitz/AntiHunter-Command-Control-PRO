@@ -1,11 +1,10 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
 import { AlarmLevel, InventoryDevice, Prisma, Webhook } from '@prisma/client';
-
-import { WebhookEventType } from './webhook-event-type';
 import { createHmac } from 'node:crypto';
 import type { ConnectionOptions as TlsConnectionOptions } from 'node:tls';
 import { Agent, request } from 'undici';
 
+import { WebhookEventType } from './webhook-event-type';
 import { PrismaService } from '../prisma/prisma.service';
 import { AlertChannelsService } from '../push/alert-channels.service';
 import { nodeAlertSource } from '../push/alert-sources';

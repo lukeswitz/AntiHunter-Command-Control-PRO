@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AlertRuleMatchMode, Prisma } from '@prisma/client';
-
-import { WebhookEventType } from '../webhooks/webhook-event-type';
 import type { AlertRule } from '@prisma/client';
 
 import { MailService } from '../mail/mail.service';
@@ -9,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { SerialTargetDetected } from '../serial/serial.types';
 import { extractOui, normalizeMac } from '../utils/mac';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
+import { WebhookEventType } from '../webhooks/webhook-event-type';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
 type AlertRuleWithHooks = Prisma.AlertRuleGetPayload<Record<string, never>>;

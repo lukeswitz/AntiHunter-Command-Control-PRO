@@ -22,6 +22,7 @@ export interface RemoteAlertConfig {
   matrixRoomId: string | null;
   matterEnabled: boolean;
   matterLayout: 'bridge' | 'flat';
+  matterInterface: string | null;
   alertTiers: Record<string, AlertTier>;
   updatedAt: string;
 }
@@ -47,6 +48,7 @@ export type RemoteAlertConfigUpdate = Partial<{
   matrixRoomId: string;
   matterEnabled: boolean;
   matterLayout: 'bridge' | 'flat';
+  matterInterface: string;
   alertTiers: Record<string, AlertTier>;
 }>;
 
@@ -155,6 +157,9 @@ export async function fetchSignalLinkQr(): Promise<Blob> {
 export const listAlertSources = () => apiClient.get<AlertSourceRow[]>('/remote-alerts/sources');
 
 export const getMatterStatus = () => apiClient.get<MatterStatus>('/remote-alerts/matter/status');
+
+export const getMatterInterfaces = () =>
+  apiClient.get<{ name: string; addresses: string[] }[]>('/remote-alerts/matter/interfaces');
 
 export const restartMatter = () => apiClient.post<MatterStatus>('/remote-alerts/matter/restart');
 

@@ -9,10 +9,7 @@ import {
 import { AlarmLevel, Prisma, TargetStatus, Target } from '@prisma/client';
 import { Observable, Subject } from 'rxjs';
 
-import {
-  GeofenceCrossing,
-  GeofenceCrossingService,
-} from '../geofences/geofence-crossing.service';
+import { GeofenceCrossing, GeofenceCrossingService } from '../geofences/geofence-crossing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 import { CreateTargetDto } from './dto/create-target.dto';
