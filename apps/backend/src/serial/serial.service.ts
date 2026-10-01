@@ -1644,14 +1644,14 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
     void this.identifyRadioWithRetry();
 
-    this.radioHeartbeatTimer = setInterval(
-      () => {
-        void this.sendRadioHeartbeat().catch((err) =>
-          this.logger.warn(`Meshtastic heartbeat: ${err instanceof Error ? err.message : err}`),
-        );
-      },
-      5 * 60 * 1000,
-    );
+    let heartbeatTicks = 0;
+    this.radioHeartbeatTimer = setInterval(() => {
+      heartbeatTicks += 1;
+      const task = heartbeatTicks % 40 === 0 ? this.initMeshtasticApi() : this.sendRadioHeartbeat();
+      void task.catch((err) =>
+        this.logger.warn(`Meshtastic keepalive: ${err instanceof Error ? err.message : err}`),
+      );
+    }, 15 * 1000);
 
     this.port.on('error', (err) => {
       this.lastError = err.message;
@@ -1694,7 +1694,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async sendRadioHeartbeat(): Promise<void> {
-    if (!this.port?.isOpen || this.localRadio.num === undefined) {
+    if (!this.port?.isOpen) {
       return;
     }
     const { Mesh } = await loadMeshModule();

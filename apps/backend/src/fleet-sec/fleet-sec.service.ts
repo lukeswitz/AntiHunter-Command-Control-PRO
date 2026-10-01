@@ -204,17 +204,34 @@ export class FleetSecService implements OnModuleInit, OnModuleDestroy {
       this.store.getPolicy(),
       Promise.resolve(this.serial.getMeshNodeNames()),
     ]);
-    return rows.map((r) => ({
-      nodeNum: r.nodeNum,
-      name: names.get(r.nodeNum) ?? `!${r.nodeNum.toString(16)}`,
-      adminKeyFingerprints: r.adminKeyFps,
-      isManaged: r.isManaged,
-      lastVerifiedAt: r.lastVerifiedAt,
-      lastVerifyMethod: r.lastVerifyMethod,
-      currentPskFp: r.currentPskFp,
-      strandedSince: r.strandedSince,
-      driftStatus: computeDrift(r, policy),
-    }));
+    const known = new Set(rows.map((r) => r.nodeNum));
+    const unverified = Array.from(names.entries())
+      .filter(([nodeNum]) => !known.has(nodeNum))
+      .map(([nodeNum, name]) => ({
+        nodeNum,
+        name,
+        adminKeyFingerprints: [] as string[],
+        isManaged: false,
+        lastVerifiedAt: null,
+        lastVerifyMethod: null,
+        currentPskFp: null,
+        strandedSince: null,
+        driftStatus: 'unknown' as const,
+      }));
+    return [
+      ...rows.map((r) => ({
+        nodeNum: r.nodeNum,
+        name: names.get(r.nodeNum) ?? `!${r.nodeNum.toString(16)}`,
+        adminKeyFingerprints: r.adminKeyFps,
+        isManaged: r.isManaged,
+        lastVerifiedAt: r.lastVerifiedAt,
+        lastVerifyMethod: r.lastVerifyMethod,
+        currentPskFp: r.currentPskFp,
+        strandedSince: r.strandedSince,
+        driftStatus: computeDrift(r, policy),
+      })),
+      ...unverified,
+    ];
   }
 
   async verifyTrust(userId: string, nodeNum: number) {
