@@ -79,7 +79,10 @@ export function nodeAlertSource(
   if (['tamper', 'vibration', 'erase', 'mesh-guard'].includes(cat) && level === 'ALERT') {
     return `node:${cat}`;
   }
-  if (['heartbeat', 'startup', 'gps', 'time-sync', 'battery-saver', 'setup'].includes(cat)) {
+  if (
+    ['heartbeat', 'startup', 'gps', 'time-sync', 'battery-saver', 'setup'].includes(cat) ||
+    cat.endsWith('-done')
+  ) {
     return 'node:status';
   }
   return null;
