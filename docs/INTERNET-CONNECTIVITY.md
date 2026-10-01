@@ -59,9 +59,9 @@ Your first admin password was printed once at install: by the setup script, or f
    | Blocked countries | empty |
    | IP allow list | `127.0.0.1` and `::1`, then every IP you see for your own sign-ins (below) |
    | IP block list | empty; add attackers from the log |
-   | Failed attempts | `5` |
-   | Failure window | `900` |
-   | Ban duration | `900` |
+   | Failed attempts (count) | `5` |
+   | Failure window (seconds) | `900` |
+   | Ban duration (seconds) | `900` |
 
    Sign in from each device you use (the AHCC computer, the phone over Tailscale, a Cloudflare login). Open **Recent firewall activity** at the bottom of the card, find each `AUTH SUCCESS` entry, and add its IP to **IP allow list**. Docker and proxied logins can show a proxy address (a Docker bridge like `172.17.0.1`, or your reverse proxy) instead of your device, because AHCC trusts a forwarded client IP only from a loopback proxy by default. Either add the address the log shows, or set `TRUST_PROXY` (to the number of proxy hops, or the proxy's address/CIDR) so the log records the real client IP. Save, then sign in again from each device.
 
@@ -86,7 +86,7 @@ Docker installs can skip steps 2-5 below: `docker-compose.yml` has a `tailscale`
        TS_HOSTNAME=ahcc
 
 4. `docker compose --profile remote up -d`
-5. In AHCC: **Config** → **Remote Access & Alerts** → **Remote access (Tailscale)**. Enter the Tailscale login (email) of each person allowed in, one per line, and click **Save**. An empty list lets nobody in.
+5. In AHCC: **Config** → **Remote Access** → **Remote access (Tailscale)**. Tick **Enable remote access**, enter the Tailscale login (email) of each person allowed in under **Allowed Tailscale logins**, one per line, and click **Save**. An empty list lets nobody in.
 
 **Check:** on the phone with Tailscale on and Wi-Fi off, `https://ahcc.<your-tailnet>.ts.net` shows the AHCC login page. Remove your login from the list and reload: you get **403 Forbidden**.
 
@@ -120,7 +120,7 @@ Restart AHCC (`Ctrl+C`, then `pnpm dev`). Docker installs skip this step.
 
 **Check:** on the AHCC computer, open the `https://...ts.net` address. You see the AHCC login page with a padlock. If you see `Blocked request. This host (...) is not allowed`, step 5 is missing or has a typo.
 
-**Step 6. Set the app URL.** **Config** → **Security Defaults** → **APPLICATION URL**: set it to your `https://...ts.net` address so links in emails point to it.
+**Step 6. Set the app URL.** **Config** → **Security Defaults** → **Application URL**: set it to your `https://...ts.net` address so links in emails point to it.
 
 ![Security defaults](images/remote/security-defaults.png)
 
@@ -188,9 +188,11 @@ Security: the tunnel dials out from the AHCC computer, so no port opens on your 
 
 No remote access needed. AHCC dials out to the service when an alert rule fires, when an alert arrives over MQTT, and when a node reports an ALERT-level event (attack, tamper, erase, ALERT-level vibration). Node heartbeats and other INFO/NOTICE messages are not sent. Each message carries the rule and severity, the alert text, and the device MAC, SSID, RSSI, channel, node, location and time when the alert has them.
 
-Set push, Signal, ntfy, Matrix and Matter in **Config** → **Remote Access & Alerts**. Only admins see these settings, and only admins with two-factor authentication turned on can change them or send tests ([step 0](#prep)). Each card has **Send test**.
+Everything in this section is on **Alerts** → **Remote alerts**: phone push, Signal, ntfy, Matrix, webhooks, Matter and **Alert sources**. Only admins see the settings cards, and only admins with two-factor authentication turned on can change them or send tests ([step 0](#prep)).
 
-Tokens and the push signing key are encrypted in the database (AES-256-GCM). The key is `REMOTE_ALERTS_SECRET_KEY` when set; otherwise a random key stored at rest per OS: the macOS Keychain, Windows DPAPI (bound to the account AHCC runs as), or, for the `deploy-production.sh` service on Linux, a `systemd-creds` credential (sealed to the TPM when present). Without those it falls back to `apps/backend/.secrets/remote-alerts.key` (Docker: the `remote-secrets` volume). A database dump alone does not reveal the tokens. Back up the key with the database; without it, re-enter the tokens and press **Replace keys**. Discord, Slack, IFTTT and Home Assistant are webhooks in **Config** → **Webhooks**.
+**Alert sources** decides what is sent. Each row (an alert rule, a node event type, linked MQTT sites, data streams) has a **Notify** and a **Critical** tick; untick both to send nothing for that source. Click **Save levels**. The same choice applies to every channel, webhooks included. Data streams (inventory, telemetry, command results, raw serial lines) start unticked.
+
+Tokens and the push signing key are encrypted in the database (AES-256-GCM). The key is `REMOTE_ALERTS_SECRET_KEY` when set; otherwise a random key stored at rest per OS: the macOS Keychain, Windows DPAPI (bound to the account AHCC runs as), or, for the `deploy-production.sh` service on Linux, a `systemd-creds` credential (sealed to the TPM when present). Without those it falls back to `apps/backend/.secrets/remote-alerts.key` (Docker: the `remote-secrets` volume). A database dump alone does not reveal the tokens. Back up the key with the database; without it, re-enter the tokens and press **Reset keys** on the **Phone push** card. Discord, Slack, IFTTT and Home Assistant are webhooks, in the **Webhooks** card on the same page.
 
 | Channel | Who can read the alert text | Setup |
 | ------- | --------------------------- | ----- |
@@ -205,14 +207,15 @@ Tokens and the push signing key are encrypted in the database (AES-256-GCM). The
 
 The alert is encrypted on the AHCC computer for your phone's key; Apple, Google or Mozilla relay it but cannot read it.
 
-1. **Config** → **Remote Access & Alerts** → **Phone push notifications** → **Generate keys** (once per install).
-2. Open AHCC over HTTPS on the phone (the Tailscale address). On iPhone/iPad (iOS 16.4 or newer): **Share** → **Add to Home Screen**, then open AHCC from the Home Screen icon. Android: Chrome works directly.
-3. **Config** → **Remote Access & Alerts** → **Push notifications on this device** → **Enable on this device** → allow notifications.
-4. **Send test**.
+AHCC creates the push keys the first time they are needed.
 
-**Check:** a notification arrives; tapping it opens **Alerts** → **Event Log**. The device appears under **Subscribed devices** on the admin card, where you can remove it.
+1. Open AHCC over HTTPS on the phone (the Tailscale address). On iPhone/iPad (iOS 16.4 or newer): **Share** → **Add to Home Screen**, then open AHCC from the Home Screen icon. Android: Chrome works directly.
+2. **Alerts** → **Remote alerts** → **Alerts on this device** → **Enable on this device** → allow notifications.
+3. **Send test**.
 
-**Replace keys** signs out every subscribed device; each one presses **Enable** again.
+**Check:** a notification arrives; tapping it opens **Alerts** → **Event log**. The device appears in the table on the admin **Phone push** card, where **Remove** deletes it. **Send test to all devices** tests every phone.
+
+**Reset keys** signs out every subscribed device; each one presses **Enable on this device** again.
 
 ### Signal (end-to-end encrypted)
 
@@ -232,10 +235,10 @@ AHCC links a Signal device (like Signal Desktop) and posts to a private **AntiHu
    | **Linux (recommended)** | Answer **yes** to "Install Signal alerts" in `setup-local.sh` / `deploy-production.sh`. | Installs signal-cli as the locked-down `ahcc-signal` service with encrypted state and a gate socket; sets `AHCC_SIGNAL_GATE`. Nothing to start. |
    | **Linux (didn't run the installer, x86_64)** | Nothing. | The first time you link, AHCC downloads signal-cli (pinned checksum), stores it at `AHCC_SIGNAL_HOME` (default `<backend cwd>/.signal-cli`, files `0700`), and runs it itself. |
    | **Docker** | `docker compose --profile signal up -d` | Runs the connector and proxy, neither published. |
-   | **macOS / arm Linux** | Open **Config → Remote Access & Alerts → Signal** and run the command the card shows. | The card detects Docker/Colima, prints the exact start/stop/restart commands (loopback `127.0.0.1:8079`) and a Docker install link, then finds the connector automatically. |
+   | **macOS / arm Linux** | Open **Alerts → Remote alerts → Signal**, click **Copy start** and run the copied command on the AHCC computer. | The card detects Docker/Colima, lists setup steps with a Docker install link, and has **Copy start** / **Copy stop** / **Copy restart** buttons (connector on loopback `127.0.0.1:8079`). AHCC then finds the connector automatically. |
    | **Windows** | Install Docker Desktop (`winget install -e --id Docker.DockerDesktop` — the card links it) and turn on virtualization (WSL2 or Hyper-V), then run the card's command. | Same Docker connector on `127.0.0.1:8079`. **A Windows VM on an Apple Silicon Mac can't run Docker** (no nested virtualization) — run the connector on a physical PC or another host and set `SIGNAL_API_URL` to it over a trusted link. |
 
-3. **Config → Remote Access & Alerts → Signal** → tick **Send alerts to Signal** → **Link Signal**. On the phone: Signal → **Settings** → **Linked devices** → **+** → scan the QR. Then **Send test**.
+3. **Alerts → Remote alerts → Signal** → tick **Send alerts to Signal** → **Save** → **Link Signal**. On the phone: Signal → **Settings** → **Linked devices** → **+** → scan the QR. Then **Send test**.
 4. Add other people by opening the **AntiHunter Alerts** group in Signal and inviting them. The group is created admin-only (no member can add others, post, or share an invite link), so alerts stay one-way.
 
 **Check:** the **AntiHunter Alerts** group gets `AntiHunter test`.
@@ -248,11 +251,11 @@ For the full hardening, what was tested, and the residual attacks to weigh again
 
 The ntfy server can read every alert. Run your own ntfy server, require login, and give AHCC an access token with write access to one topic.
 
-**Config** → **Remote Access & Alerts** → **ntfy**: tick the box, topic URL (`https://ntfy.example.com/ahcc-alerts`), access token (`tk_...`), **Save**, **Send test**. Critical alerts use priority 5.
+**Alerts** → **Remote alerts** → **ntfy**: tick **Send alerts to ntfy**, **Topic URL** (`https://ntfy.example.com/ahcc-alerts`), **Access token (optional)** (`tk_...`), **Save**, **Send test**. Critical alerts use priority 5.
 
 ### Matrix
 
-Messages are not end-to-end encrypted; the homeserver can read them. Use your own homeserver, a bot account, and a private room. **Config** → **Remote Access & Alerts** → **Matrix**: homeserver URL, room ID (`!abc:example.com`), bot access token, **Save**, **Send test**.
+Messages are not end-to-end encrypted; the homeserver can read them. Use your own homeserver, a bot account, and a private room. **Alerts** → **Remote alerts** → **Matrix**: tick **Send alerts to Matrix**, **Homeserver URL**, **Room ID** (`!abc:example.com`), **Bot access token**, **Save**, **Send test**.
 
 URLs for ntfy, Signal and Matrix must be `https://`, or `http://` to `localhost` or `signal-api`, with no username or password in the URL. Tokens are never shown again after saving; leave the field blank to keep the saved one, or click **Remove token**.
 
@@ -263,7 +266,7 @@ Alert text from nodes can contain names chosen by whoever owns the detected devi
 ### Discord
 
 1. In Discord: hover the channel → gear (**Edit Channel**) → **Integrations** → **Webhooks** → **New Webhook** → **Copy Webhook URL**.
-2. In AHCC: **Config** → **Webhooks** → **Create webhook**. **Name** `Discord alerts`, paste the URL into **Destination URL**, leave **Verify server certificates** ticked, tick only **Alert triggered**, click **Create**.
+2. In AHCC: **Alerts** → **Remote alerts** → **Webhooks** → **Create webhook**. **Name** `Discord alerts`, paste the URL into **Destination URL**, leave **Enabled** and **Verify server certificates** ticked, click **Create**.
 
    ![Discord webhook](images/remote/webhook-discord.png)
 
@@ -273,22 +276,20 @@ Alert text from nodes can contain names chosen by whoever owns the detected devi
 
    **Check:** the Discord channel shows `[INFO] Test payload from Command Center ...` and Recent deliveries says **Success**.
 
-4. Connect it to a rule: **Alerts** → pick or create a rule → **Notifications & routing** → tick **Discord alerts** under **Webhook notifications** → save.
-
-   ![Alert rule delivery](images/remote/alert-rule-delivery.png)
+Every enabled webhook receives every source ticked in **Alert sources** (top of this section). There is no per-webhook event list.
 
 ### IFTTT (SMS, phone notification, smart lights)
 
 1. At https://ifttt.com create an applet. **If This** → **Webhooks** → **Receive a web request with a JSON payload** → event name `ahcc_alert`. **Then That**: any action (notification, SMS, lights). Use the `{{JsonPayload}}` ingredient for the text.
 2. Get your key: https://ifttt.com/maker_webhooks → **Documentation**.
-3. In AHCC, create a webhook with **Destination URL** `https://maker.ifttt.com/trigger/ahcc_alert/json/with/key/<your key>` and **Alert triggered** ticked. Click **Test**.
+3. In AHCC, create a webhook with **Destination URL** `https://maker.ifttt.com/trigger/ahcc_alert/json/with/key/<your key>`. Click **Test**.
 
 **Check:** the IFTTT action fires.
 
 ### Home Assistant
 
 1. In Home Assistant: **Settings** → **Automations** → **Create automation** → trigger **Webhook**. Copy the webhook ID. Keep **Only accessible from the local network** on if AHCC is on the same network.
-2. In AHCC, create a webhook with **Preset** `Home Assistant / Apple Home`, **Destination URL** `https://<home-assistant-host>/api/webhook/<webhook_id>`, **Alert triggered** and **Node alerts & status** ticked. **Test**.
+2. In AHCC, create a webhook with **Preset** `Home Assistant / Apple Home`, **Destination URL** `https://<home-assistant-host>/api/webhook/<webhook_id>`. **Test**.
 3. In the automation, use `{{ trigger.json.summary }}` for the text, `{{ trigger.json.rule.severity }}` for the level and `{{ trigger.json.data.mac }}` for the device.
 
 **Check:** the automation's trace shows the test run.
@@ -305,10 +306,11 @@ AHCC can run a Matter device that Apple Home and Google Home add like any smart-
 | **AntiHunter Alert** | every source set to Alert or Critical |
 | **AntiHunter Critical** | only the sources you set to Critical |
 
-You pick the level per source in **Config** → **Remote Access & Alerts** → **What counts as Alert or Critical**: each alert rule by name, each node event type (deauth/disassoc attack, tamper, erase, vibration, mesh guard, other ALERT-level events) and alerts from linked MQTT sites. Each source is **Off**, **Alert** or **Critical**. Everything starts as Alert and nothing is Critical until you choose it. The same levels apply to phone push, Signal, ntfy and Matrix: Critical messages start with `CRITICAL:` and use ntfy priority 5; Off sends nothing to those channels (webhooks and email are unchanged).
+Each turns on when an alert fires and turns off after 60 seconds. Home then sends its own notifications and can run automations (turn on lights, sound a HomePod). No alert text is sent, only on/off.
+
+You pick the level per source in **Alerts** → **Remote alerts** → **Alert sources**: each alert rule by name, each node event type and linked MQTT sites. Tick **Notify** for the Alert sensor, **Critical** for both; untick both to send nothing. Click **Save levels**. Alert rules, Wi-Fi attacks, deauth/disassoc, tamper, vibration, erase, mesh guard and linked MQTT sites start at Notify; everything else starts unticked; nothing is Critical until you choose it. The same levels apply to phone push, Signal, ntfy, Matrix and webhooks: Critical messages start with `CRITICAL:` and use ntfy priority 5. Email is unchanged.
 
 Node heartbeats, GPS fixes, startup, baseline and new-device notices (INFO and NOTICE) never reach these channels; they stay in the AHCC console. To alert on a specific device, create an alert rule for it and set its level here.
- Each turns on when an alert fires and turns off after 60 seconds. Home then sends its own notifications and can run automations (turn on lights, sound a HomePod). No alert text is sent, only on/off.
 
 Needs a home hub: HomePod, HomePod mini, Apple TV or iPad for Apple Home; a Nest speaker/display, Google TV Streamer or Nest Wifi Pro for Google Home. The phone and the AHCC computer must be on the same network while pairing.
 
@@ -327,13 +329,15 @@ This builds `apps/backend/bin/matter/ahcc-matter` with Bun, signs it with your D
 
 **Pair it.**
 
-1. **Config** → **Remote Access & Alerts** → **Apple Home / Google Home (Matter)** → tick **Run the Matter device**, Layout **Bridge with named sensors**, **Save**. State changes to `waiting to pair` and the card shows a QR code, a **Setup code** and an **8-digit passcode**.
+1. **Alerts** → **Remote alerts** → **Apple Home / Google Home** → tick **On**, leave **Network** at **Automatic** (or pick your home network interface), **Save**. State changes to `waiting to pair`. Click **Show pairing code** for the QR code, **Setup code** and **Passcode**.
 2. Apple Home: **+** → **Add Accessory** → point the camera at the QR code on screen. Accept the uncertified-accessory warning. Google Home: **Devices** → **Add** → **Matter-enabled device** → scan the QR code. If the camera won't read it, choose **More options** and type the setup code.
-3. **Test (both sensors on)**.
+3. **Test**. It sends a Critical alert, which turns on both sensors.
 
 **Check:** both sensors show occupancy detected in Home, and the card shows `paired`.
 
-**Reset pairing** removes AntiHunter from every home it was added to and shows a new code. Changing **Layout** changes how Home sees the device: remove AntiHunter from Home and pair again afterwards. Pairings made before the named-sensor layout use **Two unnamed sensors**; fire a test alert (ALERT level turns on only the any-alert sensor) to tell them apart and rename them in Home.
+**Reset pairing** asks to confirm, removes AntiHunter from every home it was added to, and shows a new code. **Restart** restarts the Matter device without unpairing.
+
+The device is a bridge with the two named sensors. `AHCC_MATTER_LAYOUT=flat` in `apps/backend/.env` instead exposes two unnamed sensors; after changing it, remove AntiHunter from Home and pair again. To tell flat sensors apart, fire a Notify-level alert (only **AntiHunter Alert** turns on) and rename them in Home.
 
 Docker: Matter pairing uses local-network discovery (mDNS), which Docker's default network does not pass. Run the backend outside Docker, or with host networking, to pair.
 
@@ -356,7 +360,7 @@ iTAK can't connect to AHCC directly, so the TAK server sits in the middle. AHCC 
 Free servers: OpenTAKServer (easiest), FreeTAKServer, TAK Server. The plaintext CoT port is around 8087 or 8088. The TLS streaming port is 8089. Check your server's docs.
 
 1. Install OpenTAKServer on the AHCC host, or on a VPN-only machine.
-2. Migrate if you haven't: `pnpm --filter @command-center/backend prisma migrate deploy`
+2. Migrate if you haven't: `pnpm --filter @command-center/backend prisma:migrate`
 3. Set the bridge in apps/backend/.env:
 
        TAK_ENABLED=true
@@ -385,7 +389,7 @@ Lock it down
 5. MQTTS broker and site federation
 --------------------------------------------------------------------------------
 
-Every site connects to one shared broker and publishes its data under `ahcc/<siteId>/`, where siteId is the site's SITE_ID from .env (unique per site). Because each site also subscribes, two sites on the same broker see each other's topics and stay in sync on their own. Messages use QoS 1. To read everything from every site at once, subscribe to `ahcc/#`.
+Every site connects to one shared broker and publishes its data under `ahcc/<siteId>/`, where siteId is the site's SITE_ID from .env (unique per site). Because each site also subscribes, two sites on the same broker see each other's topics and stay in sync on their own. Messages use QoS 1 by default; **QoS (events)** and **QoS (commands)** change it per site. To read everything from every site at once, subscribe to `ahcc/#`.
 
 | Topic                        | Payload                                    |
 | ---------------------------- | ------------------------------------------ |
@@ -420,7 +424,7 @@ Mosquitto is the default: tiny, free, and configured through plain passwd and ac
 
    In the acl: `ahcc-alpha` gets `readwrite ahcc/#`, `viewer` gets `read ahcc/#`.
 4. Open 8883, not 1883. Restart Mosquitto.
-5. Point AHCC at it (Config -> MQTT). Set brokerUrl to `mqtts://host:8883`, a unique clientId, the username and password, and tlsEnabled. Leave caPem empty for a public cert.
+5. Point AHCC at it: **Config** → **MQTT Federation**. Set **Broker URL** to `mqtts://host:8883`, a unique **Client ID**, **Username** and **Password**, and tick **TLS enabled**. Leave **CA PEM** empty for a public cert.
 
 Read the feed with MQTTX or any client:
 
@@ -472,10 +476,11 @@ AHCC POSTs events to an HTTPS endpoint. It only dials out. Step-by-step setups f
 
 Body fields: `summary` (one-line plain text), `content` + `embeds` + `allowed_mentions` (Discord, escaped), `text` (Slack, escaped), `event`, `eventType`, `rule`, `data` (message, MAC, node, SSID, channel, RSSI, lat/lon, siteId, timestamp), `payload` (event-specific).
 
-1. Open Config -> Webhooks. Add the https URL of your receiver.
-2. Set a secret. AHCC signs each POST body with HMAC-SHA256 using it (hex, `x-webhook-signature` header). Your receiver checks the signature.
-3. Pick the events to send. Add a CA bundle and client cert for mutual TLS.
-4. Hit the test button. Check the delivery log.
+1. Open **Alerts** → **Remote alerts** → **Webhooks** → **Create webhook**. Enter the https URL of your receiver in **Destination URL**.
+2. Set **Secret (optional)**. AHCC signs each POST body with HMAC-SHA256 using it (hex, `x-webhook-signature` header). Your receiver checks the signature.
+3. For mutual TLS, fill in **Client certificate (PEM)**, **Client private key (PEM)** and **Custom CA bundle (optional)**.
+4. Choose what is sent in **Alert sources**; every enabled webhook gets every ticked source.
+5. Click **Test** on the webhook row, then **Edit** → **Recent deliveries**.
 
 Lock it down
 
@@ -489,6 +494,8 @@ Lock it down
 --------------------------------------------------------------------------------
 
 The Meshtastic app's TAK feature carries Meshtastic's own CoT between nodes (positions, chat, markers), not AntiHunter detections, which are plain text frames rather than CoT. It also runs over LoRa, not the internet. To get detections into TAK, use the [TAK bridge](#tak).
+
+AHCC itself reaches the mesh through one Meshtastic radio on USB with Send Mode `protobuf`. See [Serial Hardware](../README.md#serial-hardware--meshtastic-sniffer) in the README.
 
 --------------------------------------------------------------------------------
 <a id="rbac"></a>

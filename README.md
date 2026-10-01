@@ -65,10 +65,10 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 
 #### Drone Tracker & Inventory Drawer
 
-- The live map now spawns a **Drone Tracker & Inventory** drawer whenever a telemetry frame arrives. The drawer lists every tracked drone/operator pair on a single line, shows the current heading (cardinal string), operator details, FAA metadata, and exposes map focus buttons for each entry.
-- Clicking a drone or operator on the map re-opens the drawer if it was dismissed. Hostile rows pulse red, neutral/friendly rows pick up their site colors, and **Unknown** defaults to the new blue palette so status is immediately obvious.
+- The live map opens a **Drone Tracker & Inventory** drawer whenever a telemetry frame arrives. The drawer lists every tracked drone/operator pair on a single line, shows the current heading (cardinal string), operator details, FAA metadata, and exposes map focus buttons for each entry.
+- Clicking a drone or operator on the map re-opens the drawer if it was dismissed. Hostile rows pulse red, neutral/friendly rows pick up their site colors, and **Unknown** rows are blue.
 - Status changes (Friendly / Neutral / Hostile) are committed through `PATCH /api/drones/:id/status` and reflected everywhere (map markers, drawer rows, Socket.IO events, MQTT federation). The UI guards against race conditions so you can keep toggling a status even while telemetry continues to stream.
-- Set `DRONES_RECORD_INVENTORY=true` (see [Configuration](#configuration)) to automatically mirror every drone detection into the Inventory module; clearing inventory now flushes the drone cache and removes map markers until fresh telemetry arrives.
+- Set `DRONES_RECORD_INVENTORY=true` (see [Configuration](#configuration)) to mirror every drone detection into the Inventory module. Clearing inventory flushes the drone cache and removes map markers until fresh telemetry arrives.
 
 #### FAA Registry Integration
 
@@ -78,14 +78,14 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 
 #### Drone Geofence Breach Alarms
 
-- Geofences now evaluate drone positions in addition to ground nodes. Tripping a perimeter raises a dedicated **Drone Geofence Breach** alarm level with its own sound slot on the **Config -> Alarms** page.
+- Geofences evaluate drone positions as well as ground nodes. Tripping a perimeter raises a dedicated **Drone Geofence Breach** alarm level with its own sound slot on the **Config -> Alarms** page.
 - While a breach is active the impacted geofence keeps its configured color but pulsates to draw attention, and the Drone Tracker drawer highlights the offending aircraft.
 
 #### Flight Trails, Operators, and Persistence
 
-- Each drone and operator pin now uses the same status-driven palette, includes heading vectors, and draws a historical trail so you can reconstruct the approach path.
-- The backend keeps only one copy of each drone snapshot in memory and debounces writes to the database, preventing the persistence flood that previously occurred when running simulators or high-rate feeds.
-- MQTT federation has been updated to publish only local drones and to retry failed subscriptions with exponential backoff, ensuring remote sites receive telemetry even across flaky links.
+- Each drone and operator pin uses the status palette, shows a heading vector, and draws a trail of past positions.
+- The backend keeps one copy of each drone snapshot in memory and debounces database writes.
+- MQTT federation publishes only local drones and retries failed subscriptions with exponential backoff.
 
 #### Simulator-Driven Testing
 
@@ -102,18 +102,18 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Spacing guidance:** plan for at least ~50 m spacing between nodes. Tighter spacing boosts confidence and reduces dilution of precision; wider spacing works, but the estimator has less overlap between coverage lobes and will “snap” toward the loudest node.
 - **Fleet security:** the **Fleet Security** page manages the mesh's cryptographic posture — the control-post radio identity and registered operator keys (X25519, shown as fingerprints; private keys never leave the radio or the operator), a per-node trust roster (each node's admin keys, managed flag, and policy drift, refreshed by a signed `get_config` over PKC), and staged channel-PSK rotation (stage a secondary channel, migrate each node atomically, then promote and retire) with a job queue and progress. Over-the-air changes to a node's admin keys or managed flag are refused, not sent: Meshtastic replaces the whole security config and regenerates the node keypair when a set omits the 32-byte private key, so those changes must be provisioned locally over USB. Rotation and admin actions require ADMIN; verify is ADMIN or OPERATOR; the feature runs only on the node holding the serial port.
 - **Radio controls:** Config → Serial Connection → **Radio** shows the attached Meshtastic radio (name, node number, battery, clock offset, mesh node count). Operators can refresh its settings, set its clock from the host, ask all nodes to announce themselves, and read battery. Admins can set GPS mode, a fixed position, screen timeout, and Bluetooth, and can reboot, shut down, wake (RTS reset pulse), or clear the radio's node list. Settings changes start from the radio's current configuration and change only the chosen field, so the rest of that settings section is kept.
-- **Serial send settings:** Config → Serial Connection also selects how firmware commands are written — Send Mode (`protobuf`, `protobuf-ack`, or `plain` text line), mesh hop limit, and command channel — persisted per install and applied on the next connect. Fleet-security admin always uses encrypted protobuf regardless.
+- **Serial send settings:** Config → Serial Connection sets Send Mode (`protobuf` or `plain`), mesh hop limit, and command channel. Settings are saved per install and applied on reconnect. Fleet-security admin always uses encrypted protobuf. See [Serial Hardware](#serial-hardware--meshtastic-sniffer) for which mode to pick.
 - **Command post status broadcast:** Config → Serial Connection → **Mesh Status Broadcast** sends `<short name>: STATUS: Mode:C2 Scan:IDLE Hits:<mesh nodes> Temp:<°C or ?>C Up:HH:MM:SS [GPS:lat,lon] [Batt:NN%]` to `@ALL` on a 1–60 minute timer, in the same shape as the firmware STATUS reply, so other command posts show this one as a node. Timer, GPS, and answering `@ALL STATUS` / `@<short name> STATUS` are each opt-in and default off. The STATUS parser accepts `Temp:?C` for hosts without a temperature sensor.
 - **Limitations & reflections:** this is an estimation tool. It does not account for multipath reflections, terrain shielding, buildings, or antenna tilt. Treat the purple overlay as a probable region, not a guaranteed fix—obstacles and RF noise will widen the true uncertainty.
 
 ### Alert Automation & Integrations
 
 - **Custom Alerts module**: build rules that match MACs, OUI prefixes, SSIDs, channels, RSSI windows, or inventory devices. Each rule controls its own alarm level, optional audible, and map styling (color, icon, blink, label). Promotions from Inventory drop straight into rule criteria so analysts can set up a watch list in seconds.
-- **Alert Event Log**: the Alerts nav rail contains an Event Log page that mirrors Config’s layout—dark rail on the left, stacked cards on the right—so you can filter, search, and acknowledge past alert hits without leaving the module.
+- **Alert Event log**: **Alerts → Event log** lists past alert hits, searchable by rule.
 - **Webhook engine**: alert matches, inventory updates, node telemetry, and raw serial traffic can fan out to HTTPS endpoints with optional mutual TLS (CA bundle + client cert/key) and HMAC signatures. Hooks are configured under **Config → Webhooks** with inline testing, per-event subscription toggles, and automatic delivery logging.
 - **Secure runtime**: webhook dispatchers let you disable TLS validation for lab setups or enforce full-chain verification in production. Client certificates and private keys are stored encrypted in the database, and Prisma migrations now cover inventory update events plus serial/raw tap targets.
-- **Remote access & phone alerts**: Tailscale access, encrypted phone push, Signal, ntfy, Matrix, and Apple/Google Home sensors, set in **Config → Remote Access & Alerts**. Setup: [Remote Connections](docs/INTERNET-CONNECTIVITY.md).
-- **Operator UX**: the Alerts, Config, and Addons pages now share the same shell (sidebar buttons outside the card, stacked sections within) so the experience is consistent no matter which subsystem you configure.
+- **Remote access & phone alerts**: Tailscale access, encrypted phone push, Signal, ntfy, Matrix, and Apple/Google Home sensors. Tailscale is in **Config → Remote Access**; alert channels and webhooks are in **Alerts → Remote alerts**. Setup: [Remote Connections](docs/INTERNET-CONNECTIVITY.md).
+- **Operator UX**: the Alerts, Config, and Addons pages share one layout: section buttons in a sidebar, stacked sections in the card.
 - **Database panel**: **Config → System Updates** shows live row counts for the stored operational data (nodes, positions, drones, targets, inventory, alerts, commands, geofences, webhooks, users, audit log). Read-only, admin-only.
 
 ### Sentinel Command Console & Attack Telemetry
@@ -123,7 +123,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Incident log**: `INCIDENTS[:<count>]` (count 1-200) requests the node's Sentinel incident ring buffer over mesh; `INCIDENTS_CLEAR` wipes it.
 - **Mesh de-dup controls**: `CONFIG_DEDUP_TTL:<0-3600>` sets the cross-scan MAC de-dup TTL (seconds), `CONFIG_SESSION_DEDUP:<0|1>` toggles per-session de-dup, and `MESH_DEDUP_CLEAR` flushes the de-dup cache.
 - **Erase authorization**: `CONFIG_ERASE_PSK:<key>` (1-64 chars) sets the pre-shared key that gates erase/factory-reset commands, and `FACTORY_RESET:<FULL|CONFIG|DATA>:<credential>` factory-resets a single targeted node against that credential.
-- **Attack telemetry ingest**: the backend now parses Sentinel WiFi attack detections (`<nodeId>: <TYPE>:<fields>`) covering rogue-AP attacks (evil-twin, OWE-downgrade abuse, karma/MANA candidate + confirmed), credential-harvesting activity (PMKID forge/harvest, EAPOL bait, handshake capture, KRACK), flood/DoS activity (deauth flood/forge/AP-targeted, beacon flood/forge, auth flood, assoc-sleep, SAE DoS, probe floods and their behavioral/AP-targeted variants), recon and physical-layer abuse (SSID confusion, FragAttacks, generic recon, attacker-hunt, PHY jamming), and Pwnagotchi beacon fingerprints -- plus mesh-guard intrusion alerts (self-spoof, mesh flood, command injection), baseline `DEVICE_DISAPPEARED` events, and RemoteID relay frames (`RID_RX`, `RID_CLAIM`). These feed the same Console/Alerts/map pipeline as existing detection types.
+- **Attack telemetry ingest**: the backend parses Sentinel WiFi attack detections (`<nodeId>: <TYPE>:<fields>`) covering rogue-AP attacks (evil-twin, OWE-downgrade abuse, karma/MANA candidate + confirmed), credential-harvesting activity (PMKID forge/harvest, EAPOL bait, handshake capture, KRACK), flood/DoS activity (deauth flood/forge/AP-targeted, beacon flood/forge, auth flood, assoc-sleep, SAE DoS, probe floods and their behavioral/AP-targeted variants), recon and physical-layer abuse (SSID confusion, FragAttacks, generic recon, attacker-hunt, PHY jamming), and Pwnagotchi beacon fingerprints -- plus mesh-guard intrusion alerts (self-spoof, mesh flood, command injection), baseline `DEVICE_DISAPPEARED` events, and RemoteID relay frames (`RID_RX`, `RID_CLAIM`). These feed the same Console/Alerts/map pipeline as existing detection types.
 
 ### UI Modules at a Glance
 
@@ -192,7 +192,7 @@ Adjust system defaults (alarms, detection presets, serial ports, site federation
 
 #### Addons
 
-Enable or disable optional modules (Sentinel, Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment. The updated capture shows the Addons catalog card, feature summaries, and the new badge callouts for beta-grade modules.
+Enable or disable optional modules (Sentinel, Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment. Beta modules carry a badge in the catalog.
 
 <img width="1151" height="948" alt="addons" src="https://github.com/user-attachments/assets/f699d5c3-c7a2-4a11-af9f-02c0e2403897" />
 
@@ -265,7 +265,7 @@ All topics use QoS 1 by default (configurable per site). Publishers short-circui
 
 #### MQTT Configuration Cheat Sheet
 
-Configure federation per site in **Config -> MQTT** (or directly via the `MqttConfig` table). Key fields:
+Configure federation per site in **Config -> MQTT Federation** (or directly via the `MqttConfig` table). Key fields:
 
 | Field                                      | Purpose                                                           | Notes                                                                                                 |
 | ------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -279,7 +279,7 @@ Configure federation per site in **Config -> MQTT** (or directly via the `MqttCo
 **Environment defaults:**  
 Set `SITE_ID` to the local site identifier (defaults to `default`). Each Command Center deployment **must use a unique `SITE_ID`** so MQTT replication distinguishes the origin site (e.g., `SITE_ID=alpha`, `SITE_ID=bravo`). Restart the backend after changing it. Optional flags like `MQTT_ENABLED`, `MQTT_COMMANDS_ENABLED`, and `MQTT_NAMESPACE` seed runtime config before any database records exist.
 
-> **Tip:** Set `SITE_ID` (and optionally `SITE_NAME`) in the root `.env` **before** running `pnpm prisma db seed`. The seed script now creates the initial `Site`, `SerialConfig`, and `MqttConfig` rows with that identifier, so make sure it matches the value you expect the backend to advertise.
+> **Tip:** Set `SITE_ID` (and optionally `SITE_NAME`) in the root `.env` **before** running `pnpm prisma db seed`. The seed script creates the initial `Site`, `SerialConfig`, and `MqttConfig` rows with that identifier.
 
 ## Security & Hardening
 
@@ -374,13 +374,13 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | `TRUST_PROXY`                                                                  | `loopback` | Express `trust proxy`: which hops may set `X-Forwarded-For`. Addresses/CIDRs, or a hop count (Docker uses `1` for nginx). |
 | `AHCC_ALLOWED_HOSTS`                                                           | _(unset)_ | `apps/frontend/.env`: extra hostnames the Vite dev server accepts, comma-separated (e.g. your `*.ts.net` name). |
 | `TS_AUTHKEY`, `TS_HOSTNAME`                                                    | _(unset)_, `ahcc` | Tailscale container (Docker `remote` profile). |
-| `VAPID_*`, `TS_ALLOWED_LOGINS`, `NTFY_*`, `SIGNAL_*`, `MATRIX_*`               | _(unset)_ | First-start defaults for **Config → Remote Access & Alerts**; edit there after. |
+| `VAPID_*`, `TS_ALLOWED_LOGINS`, `NTFY_*`, `SIGNAL_*`, `MATRIX_*`               | _(unset)_ | First-start defaults for **Config → Remote Access** and **Alerts → Remote alerts**; edit there after. |
 | `AHCC_MATTER_BIN`, `AHCC_MATTER_INTERFACE`                                     | _(unset)_ | Signed Matter app path; network interface to bind (e.g. `en0`). |
 | `REMOTE_ALERTS_SECRET_KEY`                                                     | key file  | Encrypts alert secrets. Unset: random key in `.secrets/`; back it up. |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS.        |
 | `SITE_ID`                                                                      | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing.    |
 
-- Helmet now enforces CSP, referrer policy, frameguard, cross-origin resource policy, and HSTS (when HTTPS is enabled) for every response.
+- Helmet sets CSP, referrer policy, frameguard, cross-origin resource policy, and HSTS (when HTTPS is enabled) for every response.
 
 ### Command Audit & Attestation
 
@@ -390,7 +390,7 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 
 ### Hardening Checklist
 
-- **Authentication throttling** — login, legal acceptance, and 2FA routes now run through a Redis-backed `RateLimitGuard` that enforces both burst and sustained limits, tripping firewall escalation for abusive clients.
+- **Authentication throttling** — login, legal acceptance, and 2FA routes run through a Redis-backed `RateLimitGuard` that enforces both burst and sustained limits, tripping firewall escalation for abusive clients.
 - **Bot heuristics on login** — UI forms include a honeypot field plus a minimum submit time (600 ms) so scripted attacks are rejected server-side without inconveniencing operators.
 - **Neutral firewall messaging** — when abuse is detected, the API surfaces neutral responses while logging detailed context internally, preventing the login page from advertising firewall decisions.
 - Enforce HTTPS everywhere with modern TLS ciphers (consider terminating behind an ALB / nginx reverse proxy with OCSP stapling).
@@ -832,8 +832,8 @@ Optional environment flags:
 | `JWT_SECRET`                         | If auth is enabled later                                                                                                     |
 | `SITE_ID`                            | Default site for ingest                                                                                                      |
 | `WS_MAX_CLIENTS`                     | Socket.IO connection limit                                                                                                   |
-| `SERIAL_PROTOCOL`                    | Parser profile: `meshtastic-rewrite` (Meshtastic radio), `raw-lines` (direct AntiHunter node), `nmea-like`. |
-| `SERIAL_SEND_MODE`                   | First-start default for how mesh commands are written: `protobuf`, `protobuf-ack`, or `plain`. Editable in **Config → Serial Connection**. |
+| `SERIAL_PROTOCOL`                    | Leave at `meshtastic-rewrite`. Every value uses the same parser.                                                             |
+| `SERIAL_SEND_MODE`                   | First-start default for how commands are written: `protobuf` (Meshtastic radio over USB) or `plain` (text line). Editable in **Config → Serial Connection**. |
 | `SERIAL_HOP_LIMIT`                   | First-start default mesh hop limit (0–7) for protobuf command packets. Editable in the UI.                                    |
 | `SERIAL_COMMAND_CHANNEL`             | First-start default channel index (0–7) commands are sent on. Editable in the UI.                                            |
 | `HTTPS_ENABLED`                      | `true` to serve the backend over HTTPS                                                                                       |
@@ -867,7 +867,7 @@ Frontend currently consumes backend settings via API, so no extra `.env` is need
 1. **Mirror detections into inventory:** add `DRONES_RECORD_INVENTORY=true` to `apps/backend/.env` (or set it via your secrets manager) and restart the backend. Every drone telemetry event that includes a MAC + node id is now persisted in the Inventory module in addition to the live tracker.
 2. **Seed FAA data offline:** download [ReleasableAircraft.zip](https://registry.faa.gov/database/ReleasableAircraft.zip) from the FAA, then open **Config -> FAA Registry** in the UI and click **Upload ZIP** (or upload `MASTER.txt`) to populate the local cache. The parser runs server-side and the FAA card shows ingest progress plus the number of cached aircraft.
 3. **Enable/disable online lookups:** the same FAA card exposes a **Online Lookup** toggle backed by `FAA_ONLINE_LOOKUP_ENABLED`. Leave it on when the Command Center has outbound internet access; turn it off for fully air-gapped deployments. Online lookups hit `https://uasdoc.faa.gov/listDocs/{RID}` using the cooldown/TTL described by the env vars above.
-4. **Customize drone geofence alarms:** browse to **Config -> Alarms**, scroll to the new **Drone Geofence Breach** slot, upload a custom tone if desired, and test it with the preview button. The alarm fires whenever a tracked drone crosses a geofence boundary.
+4. **Customize drone geofence alarms:** browse to **Config -> Alarms**, scroll to the **Drone Geofence Breach** slot, upload a custom tone if desired, and test it with the preview button. The alarm fires whenever a tracked drone crosses a geofence boundary.
 
 ### Environment file layout
 
@@ -880,13 +880,13 @@ A key set in `apps/backend/.env` overrides the same key in the root `.env`; keys
 
 ### Serial defaults & persistence
 
-Each Command Center installation owns a single local LoRa gateway, so the serial stack now persists **one global configuration** (record id `serial`) regardless of how many sites you manage through federation.
+Each installation has one local radio and one serial configuration (record id `serial`), regardless of how many sites are federated.
 
-- On first access (`GET /serial/config`), the backend seeds that global record with any `SERIAL_*` values present in the environment (e.g., `SERIAL_DEVICE`, `SERIAL_BAUD`, `SERIAL_DELIMITER`, `SERIAL_RECONNECT_BASE_MS`, etc.). The **Config -> Serial** card immediately reflects those defaults so operators can tweak them without touching `.env`.
+- On first access (`GET /serial/config`), the backend seeds that record with any `SERIAL_*` values present in the environment (e.g., `SERIAL_DEVICE`, `SERIAL_BAUD`, `SERIAL_DELIMITER`, `SERIAL_RECONNECT_BASE_MS`). **Config → Serial Connection** shows those values and edits them.
 - Subsequent edits through the UI/API write directly to the database and override the env defaults. Environment variables are only used as bootstrap values—they will not overwrite saved settings on restart.
-- Changing the env defaults later? Use the UI/API (or delete the lone `SerialConfig` row) to reapply them. `SITE_ID` still labels events for federation, but it no longer influences serial persistence.
-- The Serial card also shows a **Detected Ports** dropdown (populated from `GET /serial/ports`) and a **Reset to defaults** button (`POST /serial/config/reset`). Use them to quickly switch USB devices or re-seed from the current env without touching the database manually.
-- **Protocol**: use **Meshtastic Ingest** for a Meshtastic gateway radio, or **Raw Lines** when the serial device is an AntiHunter node connected directly.
+- Changing the env defaults later? Use the UI/API (or delete the lone `SerialConfig` row) to reapply them. `SITE_ID` labels events for federation and does not affect the serial configuration.
+- **Device Path** lists detected ports (`GET /serial/ports`). **Reset to Defaults** (`POST /serial/config/reset`) re-seeds the configuration from the current env.
+- **Send Mode**: `protobuf` for a Meshtastic radio on USB, `plain` for a text-line device. See [Serial Hardware](#serial-hardware--meshtastic-sniffer).
 
 ### Two-Factor Authentication (optional)
 
@@ -896,7 +896,7 @@ Each Command Center installation owns a single local LoRa gateway, so the serial
    TWO_FACTOR_ISSUER="AntiHunter Command Center"
    ```
    Restart the backend after updating the file.
-2. Users can now browse to **Account -> Two-Factor Authentication**, click **Enable Two-Factor**, scan the QR code with Google Authenticator (or any TOTP app), submit the current code, and download/store the generated recovery codes.
+2. Users browse to **Account -> Two-Factor Authentication**, click **Enable Two-Factor**, scan the QR code with Google Authenticator (or any TOTP app), submit the current code, and download/store the generated recovery codes.
 3. Administrators can regenerate recovery codes or disable 2FA from the same panel. Temporary login tokens for 2FA challenges expire after `TWO_FACTOR_TOKEN_EXPIRY` (default 10 minutes).
 
 ### Enabling HTTPS (optional)
@@ -937,11 +937,11 @@ Each Command Center installation owns a single local LoRa gateway, so the serial
 
 The backend ships with a TAK bridge that translates node/alert telemetry into Cursor-on-Target events for ATAK/WinTAK ecosystems.
 
-1. Apply the latest Prisma migrations (`pnpm --filter @command-center/backend prisma migrate deploy`) so the `TakConfig` table exists.
+1. Apply the Prisma migrations (`pnpm --filter @command-center/backend prisma:migrate`) so the `TakConfig` table exists.
 
 2. Set baseline values through environment variables (see table above) **or** configure them from the **Config -> TAK Bridge** card in the UI.
 
-3. Choose the transport (`UDP` or `TCP` today; HTTPS/TLS fields are stored now for the upcoming TLS connector), then supply the host/port and any credentials.
+3. Choose the transport (`UDP`, `TCP` or `HTTPS`) and supply the host, port and any credentials. For TLS, tick **Require TLS certificates** and fill in the CA, client certificate and key.
 
 4. Use the **Streams** and **Alert severities** toggles to decide which telemetry (nodes, targets, command ack/results, per-level alerts) is mirrored into TAK.
 
@@ -1272,23 +1272,36 @@ The script prints a deployment summary (URLs, generated credentials). Store it s
 
 ## Serial Hardware & Meshtastic Sniffer
 
-1. Connect the radio/mesh device via USB and note the port (`/dev/ttyUSB0`, `COM6`, etc.).
+### Connect a Meshtastic radio (standard setup)
 
-2. Update `SERIAL_DEVICE`/`SERIAL_BAUD` in the backend `.env`.
+1. Plug the Meshtastic radio into the host by USB. Close every other program that uses the port (Meshtastic app over USB, `meshtastic` CLI, serial monitors); only one program can hold it.
+2. Open **Config → Serial Connection**, pick the port under **Device Path** → **Select detected port** (`/dev/ttyACM0`, `/dev/cu.usbmodem…`, `COM6`), leave baud at `115200` and Send Mode at `protobuf`.
+3. The backend connects and sends the Meshtastic API handshake; its log prints `Meshtastic config complete` with the radio's node count. Config → Serial Connection → **Radio** then shows the radio.
+4. Test: send `@ALL STATUS` from the **Console** page. Each AntiHunter node on the mesh replies with a `STATUS` line.
 
-3. Start the backend; the serial worker auto-connects and begins ingest.
+`SERIAL_DEVICE` / `SERIAL_BAUD` in the backend `.env` only set first-start defaults; the UI values are saved in the database and win after that.
 
-4. Use the built-in tool for raw capture:
+### Send Mode
+
+| Mode       | What AHCC writes                                                             | Use with                                                                 |
+| ---------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `protobuf` | Meshtastic API frames: handshake, a heartbeat every 15 s, commands as text-message packets | A Meshtastic radio on USB. This is the only mode that works over a radio's USB port. |
+| `plain`    | Only the command as a text line. No handshake or heartbeat.                  | A device that reads text lines: an AntiHunter node wired to the host, or a radio's serial-module UART pins set to `TEXTMSG`. |
+
+Meshtastic firmware ignores any USB input that is not a framed protobuf packet, and it does not allow `TEXTMSG` mode on the USB console port. A Meshtastic radio on USB in `plain` mode receives nothing.
+
+The heartbeat keeps the radio's API session open. Without client traffic for 15 minutes the radio closes the session and stops forwarding mesh packets.
+
+### Raw capture
+
+Stop the backend first; the sniffer needs the port.
 
 ```bash
-
-pnpm tool:sniffer -- --port /dev/ttyUSB0 --baud 921600
-
+pnpm tool:sniffer -- --port /dev/ttyACM0 --baud 115200
 # Additional flags: --output file.log --json --no-stdout --delimiter "\r\n"
-
 ```
 
-The sniffer is a zero-dependency TypeScript script that mirrors frames to stdout and a log file for parser development.
+The sniffer prints and logs what the device sends. It does not send the Meshtastic handshake, so a Meshtastic radio shows only its console log text.
 
 ## Useful Scripts
 
@@ -1341,7 +1354,7 @@ The sniffer is a zero-dependency TypeScript script that mirrors frames to stdout
 
 ## Operations & Maintenance
 
-- **Clearing nodes:** The UI invokes `DELETE /nodes`, which now removes rows from `Node`, `NodePosition`, `NodeCoverageOverride`, and `TriangulationResult` tables in addition to clearing the in-memory cache. This prevents stale nodes from reappearing when new telemetry arrives.
+- **Clearing nodes:** The UI calls `DELETE /nodes`, which deletes rows from the `Node`, `NodePosition`, `NodeCoverageOverride`, and `TriangulationResult` tables and clears the in-memory cache.
 
 - **Geofence focus:** Clicking **Focus** zooms/frames the polygon and highlights it for 10 seconds. No stale highlights remain thanks to background pruning.
 
@@ -1359,8 +1372,9 @@ The sniffer is a zero-dependency TypeScript script that mirrors frames to stdout
 | **Frontend shows a blank page or 404 after deploy** | Ensure the SPA is served from the `/` root and that your reverse proxy rewrites unknown routes to `index.html`. In Docker, the bundled Nginx config already handles this.                                                                                                                                                                      |
 | **Cannot log in with default credentials**          | Confirm the seed ran: the backend container logs should show "Running database migrations...". If you customized `ADMIN_EMAIL`/`ADMIN_PASSWORD`, restart the backend with the new values or rerun `prisma:seed`.                                                                                                                               |
 | **Backend returns `ECONNREFUSED` for Postgres**     | Check `docker compose logs postgres`; the DB must be healthy before the backend starts. If running locally, verify `DATABASE_URL` matches your Postgres host/port and that migrations were applied.                                                                                                                                            |
-| **Serial device not detected**                      | On Windows note the `COM` port. On Linux grant access (`sudo usermod -aG dialout $USER` then re-login). Update Config -> Serial or `.env` `SERIAL_DEVICE` with the correct path and restart the backend.                                                                                                                                       |
-| **Node connected but nothing shows in the app**     | Set Config -> Serial -> Protocol to **Raw Lines** (a directly-attached node speaks plain text, not Meshtastic protobuf) and confirm no other program holds the port.                                                                                                                                                                          |
+| **Serial device not detected**                      | On Windows note the `COM` port. On Linux grant access (`sudo usermod -aG dialout $USER` then re-login). Pick the port in **Config → Serial Connection → Device Path**; saving reconnects. `SERIAL_DEVICE` in `.env` only sets the first-start default.                                                                                                                                      |
+| **Node connected but nothing shows in the app**     | Confirm no other program holds the port. For a Meshtastic radio on USB, Send Mode must be `protobuf` and the backend log must show `Meshtastic config complete`. For an AntiHunter node wired to the host, set Send Mode to `plain`. |
+| **Commands sent but no reply**                      | Check Send Mode. In `plain` mode a Meshtastic radio on USB drops every command; switch to `protobuf`.                                                                                                                                                                                                                                      |
 | **No alerts despite telemetry**                     | Confirm devices flashed with the companion firmware send events, sockets are connected (check `/healthz`), and that the terminal/alert filters are not hiding the severity you expect.                                                                                                                                                         |
 | **Custom alarm audio silent or too loud**           | After uploading a WAV file, adjust per-level volume sliders and click "Test". If volume does not change, refresh the page to reload cached audio. Supported format: 16-bit PCM WAV.                                                                                                                                                            |
 | **Docker push fails due to upstream changes**       | Run `git pull --rebase origin main`, resolve conflicts, then `git push`. This keeps your fork in sync before you build and publish images.                                                                                                                                                                                                     |
