@@ -127,12 +127,12 @@ const FIRMWARE_MESSAGES: TestCase[] = [
   {
     name: 'DEVICE WiFi',
     input: 'AH5: DEVICE:AA:BB:CC:DD:EE:FF W -72 C6 N:HomeRouter',
-    expectKinds: ['target-detected'],
+    expectKinds: ['device-seen'],
   },
   {
     name: 'DEVICE BLE',
     input: 'AH5: DEVICE:11:22:33:44:55:66 B -85',
-    expectKinds: ['target-detected'],
+    expectKinds: ['device-seen'],
   },
 
   // ─── TARGET_DATA / T_D ───
@@ -249,9 +249,11 @@ const FIRMWARE_MESSAGES: TestCase[] = [
   // ─── VIBRATION ───
   {
     name: 'VIBRATION',
-    input: 'AH5: VIBRATION: Motion detected GPS:39.906,-105.069 TAMPER_ERASE_IN:30s',
+    input:
+      'AH5: VIBRATION: Movement detected at 2026-10-01 14:02:11 GPS:10.500000,-20.250000 TAMPER_ERASE_IN:30s',
     expectKinds: ['alert'],
     expectCategory: 'vibration',
+    expectData: { lat: 10.5, lon: -20.25, eraseIn: 30 },
   },
   {
     name: 'VIBRATION_STATUS',
@@ -299,7 +301,7 @@ const FIRMWARE_MESSAGES: TestCase[] = [
   },
   {
     name: 'ERASE_COMPLETE',
-    input: 'AH5: ERASE_COMPLETE:Done',
+    input: 'AH5: ERASE_COMPLETE',
     expectKinds: ['alert'],
     expectCategory: 'erase',
   },

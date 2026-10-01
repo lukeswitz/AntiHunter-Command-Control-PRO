@@ -81,19 +81,6 @@ function trigger(severity: unknown) {
   }
 }
 
-function lanInterface(): string | undefined {
-  const candidates = Object.entries(networkInterfaces()).filter(
-    ([name, addresses]) =>
-      !/^(utun|tun|tap|wg|ppp|ipsec|tailscale|zt|lo)/.test(name) &&
-      addresses?.some((entry) => !entry.internal && entry.family === 'IPv4') &&
-      addresses.some((entry) => entry.family === 'IPv6'),
-  );
-  const global = candidates.find(([, addresses]) =>
-    addresses?.some((entry) => entry.family === 'IPv6' && !/^(fe80|fc|fd)/i.test(entry.address)),
-  );
-  return (global ?? candidates[0])?.[0];
-}
-
 function restrictTree(path: string) {
   mkdirSync(path, { recursive: true, mode: 0o700 });
   for (const entry of readdirSync(path, { withFileTypes: true })) {
@@ -116,7 +103,7 @@ async function main() {
   const network: { port: number; listeningAddressIpv4?: string; listeningAddressIpv6?: string } = {
     port: Number(process.env.AHCC_MATTER_PORT) || 5540,
   };
-  const iface = process.env.AHCC_MATTER_INTERFACE?.trim() || lanInterface();
+  const iface = process.env.AHCC_MATTER_INTERFACE?.trim();
   if (iface) {
     const addresses = networkInterfaces()[iface];
     if (!addresses?.length) {

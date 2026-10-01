@@ -91,9 +91,7 @@ export function PushNotificationsCard() {
           await enablePush();
         }
       })
-      .catch((error: unknown) =>
-        setStatus(error instanceof Error ? error.message : String(error)),
-      )
+      .catch((error: unknown) => setStatus(error instanceof Error ? error.message : String(error)))
       .finally(() => {
         void currentPushSubscription().then((sub) => setSubscribed(Boolean(sub)));
       });
@@ -289,7 +287,6 @@ export function WebhooksSection() {
     setFormMode('create');
     setFormState({ ...DEFAULT_FORM_STATE });
   };
-
 
   const handleDelete = () => {
     if (formState.id) {
@@ -531,9 +528,6 @@ export function WebhooksSection() {
               Leave certificate fields empty to use the system trust store without mutual TLS.
             </p>
           </details>
-          <p className="field-hint">
-            Fires on every source set to Notify in Alert sources. Choose what sends there.
-          </p>
           <div className="controls-row">
             <button
               type="submit"

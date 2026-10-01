@@ -874,6 +874,17 @@ body.theme-dark .control-chip[disabled] {
 .node-marker--idle {
   animation: none;
 }
+.node-marker.node-marker--blink {
+  animation: markerBlink 0.8s steps(2, jump-none) infinite;
+}
+@keyframes markerBlink {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.15;
+  }
+}
 .node-marker-wrapper--info {
   filter: drop-shadow(0 0 12px color-mix(in srgb, var(--alert-color-info) 45%, transparent));
 }
@@ -5092,7 +5103,7 @@ body.theme-dark .strategy-table__row--selected {
   gap: 0.35rem;
   font-weight: 500;
 }
-.alerts-form input:not([type='checkbox']):not([type='radio']),
+.alerts-form input:not([type='checkbox']):not([type='radio']):not([type='color']),
 .alerts-form select,
 .alerts-form textarea {
   background: var(--color-input-bg);
@@ -5108,6 +5119,18 @@ body.theme-dark .strategy-table__row--selected {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px rgba(var(--color-accent-rgb), 0.25);
+}
+.alerts-form input[type='color'] {
+  width: 48px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.alerts-form input[type='color']:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .alerts-form textarea {
   resize: vertical;

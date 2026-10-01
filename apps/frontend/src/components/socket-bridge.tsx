@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 import type {
   AlarmLevel,
+  AlertRuleMapStyle,
   Drone,
   DroneStatus,
   FaaAircraftSummary,
@@ -662,7 +663,7 @@ export function SocketBridge() {
       if (serverEstimate) {
         useTrackingSessionStore.getState().applyServerEstimate(serverEstimate);
       }
-      if (alertDetails && alertDetails.nodeId) {
+      if (alertDetails && alertDetails.nodeId && alertDetails.mapStyle?.showOnMap !== false) {
         const level = (alertDetails.level ?? 'NOTICE').toUpperCase() as AlarmLevel;
         triggerAlert({
           nodeId: alertDetails.nodeId,
@@ -673,6 +674,7 @@ export function SocketBridge() {
           lat: alertDetails.lat,
           lon: alertDetails.lon,
           timestamp: alertDetails.timestamp,
+          mapStyle: alertDetails.mapStyle,
         });
       }
 
@@ -1336,6 +1338,7 @@ interface AlertDetails {
   lat?: number;
   lon?: number;
   timestamp?: string;
+  mapStyle?: AlertRuleMapStyle;
 }
 
 function extractAlertDetails(payload: unknown): AlertDetails | null {
@@ -1372,6 +1375,10 @@ function extractAlertDetails(payload: unknown): AlertDetails | null {
     lat: toNumber(base.lat ?? (data as Record<string, unknown>).lat),
     lon: toNumber(base.lon ?? (data as Record<string, unknown>).lon),
     timestamp: typeof base.timestamp === 'string' ? base.timestamp : undefined,
+    mapStyle:
+      base.type === 'alert.rule'
+        ? ((base as { mapStyle?: AlertRuleMapStyle | null }).mapStyle ?? undefined)
+        : undefined,
   };
 }
 

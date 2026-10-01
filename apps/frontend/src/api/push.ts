@@ -40,11 +40,12 @@ export async function enablePush(): Promise<void> {
   const serverKey = base64UrlToBytes(publicKey);
   let subscription = await reg.pushManager.getSubscription();
   const boundKey = subscription?.options.applicationServerKey;
-  if (
-    subscription &&
-    (!boundKey || !serverKey.every((byte, i) => byte === new Uint8Array(boundKey)[i]) ||
-      boundKey.byteLength !== serverKey.byteLength)
-  ) {
+  const bound = boundKey ? new Uint8Array(boundKey) : null;
+  const sameKey =
+    bound !== null &&
+    bound.length === serverKey.length &&
+    serverKey.every((byte, i) => byte === bound[i]);
+  if (subscription && !sameKey) {
     await subscription.unsubscribe();
     subscription = null;
   }

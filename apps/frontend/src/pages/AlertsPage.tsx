@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { MdDelete, MdRefresh } from 'react-icons/md';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useSearchParams } from 'react-router-dom';
 
 import {
   createAlertRule,
@@ -10,7 +10,6 @@ import {
   updateAlertRule,
 } from '../api/alert-rules';
 import { apiClient } from '../api/client';
-import { AlertsRail } from '../components/AlertsRail';
 import type {
   AlarmLevel,
   AlertRule,
@@ -19,6 +18,7 @@ import type {
   AlertRuleScope,
   InventoryDevice,
 } from '../api/types';
+import { AlertsRail } from '../components/AlertsRail';
 import { useAuthStore } from '../stores/auth-store';
 
 type FormMode = 'create' | 'edit';
@@ -98,7 +98,12 @@ export function AlertsPage() {
 
   const [search, setSearch] = useState('');
   const [formMode, setFormMode] = useState<FormMode>('create');
-  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedRuleId, setSelectedRuleIdState] = useState<string | null>(null);
+  const setSelectedRuleId = (id: string | null) => {
+    setSelectedRuleIdState(id);
+    setSearchParams(id ? { rule: id } : {}, { replace: true });
+  };
   const [formState, setFormState] = useState<AlertRuleFormState>(() => createDefaultFormState());
   const [inventorySearch, setInventorySearch] = useState('');
   const [ouiSearch, setOuiSearch] = useState('');
@@ -169,6 +174,19 @@ export function AlertsPage() {
     setFormMode('edit');
     setFormState(buildFormState(rule));
   };
+
+  const ruleParam = searchParams.get('rule');
+  useEffect(() => {
+    if (selectedRuleId || !ruleParam) {
+      return;
+    }
+    const rule = rulesQuery.data?.find((candidate) => candidate.id === ruleParam);
+    if (rule) {
+      setSelectedRuleIdState(rule.id);
+      setFormMode('edit');
+      setFormState(buildFormState(rule));
+    }
+  }, [ruleParam, rulesQuery.data, selectedRuleId]);
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const payload = buildPayload(formState);

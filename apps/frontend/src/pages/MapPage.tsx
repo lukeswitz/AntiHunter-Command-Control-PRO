@@ -25,6 +25,7 @@ import { apiClient } from '../api/client';
 import type {
   AcarsMessage,
   AlarmLevel,
+  AlertRuleMapStyle,
   AppSettings,
   AuthUser,
   Drone,
@@ -388,6 +389,17 @@ export function MapPage() {
       // Record a site-agnostic fallback so alerts without a site still pulse nodes.
       const globalKey = composeNodeKey(alert.nodeId, undefined);
       applyIndicator(map, globalKey, indicator);
+    });
+    return map;
+  }, [alerts]);
+
+  const alertStyleMap = useMemo(() => {
+    const map = new Map<string, AlertRuleMapStyle>();
+    Object.values(alerts).forEach((alert) => {
+      if (alert.mapStyle) {
+        map.set(composeNodeKey(alert.nodeId, alert.siteId), alert.mapStyle);
+        map.set(composeNodeKey(alert.nodeId, undefined), alert.mapStyle);
+      }
     });
     return map;
   }, [alerts]);
@@ -1020,6 +1032,7 @@ export function MapPage() {
             drones={drones}
             droneTrails={droneTrails}
             alertIndicators={alertIndicatorMap}
+            alertStyles={alertStyleMap}
             alertColors={alertColors}
             defaultRadius={mapDefaultRadius}
             showRadius={radiusEnabled}
