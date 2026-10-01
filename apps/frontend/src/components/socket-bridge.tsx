@@ -48,6 +48,12 @@ const HTTP_LINK_REGEX = /^https?:\/\//i;
 
 type TerminalEntryInput = Omit<TerminalEntry, 'id' | 'timestamp'> & { timestamp?: string };
 
+const replayState: { connectedBefore: boolean; bootId: string | null; seen: Set<number> } = {
+  connectedBefore: false,
+  bootId: null,
+  seen: new Set(),
+};
+
 export function SocketBridge() {
   const socket = useSocket();
   const queryClient = useQueryClient();
@@ -75,6 +81,12 @@ export function SocketBridge() {
 
     const handleInit = (payload: unknown) => {
       if (isInitPayload(payload)) {
+        if (typeof payload.bootId === 'string') {
+          if (replayState.connectedBefore) {
+            socket.emit('replay', { since: 0 });
+          }
+          replayState.connectedBefore = true;
+        }
         setInitialNodes(payload.nodes);
         if (Array.isArray(payload.geofences)) {
           useGeofenceStore.getState().setGeofences(payload.geofences);
@@ -170,6 +182,23 @@ export function SocketBridge() {
     };
 
     const handleEvent = (payload: unknown) => {
+      const stamp = payload as { seq?: unknown; bootId?: unknown } | null;
+      if (typeof stamp?.seq === 'number' && typeof stamp.bootId === 'string') {
+        if (stamp.bootId !== replayState.bootId) {
+          replayState.bootId = stamp.bootId;
+          replayState.seen = new Set();
+        }
+        if (replayState.seen.has(stamp.seq)) {
+          return;
+        }
+        replayState.seen.add(stamp.seq);
+        if (replayState.seen.size > 1000) {
+          const oldest = replayState.seen.values().next().value;
+          if (oldest !== undefined) {
+            replayState.seen.delete(oldest);
+          }
+        }
+      }
       // Handle real-time tracking updates from TDOA/RSSI triangulation
       if (isTrackingUpdateEvent(payload)) {
         const normalizedMac = normalizeMacKey(payload.mac);
@@ -775,6 +804,7 @@ interface InitPayload {
   nodes: NodeSummary[];
   geofences?: Geofence[];
   drones?: Drone[];
+  bootId?: string;
 }
 
 function isInitPayload(payload: unknown): payload is InitPayload {
