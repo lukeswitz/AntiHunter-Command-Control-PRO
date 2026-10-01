@@ -91,8 +91,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'STATUS',
     group: 'Status',
-    description:
-      'Reports system status (mode, scan state, hits, targets, unique MACs, temperature, uptime, GPS).',
+    description: 'Report node status.',
     defaultTarget: '@ALL',
     parameters: [],
     examples: [
@@ -182,7 +181,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'SCAN_START',
     group: 'Scanning',
-    description: 'Start scanning. mode: 0=WiFi, 1=BLE, 2=Both.',
+    description: 'Start scanning.',
     defaultTarget: '@ALL',
     parameters: [
       {
@@ -223,8 +222,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'DEVICE_SCAN_START',
     group: 'Scanning',
-    description:
-      'Start device scan for WiFi/BLE devices. +PROBE enables probe request capture during the scan.',
+    description: 'Start device scan for WiFi/BLE devices.',
     defaultTarget: '@ALL',
     parameters: [
       {
@@ -344,7 +342,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'RANDOMIZATION_START',
     group: 'Detection',
-    description: 'Start MAC randomization detection (mode 0=WiFi,1=BLE,2=Both).',
+    description: 'Start MAC randomization detection.',
     defaultTarget: '@ALL',
     parameters: [
       {
@@ -378,8 +376,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'PROBE_START',
     group: 'Scanning',
-    description:
-      'Start probe request scanner (mode 0=WiFi,1=BLE,2=Both). +ALL broadcasts every probe over mesh.',
+    description: 'Start the probe request scanner.',
     defaultTarget: '@ALL',
     parameters: [
       {
@@ -422,8 +419,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'PCAP_START',
     group: 'Scanning',
-    description:
-      'Record raw traffic to the node SD card as a pcap. Retrieve the file from the node web UI; it is not transferred over mesh.',
+    description: 'Record a pcap to the node SD card.',
     defaultTarget: '@ALL',
     parameters: [
       {
@@ -890,7 +886,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'CSI_MOTION_START',
     group: 'Sentinel',
-    description: 'Start CSI motion detection. Stop with STOP.',
+    description: 'Start CSI motion detection.',
     defaultTarget: '@NODE_22',
     parameters: [
       {
@@ -932,7 +928,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'CSI_STATUS',
     group: 'Sentinel',
-    description: 'Print the CSI results report on the node (length reported over mesh).',
+    description: 'Print the CSI report on the node.',
     defaultTarget: '@NODE_22',
     parameters: [],
     examples: [{ target: '@NODE_22', params: [] }],
@@ -940,7 +936,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'CSI_JSON',
     group: 'Sentinel',
-    description: 'Print the CSI JSON state on the node (length reported over mesh).',
+    description: 'Print the CSI JSON state on the node.',
     defaultTarget: '@NODE_22',
     parameters: [],
     examples: [{ target: '@NODE_22', params: [] }],
@@ -956,7 +952,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'CSI_EXCLUDE',
     group: 'Sentinel',
-    description: 'Exclude a transmitter MAC from CSI (matches the first five bytes), or NONE.',
+    description: 'Exclude a transmitter MAC from CSI.',
     defaultTarget: '@NODE_22',
     parameters: [
       {
@@ -975,8 +971,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'CSI_CFG',
     group: 'Sentinel',
-    description:
-      'Set CSI tunables: SENSITIVITY=LOW|MEDIUM|HIGH|<float>, MIN_MOTION=s, CLEAR_AFTER=s, SPOTS=n, CH=n, BROADCAST, REQUIRE_CE, ALLOW_RANDOM=ON|OFF.',
+    description: 'Set a CSI motion setting.',
     defaultTarget: '@ALL',
     parameters: [
       {
@@ -1043,7 +1038,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'CONFIG_ERASE_PSK',
     group: 'Security',
-    description: 'Set the pre-shared key used to authorize erase and factory reset.',
+    description: 'Set the erase and factory reset key.',
     defaultTarget: '@NODE_22',
     parameters: [
       {
