@@ -3,15 +3,10 @@ import { useState } from 'react';
 
 import {
   getFleetChannels,
-  getFleetIdentities,
   getFleetIdentity,
-  getFleetPolicy,
+  getFleetPubkey,
   getFleetTrust,
   refreshFleetChannels,
-  registerFleetIdentity,
-  revokeFleetIdentity,
-  setFleetIsManaged,
-  setFleetPolicy,
   startRotation,
   verifyFleetNode,
 } from '../api/fleet-security';
@@ -33,38 +28,16 @@ export function FleetSecurityPage() {
     queryFn: getFleetIdentity,
     retry: false,
   });
-  const identities = useQuery({ queryKey: ['fleet-identities'], queryFn: getFleetIdentities });
+  const pubkey = useQuery({ queryKey: ['fleet-pubkey'], queryFn: getFleetPubkey, retry: false });
   const trust = useQuery({ queryKey: ['fleet-trust'], queryFn: getFleetTrust });
   const channels = useQuery({ queryKey: ['fleet-channels'], queryFn: getFleetChannels });
-  const policy = useQuery({ queryKey: ['fleet-policy'], queryFn: getFleetPolicy });
 
-  const [regLabel, setRegLabel] = useState('');
-  const [regKey, setRegKey] = useState('');
-  const [rotateTargets, setRotateTargets] = useState('');
+  const [rotateTargets, setRotateTargets] = useState<number[]>([]);
 
   const ok = (text: string) => setNotice({ ok: true, text });
   const fail = (error: unknown) => setNotice({ ok: false, text: errorText(error) });
   const refresh = (key: string) => queryClient.invalidateQueries({ queryKey: [key] });
 
-  const register = useMutation({
-    mutationFn: () =>
-      registerFleetIdentity({ label: regLabel.trim(), publicKey: regKey.trim(), role: 'operator' }),
-    onSuccess: () => {
-      ok('Identity registered.');
-      setRegLabel('');
-      setRegKey('');
-      refresh('fleet-identities');
-    },
-    onError: fail,
-  });
-  const revoke = useMutation({
-    mutationFn: (fp: string) => revokeFleetIdentity(fp, 'revoked from console'),
-    onSuccess: () => {
-      ok('Identity revoked.');
-      refresh('fleet-identities');
-    },
-    onError: fail,
-  });
   const verify = useMutation({
     mutationFn: (nodeNum: number) => verifyFleetNode(nodeNum),
     onSuccess: (res) => {
@@ -77,15 +50,6 @@ export function FleetSecurityPage() {
     },
     onError: fail,
   });
-  const managed = useMutation({
-    mutationFn: ({ nodeNum, value }: { nodeNum: number; value: boolean }) =>
-      setFleetIsManaged(nodeNum, value),
-    onSuccess: () => {
-      ok('Managed flag sent.');
-      refresh('fleet-trust');
-    },
-    onError: fail,
-  });
   const refreshCh = useMutation({
     mutationFn: refreshFleetChannels,
     onSuccess: () => {
@@ -94,27 +58,16 @@ export function FleetSecurityPage() {
     },
     onError: fail,
   });
-  const policyMut = useMutation({
-    mutationFn: (value: boolean) => setFleetPolicy({ expectedIsManaged: value }),
-    onSuccess: () => {
-      ok('Policy saved.');
-      refresh('fleet-policy');
-    },
-    onError: fail,
-  });
   const rotate = useMutation({
     mutationFn: () =>
       startRotation({
         channelIndex: 0,
-        targets: rotateTargets
-          .split(/[\s,]+/)
-          .map((t) => Number(t))
-          .filter((n) => Number.isFinite(n) && n > 0),
+        targets: rotateTargets,
         ack: 'ROTATE',
       }),
     onSuccess: (res) => {
       ok(`Rotation ${res.rotationId.slice(0, 8)} started (new PSK ${res.newPskFingerprint}).`);
-      setRotateTargets('');
+      setRotateTargets([]);
       refresh('fleet-trust');
     },
     onError: fail,
@@ -133,94 +86,45 @@ export function FleetSecurityPage() {
 
       <section className="config-card">
         <header>
-          <h2>Identity</h2>
-          <p>The control-post radio key, and the operator keys it trusts.</p>
+          <h2>This radio&apos;s admin key</h2>
+          <p>Paste into each node&apos;s Admin Key (Meshtastic app, Security).</p>
         </header>
         <div className="config-card__body">
-          {identity.isError ? (
-            <p className="config-hint config-hint--warn">{errorText(identity.error)}</p>
-          ) : identity.data ? (
-            <div className="config-row">
-              <span className="config-label">This radio</span>
-              <span>
-                {identity.data.label ?? 'unregistered'} · <code>{identity.data.fingerprint}</code>
-              </span>
+          {pubkey.isError ? (
+            <p className="config-hint config-hint--warn">{errorText(pubkey.error)}</p>
+          ) : pubkey.data ? (
+            <div className="controls-row">
+              <code>{pubkey.data.publicKey}</code>
+              <button
+                type="button"
+                className="control-chip"
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(pubkey.data.publicKey)
+                    .then(() => ok('Admin key copied.'), fail);
+                }}
+              >
+                Copy
+              </button>
             </div>
           ) : (
             <p className="config-hint">Loading.</p>
           )}
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Label</th>
-                <th>Fingerprint</th>
-                <th>Role</th>
-                {isAdmin ? <th /> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {(identities.data ?? []).map((i) => (
-                <tr key={i.id}>
-                  <td>{i.label}</td>
-                  <td>
-                    <code>{i.fingerprint}</code>
-                  </td>
-                  <td>{i.role}</td>
-                  {isAdmin ? (
-                    <td>
-                      {i.role !== 'revoked' ? (
-                        <button
-                          type="button"
-                          className="control-chip"
-                          onClick={() => revoke.mutate(i.fingerprint)}
-                        >
-                          Revoke
-                        </button>
-                      ) : null}
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {isAdmin ? (
-            <div className="controls-row">
-              <input
-                className="control-input"
-                placeholder="Operator label"
-                value={regLabel}
-                onChange={(e) => setRegLabel(e.target.value)}
-              />
-              <input
-                className="control-input"
-                placeholder="Public key (base64)"
-                value={regKey}
-                onChange={(e) => setRegKey(e.target.value)}
-              />
-              <button
-                type="button"
-                className="control-chip"
-                disabled={register.isPending || !regLabel.trim() || !regKey.trim()}
-                onClick={() => register.mutate()}
-              >
-                Add operator key
-              </button>
-            </div>
-          ) : null}
         </div>
       </section>
 
       <section className="config-card">
         <header>
-          <h2>Trust roster</h2>
-          <p>Which admin keys each node accepts, and whether it is locked to remote admin.</p>
+          <h2>Nodes</h2>
+          <p>Verify reads each node&apos;s admin keys over the mesh.</p>
         </header>
         <div className="config-card__body">
           <table className="data-table">
             <thead>
               <tr>
+                {isAdmin ? <th aria-label="Select for rotation" /> : null}
                 <th>Node</th>
-                <th>Drift</th>
+                <th>Accepts this radio</th>
                 <th>Managed</th>
                 <th>Last verified</th>
                 {canOperate ? <th /> : null}
@@ -229,8 +133,33 @@ export function FleetSecurityPage() {
             <tbody>
               {(trust.data ?? []).map((n) => (
                 <tr key={n.nodeNum}>
+                  {isAdmin ? (
+                    <td>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${n.name} for rotation`}
+                        checked={rotateTargets.includes(n.nodeNum)}
+                        onChange={(e) =>
+                          setRotateTargets((prev) =>
+                            e.target.checked
+                              ? [...prev, n.nodeNum]
+                              : prev.filter((x) => x !== n.nodeNum),
+                          )
+                        }
+                      />
+                    </td>
+                  ) : null}
                   <td>{n.name}</td>
-                  <td>{n.driftStatus}</td>
+                  <td>
+                    {n.driftStatus === 'unreachable'
+                      ? 'unreachable'
+                      : !n.lastVerifiedAt
+                        ? 'not verified'
+                        : identity.data &&
+                            n.adminKeyFingerprints.includes(identity.data.fingerprint)
+                          ? 'yes'
+                          : 'no'}
+                  </td>
                   <td>{n.isManaged ? 'yes' : 'no'}</td>
                   <td>
                     {n.lastVerifiedAt ? new Date(n.lastVerifiedAt).toLocaleString() : 'never'}
@@ -244,24 +173,13 @@ export function FleetSecurityPage() {
                       >
                         Verify
                       </button>
-                      {isAdmin ? (
-                        <button
-                          type="button"
-                          className="control-chip"
-                          onClick={() =>
-                            managed.mutate({ nodeNum: n.nodeNum, value: !n.isManaged })
-                          }
-                        >
-                          {n.isManaged ? 'Unmanage' : 'Manage'}
-                        </button>
-                      ) : null}
                     </td>
                   ) : null}
                 </tr>
               ))}
               {(trust.data ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan={5}>No nodes verified yet.</td>
+                  <td colSpan={6}>No mesh nodes seen by the radio yet.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -276,14 +194,16 @@ export function FleetSecurityPage() {
         </header>
         <div className="config-card__body">
           {canOperate ? (
-            <button
-              type="button"
-              className="control-chip"
-              disabled={refreshCh.isPending}
-              onClick={() => refreshCh.mutate()}
-            >
-              Read channels from radio
-            </button>
+            <div className="controls-row">
+              <button
+                type="button"
+                className="control-chip"
+                disabled={refreshCh.isPending}
+                onClick={() => refreshCh.mutate()}
+              >
+                Read channels from radio
+              </button>
+            </div>
           ) : null}
           <table className="data-table">
             <thead>
@@ -303,20 +223,24 @@ export function FleetSecurityPage() {
                   <td>{c.pskFingerprint ? <code>{c.pskFingerprint}</code> : '—'}</td>
                 </tr>
               ))}
+              {(channels.data ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={4}>Not read yet.</td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
           {isAdmin ? (
             <div className="controls-row">
-              <input
-                className="control-input"
-                placeholder="Target node numbers (comma separated)"
-                value={rotateTargets}
-                onChange={(e) => setRotateTargets(e.target.value)}
-              />
+              <span className="config-hint">
+                {rotateTargets.length === 0
+                  ? 'Tick nodes in the list above to rotate.'
+                  : `${rotateTargets.length} node${rotateTargets.length === 1 ? '' : 's'} selected.`}
+              </span>
               <button
                 type="button"
                 className="control-chip"
-                disabled={rotate.isPending || !rotateTargets.trim()}
+                disabled={rotate.isPending || rotateTargets.length === 0}
                 onClick={() => {
                   if (window.confirm('Rotate the mesh PSK for these nodes?')) {
                     rotate.mutate();
@@ -327,24 +251,6 @@ export function FleetSecurityPage() {
               </button>
             </div>
           ) : null}
-        </div>
-      </section>
-
-      <section className="config-card">
-        <header>
-          <h2>Policy</h2>
-          <p>Expected fleet posture; drift shows in the roster.</p>
-        </header>
-        <div className="config-card__body">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              disabled={!isAdmin || policyMut.isPending}
-              checked={policy.data?.expectedIsManaged ?? false}
-              onChange={(e) => policyMut.mutate(e.target.checked)}
-            />
-            Expect every node to be managed (remote-admin only)
-          </label>
         </div>
       </section>
     </div>

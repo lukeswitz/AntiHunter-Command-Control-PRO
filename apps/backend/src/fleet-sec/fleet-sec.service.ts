@@ -204,9 +204,13 @@ export class FleetSecService implements OnModuleInit, OnModuleDestroy {
       this.store.getPolicy(),
       Promise.resolve(this.serial.getMeshNodeNames()),
     ]);
+    const localNum = this.serial.getLocalRadio().num;
+    if (localNum === undefined) {
+      return [];
+    }
     const known = new Set(rows.map((r) => r.nodeNum));
     const unverified = Array.from(names.entries())
-      .filter(([nodeNum]) => !known.has(nodeNum))
+      .filter(([nodeNum]) => !known.has(nodeNum) && nodeNum !== localNum)
       .map(([nodeNum, name]) => ({
         nodeNum,
         name,
@@ -219,17 +223,19 @@ export class FleetSecService implements OnModuleInit, OnModuleDestroy {
         driftStatus: 'unknown' as const,
       }));
     return [
-      ...rows.map((r) => ({
-        nodeNum: r.nodeNum,
-        name: names.get(r.nodeNum) ?? `!${r.nodeNum.toString(16)}`,
-        adminKeyFingerprints: r.adminKeyFps,
-        isManaged: r.isManaged,
-        lastVerifiedAt: r.lastVerifiedAt,
-        lastVerifyMethod: r.lastVerifyMethod,
-        currentPskFp: r.currentPskFp,
-        strandedSince: r.strandedSince,
-        driftStatus: computeDrift(r, policy),
-      })),
+      ...rows
+        .filter((r) => r.nodeNum !== localNum)
+        .map((r) => ({
+          nodeNum: r.nodeNum,
+          name: names.get(r.nodeNum) ?? `!${r.nodeNum.toString(16)}`,
+          adminKeyFingerprints: r.adminKeyFps,
+          isManaged: r.isManaged,
+          lastVerifiedAt: r.lastVerifiedAt,
+          lastVerifyMethod: r.lastVerifyMethod,
+          currentPskFp: r.currentPskFp,
+          strandedSince: r.strandedSince,
+          driftStatus: computeDrift(r, policy),
+        })),
       ...unverified,
     ];
   }
