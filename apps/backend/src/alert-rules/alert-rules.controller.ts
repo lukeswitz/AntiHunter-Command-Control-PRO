@@ -40,6 +40,12 @@ export class AlertRulesController {
     return this.alertRulesService.listEvents(auth.userId, auth.role, query);
   }
 
+  @Delete('events')
+  clearEvents(@Req() req: Request, @Query() query: ListAlertEventsDto) {
+    const auth = this.requireAuth(req);
+    return this.alertRulesService.clearEvents(auth.userId, auth.role, query.ruleId);
+  }
+
   @Get(':id')
   getRule(@Req() req: Request, @Param('id') id: string) {
     const auth = this.requireAuth(req);

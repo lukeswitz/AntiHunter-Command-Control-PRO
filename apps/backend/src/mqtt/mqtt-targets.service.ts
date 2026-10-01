@@ -18,8 +18,7 @@ type TargetDeleteMessage = {
   targetId: string;
 };
 
-const TARGET_UPSERT_TOPIC_PATTERN = 'ahcc/+/targets/upsert';
-const TARGET_DELETE_TOPIC_PATTERN = 'ahcc/+/targets/delete';
+const TARGET_TOPIC_PATTERN = 'ahcc/+/targets/+';
 
 @Injectable()
 export class MqttTargetsService implements OnModuleInit, OnModuleDestroy {
@@ -75,26 +74,15 @@ export class MqttTargetsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async attachSubscriptions(context: SiteMqttContext): Promise<void> {
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        context.client.subscribe(TARGET_UPSERT_TOPIC_PATTERN, { qos: context.qosEvents }, (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      }),
-      new Promise<void>((resolve, reject) => {
-        context.client.subscribe(TARGET_DELETE_TOPIC_PATTERN, { qos: context.qosEvents }, (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      }),
-    ]);
+    await new Promise<void>((resolve, reject) => {
+      context.client.subscribe(TARGET_TOPIC_PATTERN, { qos: context.qosEvents }, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
 
     const existing = this.inboundHandlers.get(context.siteId);
     if (existing) {

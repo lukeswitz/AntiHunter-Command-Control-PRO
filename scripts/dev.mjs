@@ -1,12 +1,15 @@
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const script = process.argv[2] ?? 'dev';
-const apps = ['backend', 'frontend'];
+let stopping = false;
+let stoppedAt = 0;
+let crashed = false;
 
 const groupAlive = (pid) => {
   try {
@@ -33,7 +36,7 @@ const signalGroup = (pid, signal) => {
   }
 };
 
-const children = apps.map((app) => {
+const spawnApp = (app) => {
   const cwd = join(root, 'apps', app);
   const command = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8')).scripts[script];
   const child = spawn('sh', ['-c', command], {
@@ -54,11 +57,36 @@ const children = apps.map((app) => {
       process.stdout.write(`${app} | ${line}\n`),
     );
   }
+  child.on('exit', () => {
+    if (!stopping) {
+      crashed = true;
+      stop('SIGTERM');
+    }
+  });
   return child;
-});
+};
 
-let stopping = false;
-let stoppedAt = 0;
+const backendListening = () =>
+  new Promise((resolve) => {
+    const socket = connect({ host: '127.0.0.1', port: 3000 });
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once('error', () => resolve(false));
+  });
+
+const children = [spawnApp('backend')];
+
+void (async () => {
+  while (!stopping && !(await backendListening())) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  if (!stopping) {
+    children.push(spawnApp('frontend'));
+  }
+})();
+
 const stop = (signal) => {
   if (!stopping) {
     stopping = true;
@@ -72,16 +100,6 @@ const stop = (signal) => {
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(signal, () => stop(signal));
 }
-
-let crashed = false;
-children.forEach((child) =>
-  child.on('exit', () => {
-    if (!stopping) {
-      crashed = true;
-      stop('SIGTERM');
-    }
-  }),
-);
 
 setInterval(() => {
   if (

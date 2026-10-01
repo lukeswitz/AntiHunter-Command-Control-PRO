@@ -37,12 +37,21 @@ export async function enablePush(): Promise<void> {
     throw new Error('Push is not configured on the server.');
   }
   const reg = await registration();
-  const subscription =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: base64UrlToBytes(publicKey),
-    }));
+  const serverKey = base64UrlToBytes(publicKey);
+  let subscription = await reg.pushManager.getSubscription();
+  const boundKey = subscription?.options.applicationServerKey;
+  if (
+    subscription &&
+    (!boundKey || !serverKey.every((byte, i) => byte === new Uint8Array(boundKey)[i]) ||
+      boundKey.byteLength !== serverKey.byteLength)
+  ) {
+    await subscription.unsubscribe();
+    subscription = null;
+  }
+  subscription ??= await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: serverKey,
+  });
   await apiClient.post('/push/subscriptions', subscription.toJSON());
 }
 

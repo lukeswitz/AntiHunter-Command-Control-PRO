@@ -11,6 +11,7 @@ import {
 
 import { apiClient } from '../api/client';
 import type { AlarmConfig, AlarmLevel, AlarmSettingsResponse, AlarmSoundKey } from '../api/types';
+import { useAuthStore } from '../stores/auth-store';
 
 type AlarmContextValue = {
   settings?: AlarmSettingsResponse;
@@ -77,6 +78,7 @@ function createFallbackTone(level: AlarmLevel, volumePercent: number) {
 
 export function AlarmProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
+  const isAuthenticated = useAuthStore((state) => state.status === 'authenticated');
   const audioRefs = useRef<Record<AlarmSoundKey, HTMLAudioElement | null>>({
     INFO: null,
     NOTICE: null,
@@ -115,6 +117,7 @@ export function AlarmProvider({ children }: PropsWithChildren) {
   const settingsQuery = useQuery({
     queryKey: ['alarms'],
     queryFn: () => apiClient.get<AlarmSettingsResponse>('/alarms'),
+    enabled: isAuthenticated,
   });
 
   useEffect(() => {

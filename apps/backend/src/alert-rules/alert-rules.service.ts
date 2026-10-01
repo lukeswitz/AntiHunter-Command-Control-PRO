@@ -275,6 +275,19 @@ export class AlertRulesService {
     }));
   }
 
+  async clearEvents(userId: string, role: Role, ruleId?: string): Promise<{ deleted: number }> {
+    const where: Prisma.AlertEventWhereInput = {};
+    if (ruleId) {
+      const rule = await this.findRuleOrThrow(ruleId);
+      this.ensureAccess(rule, userId, role, true);
+      where.ruleId = ruleId;
+    } else if (role !== Role.ADMIN) {
+      where.rule = { ownerId: userId, scope: AlertRuleScope.PERSONAL };
+    }
+    const result = await this.prisma.alertEvent.deleteMany({ where });
+    return { deleted: result.count };
+  }
+
   private async findRuleOrThrow(id: string): Promise<AlertRuleEntity> {
     const rule = await this.prisma.alertRule.findUnique({
       where: { id },

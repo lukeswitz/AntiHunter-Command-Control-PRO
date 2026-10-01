@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { MdNotificationsActive, MdRefresh } from 'react-icons/md';
 import { AlertsRail } from '../components/AlertsRail';
 
-import { listAlertRuleEvents, listAlertRules } from '../api/alert-rules';
+import { clearAlertRuleEvents, listAlertRuleEvents, listAlertRules } from '../api/alert-rules';
 import type { AlertRule, AlertRuleEvent } from '../api/types';
 
 export function AlertsEventLogPage() {
@@ -35,8 +35,9 @@ export function AlertsEventLogPage() {
   const menuEmpty = visibleRules.length === 0;
   const enableScroll = recentEvents.length > 30;
 
-  const handleClearEvents = () => {
-    queryClient.setQueryData(['alert-rule-events', selectedRuleId ?? 'all'], []);
+  const handleClearEvents = async () => {
+    await clearAlertRuleEvents(selectedRuleId ?? undefined);
+    await queryClient.invalidateQueries({ queryKey: ['alert-rule-events'] });
   };
 
   return (

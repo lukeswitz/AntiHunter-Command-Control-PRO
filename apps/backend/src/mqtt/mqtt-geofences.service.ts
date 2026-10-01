@@ -28,9 +28,7 @@ type GeofenceSnapshotMessage = {
   geofences: GeofenceUpsertPayload[];
 };
 
-const GEOFENCE_UPSERT_TOPIC_PATTERN = 'ahcc/+/geofences/upsert';
-const GEOFENCE_DELETE_TOPIC_PATTERN = 'ahcc/+/geofences/delete';
-const GEOFENCE_SNAPSHOT_TOPIC_PATTERN = 'ahcc/+/geofences/snapshot';
+const GEOFENCE_TOPIC_PATTERN = 'ahcc/+/geofences/+';
 
 @Injectable()
 export class MqttGeofencesService implements OnModuleInit, OnModuleDestroy {
@@ -86,47 +84,15 @@ export class MqttGeofencesService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async attachSubscriptions(context: SiteMqttContext): Promise<void> {
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        context.client.subscribe(
-          GEOFENCE_UPSERT_TOPIC_PATTERN,
-          { qos: context.qosEvents },
-          (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          },
-        );
-      }),
-      new Promise<void>((resolve, reject) => {
-        context.client.subscribe(
-          GEOFENCE_DELETE_TOPIC_PATTERN,
-          { qos: context.qosEvents },
-          (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          },
-        );
-      }),
-      new Promise<void>((resolve, reject) => {
-        context.client.subscribe(
-          GEOFENCE_SNAPSHOT_TOPIC_PATTERN,
-          { qos: context.qosEvents },
-          (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          },
-        );
-      }),
-    ]);
+    await new Promise<void>((resolve, reject) => {
+      context.client.subscribe(GEOFENCE_TOPIC_PATTERN, { qos: context.qosEvents }, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
 
     const existing = this.inboundHandlers.get(context.siteId);
     if (existing) {
