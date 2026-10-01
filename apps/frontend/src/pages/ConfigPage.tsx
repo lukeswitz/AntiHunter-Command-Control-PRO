@@ -3232,7 +3232,8 @@ export function ConfigPage() {
                   <option value="plain">Plain text line</option>
                 </select>
                 <span className="config-hint">
-                  Command wire format: protobuf (Meshtastic frame) or plain text.
+                  Protobuf for a Meshtastic radio on USB. Plain for an AntiHunter node wired
+                  directly.
                 </span>
               </div>
               <div className="config-row">
