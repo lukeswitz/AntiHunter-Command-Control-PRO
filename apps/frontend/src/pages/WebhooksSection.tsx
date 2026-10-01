@@ -85,7 +85,18 @@ export function PushNotificationsCard() {
     if (!supported) {
       return;
     }
-    void currentPushSubscription().then((sub) => setSubscribed(Boolean(sub)));
+    void currentPushSubscription()
+      .then(async (sub) => {
+        if (sub && Notification.permission === 'granted') {
+          await enablePush();
+        }
+      })
+      .catch((error: unknown) =>
+        setStatus(error instanceof Error ? error.message : String(error)),
+      )
+      .finally(() => {
+        void currentPushSubscription().then((sub) => setSubscribed(Boolean(sub)));
+      });
   }, [supported]);
 
   const run = async (action: () => Promise<unknown>, done: string) => {

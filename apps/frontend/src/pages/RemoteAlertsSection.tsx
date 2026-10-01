@@ -764,8 +764,7 @@ function AlertLevelsCard(props: {
         <h3>Alert sources</h3>
       </div>
       <p className="field-hint">
-        Notify: send this detection to your alert channels (push, ntfy, Signal). Critical:
-        escalate it and trigger the Home critical sensor.
+        Pick one per source. Notify: normal alert. Critical: one alert marked critical.
       </p>
       <div>
         <div className="table-scroll">
@@ -793,7 +792,7 @@ function AlertLevelsCard(props: {
                           <input
                             type="checkbox"
                             aria-label={`Notify: ${row.label}`}
-                            checked={tier !== 'off'}
+                            checked={tier === 'alert'}
                             onChange={(event) =>
                               setTier(row.key, event.target.checked ? 'alert' : 'off')
                             }
@@ -804,9 +803,8 @@ function AlertLevelsCard(props: {
                             type="checkbox"
                             aria-label={`Critical: ${row.label}`}
                             checked={tier === 'critical'}
-                            disabled={tier === 'off'}
                             onChange={(event) =>
-                              setTier(row.key, event.target.checked ? 'critical' : 'alert')
+                              setTier(row.key, event.target.checked ? 'critical' : 'off')
                             }
                           />
                         </td>

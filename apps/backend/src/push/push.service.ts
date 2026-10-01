@@ -58,7 +58,7 @@ export class PushService {
       return null;
     }
     return {
-      subject: config.vapidSubject || 'mailto:admin@localhost',
+      subject: config.vapidSubject || 'https://github.com/lukeswitz/AntiHunter-Command-Control-PRO',
       publicKey: config.vapidPublicKey,
       privateKey: config.vapidPrivateKey,
     };

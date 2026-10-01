@@ -59,3 +59,8 @@ export function listAlertRuleEvents(params: ListAlertRuleEventsParams = {}) {
   const qs = query.toString();
   return apiClient.get<AlertRuleEvent[]>(`/alert-rules/events${qs ? `?${qs}` : ''}`);
 }
+
+export function clearAlertRuleEvents(ruleId?: string) {
+  const qs = ruleId ? `?${new URLSearchParams({ ruleId }).toString()}` : '';
+  return apiClient.delete<{ deleted: number }>(`/alert-rules/events${qs}`);
+}
