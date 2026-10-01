@@ -12,19 +12,10 @@ export const FINGERPRINT_LEN = 8;
 export const VALID_PSK_LENGTHS = [0, 16, 32];
 
 const PKCS8_X25519_PREFIX = Buffer.from('302e020100300506032b656e04220420', 'hex');
-const SPKI_X25519_PREFIX = Buffer.from('302a300506032b656e032100', 'hex');
 
 export interface KeyPair {
   privateKey: Buffer;
   publicKey: Buffer;
-}
-
-function clamp(priv: Buffer): Buffer {
-  const out = Buffer.from(priv);
-  out[0] &= 248;
-  out[31] &= 127;
-  out[31] |= 64;
-  return out;
 }
 
 export function generateX25519KeyPair(): KeyPair {
