@@ -106,7 +106,7 @@ export class AlertRulesService {
       emailRecipients,
       mapStyle,
       messageTemplate,
-    } = await this.sanitizeRuleCollections(dto, null, userId, role);
+    } = await this.sanitizeRuleCollections(dto, null);
 
     const ownerId = scope === AlertRuleScope.PERSONAL ? userId : null;
 
@@ -175,7 +175,7 @@ export class AlertRulesService {
       emailRecipients,
       mapStyle,
       messageTemplate,
-    } = await this.sanitizeRuleCollections(dto, existing, userId, role);
+    } = await this.sanitizeRuleCollections(dto, existing);
 
     const updated = await this.prisma.alertRule.update({
       where: { id },
@@ -346,8 +346,6 @@ export class AlertRulesService {
   private async sanitizeRuleCollections(
     dto: CreateAlertRuleDto | UpdateAlertRuleDto,
     existing: AlertRuleEntity | null,
-    userId: string,
-    role: Role,
   ) {
     const nextOui =
       dto.ouiPrefixes !== undefined
