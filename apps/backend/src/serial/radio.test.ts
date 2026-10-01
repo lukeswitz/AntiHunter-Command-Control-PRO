@@ -89,6 +89,38 @@ async function main() {
     await assert.rejects(() => act({ action: 'reboot', seconds: 5 }), /Radio not identified/);
     assert.equal(written.length, 0);
   });
+  await test('own radio telemetry is not a node before the radio is identified', async () => {
+    const events: unknown[] = [];
+    const sub = service.getParsedStream().subscribe((event) => events.push(event));
+    const telemetry = toBinary(
+      proto.Telemetry.TelemetrySchema,
+      create(proto.Telemetry.TelemetrySchema, {
+        variant: { case: 'deviceMetrics', value: { batteryLevel: 101, voltage: 4.2 } },
+      }),
+    );
+    const position = toBinary(
+      Mesh.PositionSchema,
+      create(Mesh.PositionSchema, { latitudeI: 100000000, longitudeI: 200000000 }),
+    );
+    for (const [portnum, payload] of [
+      [Portnums.PortNum.TELEMETRY_APP, telemetry],
+      [Portnums.PortNum.POSITION_APP, position],
+    ] as const) {
+      await feed({
+        payloadVariant: {
+          case: 'packet',
+          value: {
+            from: LOCAL,
+            to: BROADCAST,
+            id: portnum,
+            payloadVariant: { case: 'decoded', value: { portnum, payload } },
+          },
+        },
+      });
+    }
+    sub.unsubscribe();
+    assert.deepEqual(events, []);
+  });
 
   await feed({ payloadVariant: { case: 'myInfo', value: { myNodeNum: LOCAL } } });
   await feed({
