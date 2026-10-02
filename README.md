@@ -47,7 +47,7 @@ AntiHunter Command & Control PRO is the companion operations platform for the An
 
 ## Try the feature branch
 
-This branch (`feat/remote`) adds remote access, remote alerts, protobuf serial support and inventory device classes. It changes the database:
+This branch (`feat/remote`) adds remote access (Tailscale), remote alerts (push, ntfy, Signal, Matrix, Matter), protobuf serial support and inventory device classes. Remote access works out of the box — pre-built Tailscale helpers for macOS, Linux and Windows are included. It changes the database:
 
 - Adds tables and columns (push subscriptions, remote alert settings, fleet security, serial send settings).
 - **Removes** each webhook's event list (`Webhook.subscribedEvents`) and the alert-rule-to-webhook links (`AlertRuleWebhook`). On this branch every enabled webhook receives the sources ticked in **Alerts → Remote alerts → Alert sources**.
@@ -86,6 +86,8 @@ pnpm AHCC
 - Docker: `docker compose up -d --build`
 
 Open the app at the same address as before: http://localhost:5173 (normal install) or http://localhost:8080 (Docker). Serial settings saved in the app carry over; values only in `.env` files may need setting again in **Config → Serial Connection**.
+
+Remote access via Tailscale is available in **Config → Remote Access**. No extra build steps needed — the branch includes pre-built helpers for all platforms. Just enter your Tailscale auth key and enable it.
 
 ### Get later updates
 

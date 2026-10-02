@@ -37,6 +37,7 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
   }
 
   status(): {
+    available: boolean;
     running: boolean;
     connecting: boolean;
     dnsName: string | null;
@@ -47,6 +48,7 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
     lastExit: string | null;
   } {
     return {
+      available: existsSync(this.binary()),
       https: this.helperStatus?.https ?? false,
       ip: this.helperStatus?.ip ?? null,
       running: Boolean(this.helper) && this.helperStatus?.type === 'running',
@@ -59,10 +61,14 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
   }
 
   private binary(): string {
-    return (
-      process.env.AHCC_TAILSCALE_BIN?.trim() ||
-      join(process.cwd(), 'bin', 'tailscale', 'ahcc-tailscale')
-    );
+    if (process.env.AHCC_TAILSCALE_BIN?.trim()) return process.env.AHCC_TAILSCALE_BIN.trim();
+    const base = join(process.cwd(), 'bin', 'tailscale');
+    const plat = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : 'linux';
+    const arch = process.arch === 'arm64' ? 'arm64' : 'amd64';
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const specific = join(base, `ahcc-tailscale-${plat}-${arch}${ext}`);
+    if (existsSync(specific)) return specific;
+    return join(base, 'ahcc-tailscale');
   }
 
   private async sync(): Promise<void> {
