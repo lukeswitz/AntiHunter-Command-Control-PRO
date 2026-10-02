@@ -104,6 +104,7 @@ export interface AlertSourceRow {
 
 export const getTailscaleStatus = () =>
   apiClient.get<{
+    available: boolean;
     running: boolean;
     connecting: boolean;
     dnsName: string | null;
