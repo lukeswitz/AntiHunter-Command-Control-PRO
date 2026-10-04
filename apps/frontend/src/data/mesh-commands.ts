@@ -453,11 +453,9 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         ],
       },
     ],
-    allowForever: true,
     examples: [
       { target: '@ALL', params: ['0', '300', '0'] },
       { target: '@NODE_22', params: ['1', '600'] },
-      { target: '@ALL', params: ['0', '300', '2', 'FOREVER'] },
     ],
   },
   {
@@ -467,6 +465,27 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     defaultTarget: '@ALL',
     parameters: [],
     examples: [{ target: '@ALL', params: [] }],
+  },
+  {
+    name: 'PCAP_LIMITS',
+    group: 'Scanning',
+    description: 'Set or query the pcap max file size (8-300 MB). Omit value to query.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'maxFileMB',
+        label: 'Max file size (MB)',
+        type: 'number',
+        placeholder: '100',
+        min: 8,
+        max: 300,
+        suffix: 'MB',
+      },
+    ],
+    examples: [
+      { target: '@ALL', params: [] },
+      { target: '@NODE_22', params: ['100'] },
+    ],
   },
   {
     name: 'TRIANGULATE_START',

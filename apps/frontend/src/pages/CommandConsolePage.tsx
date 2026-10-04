@@ -549,6 +549,17 @@ export function CommandConsolePage() {
       const value = (form.paramValues[param.key] ?? '').trim();
       if (param.required && !value) {
         errors[param.key] = 'Required';
+        return;
+      }
+      if (value && (param.type === 'number' || param.type === 'duration')) {
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed)) {
+          errors[param.key] = 'Must be a whole number';
+        } else if (param.min !== undefined && parsed < param.min) {
+          errors[param.key] = `Minimum ${param.min}`;
+        } else if (param.max !== undefined && parsed > param.max) {
+          errors[param.key] = `Maximum ${param.max}`;
+        }
       }
     });
     setParamErrors(errors);
@@ -917,7 +928,7 @@ export function CommandConsolePage() {
                     }))
                   }
                 />
-                Append FOREVER
+                Run until STOP
               </label>
               <span>Command continues until a STOP is issued.</span>
             </div>
