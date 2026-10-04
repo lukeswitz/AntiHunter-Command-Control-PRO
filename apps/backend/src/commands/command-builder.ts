@@ -60,6 +60,7 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['PROBE_STOP', expectNoParams],
   ['PCAP_START', handlePcapStart],
   ['PCAP_STOP', expectNoParams],
+  ['PCAP_LIMITS', handlePcapLimits],
   ['TRIANGULATE_START', handleTriangulateStart],
   ['TRIANGULATE_STOP', expectNoParams],
   ['TRIANGULATE_RESULTS', expectNoParams],
@@ -267,10 +268,8 @@ function handleTimedCommand(params: string[]): string[] {
 }
 
 function handlePcapStart(params: string[]): string[] {
-  if (params.length < 2 || params.length > 4) {
-    throw new BadRequestException(
-      'PCAP_START expects radio, duration (seconds), optional band, and optional FOREVER token.',
-    );
+  if (params.length < 2 || params.length > 3) {
+    throw new BadRequestException('PCAP_START expects radio, duration (seconds), and optional band.');
   }
   const radio = params[0].trim();
   if (!['0', '1'].includes(radio)) {
@@ -278,20 +277,31 @@ function handlePcapStart(params: string[]): string[] {
   }
   const duration = normalizeDuration(params[1]);
   const output = [radio, duration];
-  for (let i = 2; i < params.length; i += 1) {
-    const token = params[i].trim().toUpperCase();
-    if (token === 'FOREVER') {
-      output.push(token);
-      continue;
+  if (params.length === 3) {
+    const band = params[2].trim().toUpperCase();
+    if (band === 'FOREVER') {
+      throw new BadRequestException('PCAP_START does not support FOREVER; it requires a bounded duration.');
     }
-    if (!['0', '1', '2'].includes(token)) {
-      throw new BadRequestException(
-        `Invalid PCAP_START token: ${params[i]}. Expected band 0, 1, 2 or FOREVER.`,
-      );
+    if (!['0', '1', '2'].includes(band)) {
+      throw new BadRequestException(`Invalid PCAP_START band: ${params[2]}. Expected 0, 1, or 2.`);
     }
-    output.push(token);
+    output.push(band);
   }
   return output;
+}
+
+function handlePcapLimits(params: string[]): string[] {
+  if (params.length === 0) {
+    return [];
+  }
+  if (params.length > 1) {
+    throw new BadRequestException('PCAP_LIMITS expects an optional max file size in MB (8-300).');
+  }
+  const mb = Number.parseInt(params[0].trim(), 10);
+  if (!Number.isFinite(mb) || mb < 8 || mb > 300) {
+    throw new BadRequestException('PCAP_LIMITS max file size must be between 8 and 300 MB.');
+  }
+  return [mb.toString()];
 }
 
 function handleRandomizationStart(params: string[]): string[] {
