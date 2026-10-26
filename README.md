@@ -87,7 +87,7 @@ pnpm AHCC
 
 Open the app at the same address as before: http://localhost:5173 (normal install) or http://localhost:8080 (Docker). Serial settings saved in the app carry over; values only in `.env` files may need setting again in **Config → Serial Connection**.
 
-Remote access via Tailscale is available in **Config → Remote Access**. No extra build steps needed — the branch includes pre-built helpers for all platforms. Just enter your Tailscale auth key and enable it.
+Remote access via Tailscale is available in **Config → Remote Access**. The branch includes pre-built helpers for all platforms. Enter a one-time Tailscale auth key and turn it on. AHCC deletes the key after the machine joins your tailnet.
 
 ### Get later updates
 
@@ -481,7 +481,7 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | TAK/CoT bridge               | 8087 / 8089   | Use TLS profiles when possible; generate per-client API keys; segregate on dedicated security group. |
 | Prometheus / Metrics scrape  | 9100+         | Keep behind VPN and IP allowlists; disable if metrics are collected by sidecars.                     |
 | SMTP relay                   | 587 / 465     | Require STARTTLS/SMTPS with credential auth; scope accounts to command notifications only.           |
-| Tailscale entrance (Docker)  | 8081 (internal) | Allowed Tailscale logins only. Never publish. |
+| Tailscale entrance (Docker)  | 8081 (loopback) | Listens on 127.0.0.1 inside the frontend container, which the Tailscale container shares. Allowed Tailscale logins only. Never publish. |
 | Matter device                | 5540 UDP, 5353 | LAN only, off by default. Firewall: allow `ahcc-matter` only. |
 | signal-api (Docker)          | none          | Internal network only; reached solely via signal-proxy. |
 | signal-proxy (Docker)        | none          | Allowlist in front of signal-api: group-only sends, no contacts/receive. |

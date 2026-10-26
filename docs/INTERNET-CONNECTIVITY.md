@@ -76,7 +76,7 @@ Tailscale is a private network between your own devices. Only devices signed in 
 
 ### Docker: built-in Tailscale container
 
-Docker installs can skip steps 2-5 below: `docker-compose.yml` has a `tailscale` service under the `remote` profile. It runs Tailscale in its own container, serves AHCC over HTTPS on your tailnet, and never turns on Funnel. Requests go through a separate nginx entrance (port 8081, not published) that checks each person's Tailscale login against an allowlist before AHCC's own login.
+Docker installs can skip steps 2-5 below: `docker-compose.yml` has a `tailscale` service under the `remote` profile. It runs Tailscale in its own container, serves AHCC over HTTPS on your tailnet, and never turns on Funnel. Requests go through a separate nginx entrance that checks each person's Tailscale login against an allowlist before AHCC's own login. The entrance listens on port 8081 at 127.0.0.1 inside the frontend container. The Tailscale container shares that container's network, so nothing else can reach the entrance.
 
 1. Do step 1 and step 3 below (account, MagicDNS + HTTPS Certificates), and paste the access-control policy from step 8 so `tag:ahcc` exists.
 2. In the Tailscale admin console: **Settings** → **Keys** → **Generate auth key**. Tick **Tags** and pick `tag:ahcc`. Leave **Reusable** off. Copy the key.

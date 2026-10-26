@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toDataURL } from 'qrcode';
 import { ReactNode, useEffect, useState } from 'react';
+import { MdInfoOutline } from 'react-icons/md';
 
 import { PushNotificationsCard, WebhooksSection } from './WebhooksSection';
 import {
@@ -258,7 +259,10 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
         </label>
         <div className="form-grid">
           <label>
-            <span>Topic URL</span>
+            <FieldLabel
+              text="Topic URL"
+              help="The full address of your ntfy topic. It must start with https://, unless ntfy runs on this machine."
+            />
             <input
               className="control-input"
               value={form.ntfyUrl}
@@ -267,7 +271,10 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
             />
           </label>
           <label>
-            <span>Access token (optional)</span>
+            <FieldLabel
+              text="Access token (optional)"
+              help="Only needed if the topic requires a login. Create a token in your ntfy account settings."
+            />
             <input
               className="control-input"
               type="password"
@@ -333,7 +340,7 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
         </label>
         <div className="form-grid">
           <label>
-            <span>Homeserver URL</span>
+            <FieldLabel text="Homeserver URL" help="The https:// address of your Matrix server." />
             <input
               className="control-input"
               value={form.matrixHomeserverUrl}
@@ -342,7 +349,10 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
             />
           </label>
           <label>
-            <span>Room ID</span>
+            <FieldLabel
+              text="Room ID"
+              help="The room's internal ID, which starts with !. In Element, open Room settings → Advanced."
+            />
             <input
               className="control-input"
               value={form.matrixRoomId}
@@ -352,7 +362,10 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
           </label>
         </div>
         <label className="form-field">
-          <span>Bot access token</span>
+          <FieldLabel
+            text="Bot access token"
+            help="The token of the account that posts alerts. That account must already be in the room. In Element, open Settings → Help & About."
+          />
           <input
             className="control-input"
             type="password"
@@ -429,6 +442,30 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
   );
 }
 
+function FieldLabel({ text, help }: { text: string; help: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <span>
+        {text}
+        <button
+          type="button"
+          className="info-button"
+          aria-label={`About ${text}`}
+          aria-expanded={open}
+          onClick={(event) => {
+            event.preventDefault();
+            setOpen((value) => !value);
+          }}
+        >
+          <MdInfoOutline aria-hidden />
+        </button>
+      </span>
+      {open && <span className="field-help">{help}</span>}
+    </>
+  );
+}
+
 function ChannelRow(props: {
   title: string;
   status: string;
@@ -488,13 +525,22 @@ function TailscaleAccessPanel({
       </label>
       <TailscaleStatus enabled={config.tailscaleEnabled} />
       <label className="form-field">
-        <span>Tailscale auth key</span>
+        <FieldLabel
+          text="Tailscale auth key"
+          help="A one-time key that adds AHCC to your tailnet. Create it with Reusable off and the tag:ahcc tag. AHCC deletes the key once it has joined."
+        />
         <input
           className="control-input"
           type="password"
           autoComplete="off"
           value={form.tsAuthKey}
-          placeholder={config.hasTsAuthKey ? 'Saved (leave blank to keep)' : 'tskey-auth-…'}
+          placeholder={
+            config.hasTsAuthKey
+              ? 'Saved (leave blank to keep)'
+              : statusQuery.data?.enrolled
+                ? 'Joined. Key deleted.'
+                : 'tskey-auth-…'
+          }
           onChange={(event) => set('tsAuthKey', event.target.value)}
         />
       </label>
@@ -510,7 +556,10 @@ function TailscaleAccessPanel({
         — click "Generate auth key", turn on <strong>Tags</strong> and pick <code>tag:ahcc</code>.
       </p>
       <label className="form-field">
-        <span>Hostname on the tailnet</span>
+        <FieldLabel
+          text="Hostname on the tailnet"
+          help="The machine name AHCC gets on your tailnet. The default is ahcc."
+        />
         <input
           className="control-input"
           value={form.tsHostname}
@@ -519,7 +568,10 @@ function TailscaleAccessPanel({
         />
       </label>
       <label className="form-field">
-        <span>Allowed Tailscale logins</span>
+        <FieldLabel
+          text="Allowed Tailscale logins"
+          help="The Tailscale logins that may open AHCC, one per line. Everyone else is refused, and an empty list refuses everyone. People still sign in to AHCC after this."
+        />
         <textarea
           className="control-input"
           rows={3}
@@ -1054,7 +1106,10 @@ function MatterCard(props: {
           <span>On</span>
         </label>
         <label className="form-field">
-          <span>Network</span>
+          <FieldLabel
+            text="Network"
+            help="The network AHCC announces itself on. Pick the one your home hub is on."
+          />
           <select
             className="control-input"
             value={props.networkInterface}

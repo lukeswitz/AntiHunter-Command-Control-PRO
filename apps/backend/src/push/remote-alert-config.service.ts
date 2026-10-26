@@ -223,7 +223,9 @@ export class RemoteAlertConfigService {
     return this.save(data);
   }
 
-  async clearSecret(field: 'ntfyToken' | 'matrixAccessToken'): Promise<RemoteAlertConfig> {
+  async clearSecret(
+    field: 'ntfyToken' | 'matrixAccessToken' | 'tsAuthKey',
+  ): Promise<RemoteAlertConfig> {
     await this.get();
     return this.save({ [field]: null });
   }

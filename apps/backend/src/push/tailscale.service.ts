@@ -46,9 +46,11 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
     ip: string | null;
     lastError: string | null;
     lastExit: string | null;
+    enrolled: boolean;
   } {
     return {
       available: existsSync(this.binary()),
+      enrolled: this.enrolled(),
       https: this.helperStatus?.https ?? false,
       ip: this.helperStatus?.ip ?? null,
       running: Boolean(this.helper) && this.helperStatus?.type === 'running',
@@ -71,19 +73,35 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
     return join(base, 'ahcc-tailscale');
   }
 
+  private stateDir(): string {
+    return join(process.cwd(), '.tailscale');
+  }
+
+  private enrolled(): boolean {
+    return existsSync(join(this.stateDir(), 'tailscaled.state'));
+  }
+
   private async sync(): Promise<void> {
     const config = await this.config.get();
-    const wanted = config.tailscaleEnabled && Boolean(config.tsAuthKey);
+    const wanted = config.tailscaleEnabled && (Boolean(config.tsAuthKey) || this.enrolled());
     if (!wanted && this.helper) {
       await this.stop();
       return;
     }
     if (wanted && !this.helper) {
-      this.start(config.tsAuthKey!, config.tsHostname, config.tsAllowedLogins);
+      this.start(config.tsAuthKey, config.tsHostname, config.tsAllowedLogins);
     }
   }
 
-  private start(authKey: string, hostname: string | null, allowed: string[]): void {
+  private async dropAuthKey(): Promise<void> {
+    const config = await this.config.get();
+    if (config.tsAuthKey && this.enrolled()) {
+      await this.config.clearSecret('tsAuthKey');
+      this.logger.log('Tailscale joined; deleted the saved auth key');
+    }
+  }
+
+  private start(authKey: string | null, hostname: string | null, allowed: string[]): void {
     const binary = this.binary();
     if (!existsSync(binary)) {
       this.logger.error(`Tailscale helper not found at ${binary}`);
@@ -93,12 +111,12 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
     const env: NodeJS.ProcessEnv = {
       PATH: process.env.PATH,
       HOME: process.env.HOME,
-      AHCC_TS_AUTHKEY: authKey,
+      AHCC_TS_AUTHKEY: authKey ?? '',
       AHCC_TS_HOSTNAME: hostname?.trim() || process.env.TS_HOSTNAME?.trim() || 'ahcc',
       AHCC_TS_UPSTREAM:
         process.env.AHCC_TS_UPSTREAM?.trim() ||
         (process.env.NODE_ENV === 'production' ? 'http://127.0.0.1:8080' : 'http://127.0.0.1:5173'),
-      AHCC_TS_STATE: join(process.cwd(), '.tailscale'),
+      AHCC_TS_STATE: this.stateDir(),
       AHCC_TS_ALLOWED: allowed.join(','),
     };
     const child = spawn(binary, [], { env, stdio: ['pipe', 'pipe', 'inherit'], detached: true });
@@ -110,6 +128,13 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
         if (line.startsWith(STATUS_PREFIX)) {
           try {
             this.helperStatus = JSON.parse(line.slice(STATUS_PREFIX.length));
+            if (this.helperStatus?.type === 'running') {
+              void this.dropAuthKey().catch((error: unknown) =>
+                this.logger.error(
+                  `Could not delete the Tailscale auth key: ${error instanceof Error ? error.message : error}`,
+                ),
+              );
+            }
           } catch {
             this.logger.warn('Tailscale helper sent a malformed status line');
           }
