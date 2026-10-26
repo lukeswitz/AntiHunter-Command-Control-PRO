@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -52,8 +53,10 @@ func main() {
 	allowed := parseList(os.Getenv("AHCC_TS_ALLOWED"))
 
 	if authKey == "" {
-		status("error", map[string]any{"message": "AHCC_TS_AUTHKEY is required"})
-		os.Exit(1)
+		if _, err := os.Stat(filepath.Join(stateDir, "tailscaled.state")); err != nil {
+			status("error", map[string]any{"message": "AHCC_TS_AUTHKEY is required"})
+			os.Exit(1)
+		}
 	}
 	target, err := url.Parse(upstream)
 	if err != nil {

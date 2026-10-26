@@ -1,6 +1,21 @@
 #!/bin/sh
 set -eu
 
+if [ "$(id -u)" = "0" ]; then
+  node_uid=$(id -u node)
+  for dir in /app/data/matter /app/data/tiles /app/apps/backend/.secrets; do
+    mkdir -p "$dir"
+    if [ "$(stat -c %u "$dir")" != "$node_uid" ]; then
+      chown -R node:node "$dir"
+    fi
+  done
+  groups=$(id -G | tr ' ' '\n' | grep -vx 0 | paste -sd, -)
+  if [ -n "$groups" ]; then
+    exec env HOME=/home/node setpriv --reuid=node --regid=node --groups="$groups" "$0" "$@"
+  fi
+  exec env HOME=/home/node setpriv --reuid=node --regid=node --clear-groups "$0" "$@"
+fi
+
 # BusyBox / dash do not support pipefail. Only enable when available.
 if [ -n "${BASH:-}" ]; then
   set -o pipefail

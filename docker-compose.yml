@@ -105,7 +105,7 @@ services:
     image: tailscale/tailscale:v1.104.2@sha256:b11583ad2e93e4671128538c88cf11f460444a5d7e449311dd1933a400ab849d
     container_name: cc_tailscale
     profiles: ['remote']
-    hostname: ${TS_HOSTNAME:-ahcc}
+    network_mode: service:frontend
     restart: unless-stopped
     environment:
       TS_AUTHKEY: ${TS_AUTHKEY:-}

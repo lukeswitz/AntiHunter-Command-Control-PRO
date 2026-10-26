@@ -113,6 +113,7 @@ export const getTailscaleStatus = () =>
     tailnet: string | null;
     lastError: string | null;
     lastExit: string | null;
+    enrolled: boolean;
   }>('/remote-alerts/tailscale/status');
 
 export const getSignalStatus = () =>
