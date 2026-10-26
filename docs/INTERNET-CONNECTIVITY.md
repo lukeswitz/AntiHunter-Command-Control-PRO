@@ -79,13 +79,13 @@ Tailscale is a private network between your own devices. Only devices signed in 
 Docker installs can skip steps 2-5 below: `docker-compose.yml` has a `tailscale` service under the `remote` profile. It runs Tailscale in its own container, serves AHCC over HTTPS on your tailnet, and never turns on Funnel. Requests go through a separate nginx entrance (port 8081, not published) that checks each person's Tailscale login against an allowlist before AHCC's own login.
 
 1. Do step 1 and step 3 below (account, MagicDNS + HTTPS Certificates), and paste the access-control policy from step 8 so `tag:ahcc` exists.
-2. In the Tailscale admin console: **Settings** → **Keys** → **Generate auth key**. Tick **Tags** and pick `tag:ahcc`. Copy the key.
+2. In the Tailscale admin console: **Settings** → **Keys** → **Generate auth key**. Tick **Tags** and pick `tag:ahcc`. Leave **Reusable** off. Copy the key.
 3. In `.env` next to `docker-compose.yml`:
 
        TS_AUTHKEY=tskey-auth-...
        TS_HOSTNAME=ahcc
 
-4. `docker compose --profile remote up -d`
+4. `docker compose --profile remote up -d`. Once the machine shows up in the Tailscale admin console, delete the `TS_AUTHKEY` line from `.env`. The container keeps its login in the `tailscale-state` volume.
 5. In AHCC: **Config** → **Remote Access** → **Remote access (Tailscale)**. Tick **Enable remote access**, enter the Tailscale login (email) of each person allowed in under **Allowed Tailscale logins**, one per line, and click **Save**. An empty list lets nobody in.
 
 **Check:** on the phone with Tailscale on and Wi-Fi off, `https://ahcc.<your-tailnet>.ts.net` shows the AHCC login page. Remove your login from the list and reload: you get **403 Forbidden**.
@@ -99,7 +99,7 @@ Tagged devices (servers you tagged in Tailscale) carry no user login, so the ent
 - Linux: `curl -fsSL https://tailscale.com/install.sh | sh` then `sudo tailscale up`, and open the link it prints to sign in.
 - macOS / Windows: install the app from https://tailscale.com/download and sign in. On the macOS App Store version the command is `/Applications/Tailscale.app/Contents/MacOS/Tailscale` (use it wherever this guide says `tailscale`).
 
-**Check:** `tailscale status` lists this computer.
+**Check:** `tailscale status` lists this computer, and `tailscale version` shows 1.104.2 or newer. Leave Tailscale SSH off on this computer: `tailscale set --ssh=false`.
 
 **Step 3. Turn on HTTPS certificates.** Open https://console.tailscale.com/admin/dns. Turn on **MagicDNS**, then turn on **HTTPS Certificates** on the same page.
 
@@ -154,6 +154,8 @@ Restart AHCC (`Ctrl+C`, then `pnpm dev`). Docker installs skip this step.
 **Turn it off:** `tailscale serve reset`.
 
 Security: no port is open to the internet. Tailscale encrypts traffic between your devices, and only devices signed in to your tailnet can connect. AHCC's login and 2FA still apply.
+
+If the AHCC computer is lost or compromised, delete it on the **Machines** page of the Tailscale admin console. Reinstalling it does not revoke its key.
 
 --------------------------------------------------------------------------------
 <a id="cloudflare"></a>
