@@ -37,6 +37,8 @@ Never forward ports 3000, 5173, 8080 or 5432 on your router, and never run `tail
 
 Your first admin password was printed once at install: by the setup script, or for Docker by `docker compose logs backend | grep "Admin account created"`.
 
+Only the web UI needs a VPN. Use WireGuard or Netbird. Don't open ports 3000 or 5173 to the internet. The backend listens on all interfaces on port 3000, so block it with the host firewall.
+
 1. Sign in, open **Account** in the sidebar → **User Management** → **Manage** on your admin row → type a long password you will remember in **Set New Password** → **Save Changes**.
 2. Open **Account** → **Security** → **Enable Two-Factor**. Scan the QR code with Google Authenticator, 1Password, Authy or any TOTP app, then enter the 6-digit code and click **Confirm Setup**. Save the recovery codes.
 

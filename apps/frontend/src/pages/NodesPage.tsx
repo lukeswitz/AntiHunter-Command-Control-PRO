@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { MeshRadiosCard } from './MeshRadiosCard';
 import { apiClient } from '../api/client';
 import type { CommandRequest } from '../api/types';
 import { useAuthStore } from '../stores/auth-store';
@@ -574,6 +575,8 @@ export function NodesPage() {
           </table>
         </div>
       )}
+
+      <MeshRadiosCard canEdit={canSendCommands} />
 
       {batterySaverDialog && (
         <BatterySaverDialog

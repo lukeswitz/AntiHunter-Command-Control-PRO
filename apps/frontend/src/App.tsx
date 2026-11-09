@@ -23,6 +23,7 @@ import { AdsbPage } from './pages/AdsbPage';
 import { AlertsEventLogPage } from './pages/AlertsEventLogPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { BaselinePage } from './pages/BaselinePage';
+import { CampaignsPage } from './pages/CampaignsPage';
 import { ChatPage } from './pages/ChatPage';
 import { CommandConsolePage } from './pages/CommandConsolePage';
 import { ConfigPage } from './pages/ConfigPage';
@@ -145,6 +146,7 @@ export default function App() {
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/probes" element={<ProbeInventoryPage />} />
                 <Route path="/baseline" element={<BaselinePage />} />
+                <Route path="/campaigns" element={<CampaignsPage />} />
                 <Route path="/alerts" element={<Navigate to="/alerts/custom" replace />} />
                 <Route path="/alerts/custom" element={<AlertsPage />} />
                 <Route path="/alerts/adsb" element={<AdsbAlertsPage />} />

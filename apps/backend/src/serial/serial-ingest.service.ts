@@ -11,9 +11,11 @@ import {
   SerialTargetDetected,
 } from './serial.types';
 import { AlertRulesEngineService } from '../alert-rules/alert-rules-engine.service';
+import { CampaignsService } from '../campaigns/campaigns.service';
 import { CommandsService } from '../commands/commands.service';
 import { DronesService } from '../drones/drones.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { KnownRadiosService } from '../known-radios/known-radios.service';
 import { NodesService } from '../nodes/nodes.service';
 import { ProbeInventoryService } from '../probe-inventory/probe-inventory.service';
 import { TakService } from '../tak/tak.service';
@@ -109,6 +111,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
     private readonly alertRulesEngine: AlertRulesEngineService,
     private readonly targetsService: TargetsService,
     private readonly probeInventoryService: ProbeInventoryService,
+    private readonly campaignsService: CampaignsService,
+    private readonly knownRadios: KnownRadiosService,
     configService: ConfigService,
   ) {
     const concurrency = Math.max(1, configService.get<number>('serial.ingestConcurrency', 1));
@@ -193,6 +197,9 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             temperatureC: event.temperatureC ?? null,
             temperatureF: event.temperatureF ?? null,
           });
+          if (event.campaign !== undefined) {
+            this.trackCampaign(event.nodeId, event.campaign, siteId);
+          }
           void this.takService.streamNodeTelemetry({
             nodeId: event.nodeId,
             name: event.nodeId,
@@ -343,6 +350,9 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
         break;
       case 'alert':
         {
+          if (this.knownRadios.observe(event)) {
+            break;
+          }
           const timestamp = new Date();
           const { lat, lon } = this.extractCoordinates(event);
           const { temperatureC, temperatureF } = this.extractAlertTemperatures(event);
@@ -435,6 +445,15 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
                 }`,
               ),
             );
+
+          if (event.category === 'campaign' && event.nodeId && event.data) {
+            const campaign = event.data as { event?: string; name?: string | null };
+            this.trackCampaign(
+              event.nodeId,
+              campaign.event === 'stop' ? null : (campaign.name ?? null),
+              siteId,
+            );
+          }
 
           if (
             event.category?.toLowerCase() === 'triangulation' &&
@@ -784,6 +803,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           rssi: probeEvent.rssi,
           type: 'WiFi',
           name: probeEvent.ssid,
+          probe: true,
           channel: probeEvent.channel,
           lat: probeEvent.lat,
           lon: probeEvent.lon,
@@ -846,6 +866,18 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           );
         break;
     }
+  }
+
+  private trackCampaign(nodeId: string, name: string | null, siteId: string | null): void {
+    void this.campaignsService
+      .reconcile(nodeId, name, siteId)
+      .catch((error) =>
+        this.logger.warn(
+          `Failed to record campaign state for ${nodeId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
   }
 
   private shouldFilterDuplicate(event: SerialParseResult, siteId: string | null): boolean {

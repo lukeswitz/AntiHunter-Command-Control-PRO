@@ -1454,6 +1454,20 @@ The sniffer prints and logs what the device sends. It does not send the Meshtast
 
 ---
 
+## Credits
+
+Device classification data in `apps/backend/data/classify/`:
+
+- **OffGridPete** ([Fieldwatch](https://github.com/OffGridPete/Fieldwatch)): device signature catalog (`fieldwatch-signatures-v2.json`) and classifier. MIT, Copyright (c) 2026 Off Grid Pete LLC; license in `LICENSE-fieldwatch.txt`.
+- Upstream engines: [Detector](https://github.com/colonelpanichacks/ouispy-detector), [Foxhunter](https://github.com/colonelpanichacks/ouispy-foxhunter), [Flock You](https://github.com/colonelpanichacks/flock-you), [Sky-Spy](https://github.com/colonelpanichacks/Sky-Spy), [UniPwn](https://github.com/colonelpanichacks/Oui-Spy-UniPwn) by **colonelpanichacks**.
+- **Will Greenberg** ([flock-you](https://github.com/wgreenberg/flock-you)): XUNTONG `0x09C8` detection.
+- **@NitekryDPaul / OrdoOuroborous** ([@nitekry](https://github.com/nitekry)): promiscuous Flock OUI set and the addr1 receiver technique.
+- **DeFlockJoplin** ([flock-you](https://github.com/DeflockJoplin/flock-you)): wildcard-probe signature.
+- Company and service IDs: [Bluetooth SIG assigned numbers](https://bitbucket.org/bluetooth-SIG/public).
+- OUI sources: [zmattmanz](https://github.com/zmattmanz), [dougborg/AirHound](https://github.com/dougborg), [VirtuallyScott](https://github.com/VirtuallyScott).
+
+---
+
 ## Legal Disclaimer
 
 AntiHunter Command & Control PRO ("Software") is distributed for **lawful, authorized defensive use only**. You may operate this project solely on infrastructure, networks, devices, radio spectrum, and datasets that you own or for which you hold explicit, written permission to assess. By downloading, compiling, or executing the Software you agree to the following conditions:

@@ -4,6 +4,7 @@ export type CommandGroup =
   | 'Detection'
   | 'Sentinel'
   | 'Triangulation'
+  | 'Campaign'
   | 'Status'
   | 'Security';
 
@@ -905,7 +906,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
           { label: 'Recon', value: 'recon' },
           { label: 'Physical', value: 'physical' },
           { label: 'Mesh', value: 'mesh' },
-          { label: 'LoRa Mesh Radios', value: 'devices' },
+          { label: 'Mesh Radios', value: 'devices' },
           { label: 'All', value: 'all' },
         ],
       },
@@ -1121,6 +1122,26 @@ export const MESH_COMMANDS: CommandDefinition[] = [
       },
     ],
     examples: [{ target: '@ALL', params: ['1'] }],
+  },
+  {
+    name: 'CONFIG_BAND',
+    group: 'Configuration',
+    description: 'Set the radio band on an ESP32-C5 node (Experimental build only).',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'band',
+        label: 'Band',
+        type: 'select',
+        required: true,
+        options: [
+          { label: '0 - 2.4 GHz', value: '0' },
+          { label: '1 - 5 GHz', value: '1' },
+          { label: '2 - Both', value: '2' },
+        ],
+      },
+    ],
+    examples: [{ target: '@NODE_22', params: ['2'] }],
   },
   {
     name: 'MESH_DEDUP_CLEAR',
@@ -1613,6 +1634,39 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     defaultTarget: '@AH01',
     parameters: [],
   },
+  {
+    name: 'BATTERY_SAVER_START',
+    group: 'Status',
+    description: 'Start battery saver with heartbeat interval (minutes).',
+    defaultTarget: '@NODE_22',
+    parameters: [
+      {
+        key: 'minutes',
+        label: 'Interval (minutes)',
+        type: 'number',
+        placeholder: '10',
+        required: true,
+        min: 1,
+        max: 30,
+        suffix: 'min',
+      },
+    ],
+    examples: [{ target: '@NODE_22', params: ['10'] }],
+  },
+  {
+    name: 'BATTERY_SAVER_STOP',
+    group: 'Status',
+    description: 'Stop battery saver.',
+    defaultTarget: '@NODE_22',
+    parameters: [],
+  },
+  {
+    name: 'BATTERY_SAVER_STATUS',
+    group: 'Status',
+    description: 'Report battery saver state.',
+    defaultTarget: '@NODE_22',
+    parameters: [],
+  },
 ];
 
 export const COMMAND_GROUP_ORDER: CommandGroup[] = [
@@ -1621,6 +1675,7 @@ export const COMMAND_GROUP_ORDER: CommandGroup[] = [
   'Detection',
   'Sentinel',
   'Triangulation',
+  'Campaign',
   'Status',
   'Security',
 ];

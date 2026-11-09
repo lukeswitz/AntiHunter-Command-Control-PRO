@@ -11,7 +11,7 @@
     "start:cluster": "node dist/main.cluster.js",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "test": "ts-node --transpile-only --project tsconfig.json src/serial/serial-pipeline.test.ts && ts-node --transpile-only --project tsconfig.json src/tiles/tiles.test.ts && ts-node --transpile-only --project tsconfig.json src/status-broadcast/status-broadcast.test.ts && ts-node --transpile-only --project tsconfig.json src/serial/node-id.test.ts && ts-node --transpile-only --project tsconfig.json src/serial/radio.test.ts && ts-node --transpile-only --project tsconfig.json src/serial/fleet-admin.test.ts && ts-node --transpile-only --project tsconfig.json src/fleet-sec/fleet-crypto.test.ts && ts-node --transpile-only --project tsconfig.json src/fleet-sec/fleet-rotation.test.ts && ts-node --transpile-only --project tsconfig.json src/webhooks/webhook-sources.test.ts && ts-node --transpile-only --project tsconfig.json src/inventory/device-signatures.test.ts && ts-node --transpile-only --project tsconfig.json src/commands/command-builder.test.ts && ts-node --transpile-only --project tsconfig.json src/serial/firmware-v105.test.ts",
+    "test": "ts-node --transpile-only --project tsconfig.json src/serial/serial-pipeline.test.ts && ts-node --transpile-only --project tsconfig.json src/tiles/tiles.test.ts && ts-node --transpile-only --project tsconfig.json src/status-broadcast/status-broadcast.test.ts && ts-node --transpile-only --project tsconfig.json src/serial/node-id.test.ts && ts-node --transpile-only --project tsconfig.json src/serial/radio.test.ts && ts-node --transpile-only --project tsconfig.json src/serial/fleet-admin.test.ts && ts-node --transpile-only --project tsconfig.json src/fleet-sec/fleet-crypto.test.ts && ts-node --transpile-only --project tsconfig.json src/fleet-sec/fleet-rotation.test.ts && ts-node --transpile-only --project tsconfig.json src/webhooks/webhook-sources.test.ts && ts-node --transpile-only --project tsconfig.json src/inventory/device-signatures.test.ts && ts-node --transpile-only --project tsconfig.json src/device-classification/device-class.test.ts && ts-node --transpile-only --project tsconfig.json src/commands/command-builder.test.ts && ts-node --transpile-only --project tsconfig.json src/serial/firmware-v105.test.ts && ts-node --transpile-only --project tsconfig.json src/known-radios/known-radios.test.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
@@ -49,7 +49,7 @@
     "ipaddr.js": "^2.3.0",
     "jsonwebtoken": "^9.0.3",
     "mqtt": "^5.14.1",
-    "multer": "^2.3.0",
+    "multer": "^2.5.0",
     "nestjs-pino": "^4.5.0",
     "nodemailer": "^10.0.6",
     "otplib": "^12.0.1",
@@ -60,9 +60,9 @@
     "rxjs": "^7.8.1",
     "sanitize-html": "^2.12.1",
     "socket.io": "^4.8.3",
-    "undici": "^6.28.1",
+    "undici": "^6.29.1",
     "web-push": "^3.6.7",
-    "zod": "^3.23.8"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",

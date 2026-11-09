@@ -933,7 +933,7 @@ export function MapPage() {
   return (
     <>
       <section className="panel">
-        <header className="panel__header">
+        <header className="panel__header map-panel__header">
           <div>
             <h1 className="panel__title">Operational Map</h1>
             <p className="panel__subtitle">

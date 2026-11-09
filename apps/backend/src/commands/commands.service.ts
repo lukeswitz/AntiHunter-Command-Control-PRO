@@ -64,6 +64,19 @@ const ACK_TO_COMMAND: Record<string, string | string[]> = {
   CSI_CFG_ACK: 'CSI_CFG',
   CSI_RECAL_ACK: 'CSI_RECAL',
   CSI_EXCLUDE_ACK: 'CSI_EXCLUDE',
+  DEDUP_TTL_ACK: 'CONFIG_DEDUP_TTL',
+  SESSION_DEDUP_ACK: 'CONFIG_SESSION_DEDUP',
+  NODE_ID_ACK: 'CONFIG_NODEID',
+  RSSI_ACK: 'CONFIG_RSSI',
+  ERASE_PSK_ACK: 'CONFIG_ERASE_PSK',
+  BLE_CLASSIFY_ACK: 'BLE_CLASSIFY',
+  BASELINE_WATCH_ACK: 'BASELINE_WATCH',
+  CAMPAIGN_START_ACK: 'CAMPAIGN_START',
+  CAMPAIGN_STOP_ACK: 'CAMPAIGN_STOP',
+  SCHED_ADD_ACK: 'SCHED_ADD',
+  SCHED_DEL_ACK: 'SCHED_DEL',
+  BAND_ACK: 'CONFIG_BAND',
+  CALIBRATE_RESET_ACK: 'CALIBRATE_RESET',
 };
 
 export interface CommandState {
@@ -582,9 +595,10 @@ export class CommandsService {
   }
 
   private async findLatestMatchingCommand(
-    name: string | string[],
+    names: string | string[],
     nodeId?: string,
   ): Promise<CommandLog | null> {
+    const name = Array.isArray(names) ? { in: names } : names;
     const targets: string[] = [];
     if (nodeId) {
       targets.push(`@${nodeId}`);

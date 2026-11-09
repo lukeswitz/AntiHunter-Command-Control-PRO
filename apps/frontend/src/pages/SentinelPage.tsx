@@ -52,6 +52,9 @@ export function SentinelPage() {
   const [selectedBoot, setSelectedBoot] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ level: 'ok' | 'error'; message: string } | null>(null);
   const [csiSeconds, setCsiSeconds] = useState('300');
+  const [jamNfDb, setJamNfDb] = useState('8');
+  const jamNfDbValue = Number(jamNfDb);
+  const jamNfDbValid = Number.isInteger(jamNfDbValue) && jamNfDbValue >= 3 && jamNfDbValue <= 30;
   const [csiForever, setCsiForever] = useState(false);
   const [csiChannel, setCsiChannel] = useState('');
   const [csiSensitivity, setCsiSensitivity] = useState<string | null>(null);
@@ -604,6 +607,28 @@ export function SentinelPage() {
             </div>
           ))}
         </div>
+        <div className="sentinel-field">
+          <label htmlFor="jam-nf-db">Wi-Fi Interference: noise rise (dB)</label>
+          <input
+            id="jam-nf-db"
+            type="number"
+            min={3}
+            max={30}
+            value={jamNfDb}
+            onChange={(event) => setJamNfDb(event.target.value)}
+          />
+        </div>
+        <p className="form-hint">
+          Alerts when a channel&apos;s noise rises this much. 3 to 30, default 8.
+        </p>
+        <button
+          type="button"
+          className="control-chip"
+          disabled={!canSend || busy || !jamNfDbValid}
+          onClick={() => send('DETECT_CFG', [JSON.stringify({ jam_nf_db: jamNfDbValue })])}
+        >
+          Set
+        </button>
       </article>
     </div>
   );

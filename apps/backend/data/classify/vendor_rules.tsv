@@ -1,0 +1,190 @@
+hikvision	camera	a Hikvision camera or recorder	3
+dahua	camera	a Dahua camera or recorder	3
+axis communications	camera	an Axis network camera	3
+hanwha	camera	a Hanwha (Wisenet) camera	3
+uniview	camera	a Uniview camera	3
+vivotek	camera	a Vivotek camera	3
+mobotix	camera	a Mobotix camera	3
+avigilon	camera	an Avigilon camera	3
+verkada	camera	a Verkada camera or sensor	3
+reolink	camera	a Reolink camera	3
+amcrest	camera	an Amcrest camera	3
+arlo technology	camera	an Arlo camera	3
+wyze	camera	a Wyze camera or smart-home device	3
+ring llc	camera	a Ring doorbell or camera	3
+blink by amazon	camera	a Blink camera	3
+lorex	camera	a Lorex camera	3
+swann	camera	a Swann camera	3
+ezviz	camera	an EZVIZ camera	3
+flir	camera	a FLIR thermal camera	3
+rhombus	camera	a Rhombus camera	3
+gopro	camera	a GoPro camera	3
+axon enterprise	radio	an Axon body camera or device	4
+taser international	radio	an Axon (TASER) body camera or weapon	4
+digi international	router	a Digi cellular router or module	2
+mikrotikls	network	a MikroTik router	3
+dexcom	health	a Dexcom glucose monitor	4
+tile	tag	a Tile tracker	4
+chipolo	tag	a Chipolo tracker	4
+rivian automotive	vehicle	a Rivian vehicle	4
+nissan motor	vehicle	a Nissan vehicle	4
+geotab	vehicle	a Geotab fleet tracker	4
+allterco robotics	home	a Shelly smart relay	3
+motorola solutions	radio	a Motorola Solutions radio or camera	3
+kenwood	radio	a Kenwood radio	2
+icom inc	radio	an Icom radio	2
+sepura	radio	a Sepura radio	3
+cradlepoint	router	a Cradlepoint cellular router (often in vehicles)	3
+sierra wireless	router	a Sierra Wireless cellular modem	2
+inseego	router	an Inseego hotspot	3
+peplink	router	a Peplink cellular router	3
+dji	drone	a DJI drone or controller	4
+parrot sa	drone	a Parrot drone	3
+skydio	drone	a Skydio drone	4
+apple	phone	an Apple device (iPhone, iPad, Mac, Watch)	2
+samsung electronics	phone	a Samsung phone, TV, or appliance	1
+google	phone	a Google device (Pixel, Nest, Chromecast)	1
+xiaomi	phone	a Xiaomi phone or smart-home device	1
+huawei device	phone	a Huawei phone or wearable	2
+honor device	phone	an Honor phone	2
+oppo mobile	phone	an OPPO phone	2
+vivo mobile	phone	a vivo phone	2
+oneplus	phone	a OnePlus phone	2
+realme	phone	a realme phone	2
+motorola mobility	phone	a Motorola phone	2
+lg electronics (mobile communications)	phone	an LG phone	2
+nokia corporation	phone	a Nokia phone	1
+hmd global	phone	a Nokia (HMD) phone	2
+itel mobile	phone	an itel phone	2
+zte corporation	phone	a ZTE phone or router	1
+tcl	tv	a TCL TV or phone	1
+sony interactive	console	a PlayStation	3
+nintendo	console	a Nintendo console or controller	3
+valve corporation	console	a Steam Deck or Valve device	2
+microsoft	computer	a Microsoft device (Surface, Xbox)	1
+dell	computer	a Dell computer	2
+lenovo	computer	a Lenovo computer	1
+hewlett packard enterprise	network	an HPE/Aruba access point	2
+hewlett packard	computer	an HP computer or printer	1
+asustek	computer	an ASUS computer or router	1
+acer	computer	an Acer computer	2
+intel corporate	computer	a computer with an Intel Wi-Fi card	1
+liteon	computer	a device with a Lite-On radio module	1
+azurewave	computer	a device with an AzureWave radio module	1
+hon hai	computer	a Foxconn-built device	1
+cloud network technology	computer	a Foxconn-built laptop	1
+raspberry pi	computer	a Raspberry Pi	3
+canon	printer	a Canon printer or camera	2
+seiko epson	printer	an Epson printer	3
+brother industries	printer	a Brother printer	3
+xerox corporation	printer	a Xerox printer	3
+kyocera	printer	a Kyocera printer or phone	2
+ricoh	printer	a Ricoh printer	3
+zebra technologies	pos	a Zebra scanner or label printer	3
+honeywell	industrial	a Honeywell scanner, thermostat, or building device	1
+ingenico	pos	an Ingenico card terminal	3
+verifone	pos	a Verifone card terminal	3
+pax computer	pos	a PAX card terminal	3
+toast	pos	a Toast restaurant terminal	3
+meraki	network	a Cisco Meraki access point	3
+linksys	network	a Linksys router	3
+cisco	network	a Cisco access point or switch	2
+juniper networks	network	a Juniper/Mist access point	3
+ruckus	network	a Ruckus access point	3
+extreme networks	network	an Extreme Networks access point	3
+ubiquiti	network	a Ubiquiti access point or camera	2
+fortinet	network	a Fortinet access point or firewall	3
+routerboard	network	a MikroTik router	3
+netgear	network	a Netgear router	3
+tp-link	network	a TP-Link router, plug, or camera	2
+d-link	network	a D-Link router or camera	2
+belkin	network	a Belkin router or smart plug	2
+eero	network	an eero mesh router	3
+zyxel	network	a Zyxel router	3
+arcadyan	isp	an ISP gateway (Arcadyan)	3
+sagemcom	isp	an ISP gateway (Sagemcom)	3
+commscope	isp	an ISP gateway (CommScope/ARRIS)	3
+arris	isp	an ISP cable modem (ARRIS)	3
+technicolor	isp	an ISP gateway (Technicolor)	3
+vantiva	isp	an ISP gateway (Vantiva)	3
+askey	isp	an ISP gateway (Askey)	3
+fiberhome	isp	an ISP fiber gateway (FiberHome)	3
+sercomm	isp	an ISP gateway or camera (Sercomm)	2
+calix	isp	an ISP fiber gateway (Calix)	3
+adtran	isp	an ISP gateway (Adtran)	3
+nokia shanghai bell	isp	an ISP fiber gateway (Nokia)	3
+huawei technologies	network	a Huawei router or phone	1
+h3c	network	an H3C access point	3
+skyworth	tv	a Skyworth TV or set-top box	3
+vizio	tv	a Vizio TV	3
+roku	tv	a Roku player or TV	3
+hisense	tv	a Hisense TV	1
+lg electronics	tv	an LG TV or appliance	2
+panasonic	tv	a Panasonic device	1
+sharp	tv	a Sharp TV	2
+philips	home	a Philips device	1
+amazon technologies	home	an Amazon Echo, Fire TV, or Ring device	2
+sonos	audio-personal	a Sonos speaker	3
+bose	audio-personal	a Bose speaker or headphones	3
+harman	audio-personal	a Harman/JBL speaker or car audio	2
+bang & olufsen	audio-personal	a Bang & Olufsen speaker	3
+sennheiser	audio-personal	Sennheiser headphones	3
+gn audio	audio-personal	a Jabra headset	3
+gn hearing	health	a ReSound hearing aid	3
+skullcandy	audio-personal	Skullcandy headphones	3
+plantronics	audio-personal	a Poly headset	3
+signify	home	a Philips Hue light	3
+ecobee	home	an ecobee thermostat	3
+nest labs	home	a Nest thermostat or camera	3
+irobot	home	a Roomba	3
+roborock	home	a Roborock robot vacuum	3
+dyson	home	a Dyson appliance	3
+tuya	home	a Tuya smart-home device	3
+lutron	home	a Lutron light control	3
+chamberlain	home	a myQ garage opener	3
+simplisafe	home	a SimpliSafe alarm	3
+resideo	home	a Resideo/Honeywell Home device	3
+vivint	home	a Vivint alarm or camera	3
+assa abloy	lock	an ASSA ABLOY / Yale lock	3
+allegion	lock	a Schlage lock	3
+august home	lock	an August lock	3
+whirlpool	home	a Whirlpool appliance	3
+bsh hausgeraete	home	a Bosch/Siemens appliance	3
+bsh hausgeräte	home	a Bosch/Siemens appliance	3
+haier	home	a Haier/GE appliance	2
+midea	home	a Midea appliance	3
+espressif	iot	an ESP32/ESP8266-based IoT gadget	2
+silicon laboratories	iot	a device with a Silicon Labs radio	1
+texas instruments	iot	a device with a TI radio	1
+nordic semiconductor	iot	a device with a Nordic radio	1
+realtek	iot	a device with a Realtek radio	1
+mediatek	iot	a device with a MediaTek radio	1
+murata manufacturing	iot	a device with a Murata radio module	1
+quectel	iot	a cellular IoT device (Quectel module)	2
+u-blox	iot	a GPS/cellular tracker (u-blox module)	2
+telit	iot	a cellular IoT device (Telit module)	2
+em microelectronic	iot	a BLE tag or beacon (EM Micro)	2
+tesla inc	vehicle	a Tesla vehicle or charger	4
+tesla,inc	vehicle	a Tesla vehicle or charger	4
+ford motor	vehicle	a Ford vehicle	4
+general motors	vehicle	a GM vehicle	4
+toyota	vehicle	a Toyota vehicle	2
+honda motor	vehicle	a Honda vehicle	3
+volkswagen	vehicle	a Volkswagen vehicle	4
+bmw	vehicle	a BMW vehicle	4
+mercedes	vehicle	a Mercedes-Benz vehicle	4
+denso	vehicle	a car electronics module (Denso)	3
+alps alpine	vehicle	a car infotainment unit (Alps Alpine)	3
+visteon	vehicle	a car infotainment unit (Visteon)	3
+lg innotek	vehicle	a car telematics module (LG Innotek)	2
+samsara	vehicle	a Samsara fleet tracker or dashcam	4
+garmin	wearable	a Garmin watch or GPS	3
+fitbit	wearable	a Fitbit tracker	3
+polar electro	wearable	a Polar watch	3
+oura	wearable	an Oura ring	3
+meta platforms	glasses	a Meta device (Ray-Ban glasses, Quest)	3
+oculus	glasses	a Meta Quest headset	3
+medtronic	health	a Medtronic medical device	3
+abbott	health	an Abbott medical device	3
+omron healthcare	health	an Omron health monitor	3
+withings	health	a Withings health device	3

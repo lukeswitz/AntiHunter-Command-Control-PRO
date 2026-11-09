@@ -7,9 +7,18 @@ export interface SentinelGroup {
 export const SENTINEL_GROUPS: SentinelGroup[] = [
   { key: 'dos', label: 'DoS', description: 'Evil-twin, SAE flood, assoc-sleep' },
   { key: 'rogue', label: 'Rogue AP', description: 'Evil-twin, OWE abuse, Karma' },
-  { key: 'recon', label: 'Recon', description: 'PMKID, probe flood, handshake capture' },
-  { key: 'physical', label: 'Physical', description: 'FragAttack, TSF anomaly, jamming' },
+  {
+    key: 'recon',
+    label: 'Recon',
+    description: 'PMKID, probe flood, handshake capture, Pwnagotchi',
+  },
+  {
+    key: 'physical',
+    label: 'Physical',
+    description: 'FragAttack, TSF anomaly, Wi-Fi interference, interference baseline',
+  },
   { key: 'mesh', label: 'Mesh Guard', description: 'Mesh spoof / flood / command injection' },
+  { key: 'devices', label: 'Mesh Radios', description: 'Meshtastic / MeshCore radios' },
 ];
 
 export const SENTINEL_MODES = [
@@ -36,9 +45,11 @@ export const SENTINEL_DETECTORS: SentinelDetector[] = [
   { key: 'hshk', label: 'Handshake Capture' },
   { key: 'frag', label: 'FragAttack' },
   { key: 'tsf', label: 'TSF Anomaly' },
-  { key: 'jam', label: 'WiFi Jamming' },
+  { key: 'jam', label: 'Wi-Fi Interference' },
+  { key: 'jam_baseline', label: 'Interference Baseline' },
   { key: 'mesh_guard', label: 'Mesh Guard' },
   { key: 'pwna', label: 'Pwnagotchi' },
+  { key: 'meshradio', label: 'Meshtastic / MeshCore' },
   { key: 'csa_quiet', label: 'CSA / Quiet Abuse' },
   { key: 'bloom_gossip', label: 'Bloom Gossip (mesh)' },
   { key: 'attacker_trilat', label: 'Attacker Trilateration' },
@@ -55,8 +66,9 @@ export const SENTINEL_DETECTORS: SentinelDetector[] = [
   { key: 'mesh_assoc_sleep', label: 'Mesh Relay: Assoc-Sleep' },
   { key: 'mesh_frag', label: 'Mesh Relay: FragAttack' },
   { key: 'mesh_hshk', label: 'Mesh Relay: Handshake' },
-  { key: 'mesh_jam', label: 'Mesh Relay: Jamming' },
+  { key: 'mesh_jam', label: 'Mesh Relay: Wi-Fi Interference' },
   { key: 'mesh_tsf', label: 'Mesh Relay: TSF Anomaly' },
+  { key: 'mesh_meshradio', label: 'Mesh Relay: LoRa Mesh Radios' },
 ];
 
 const DETECTION_LABELS: Record<string, string> = {
@@ -84,7 +96,11 @@ const DETECTION_LABELS: Record<string, string> = {
   FRAG: 'FragAttack',
   ATTACKER_HUNT: 'Attacker Hunt',
   RECON: 'Recon Score',
-  JAMMING: 'RF Jamming',
+  JAMMING: 'Wi-Fi Interference',
+  JAMMING_BASELINE: 'Interference Baseline',
+  RADIO_DETECTED: 'Meshtastic / MeshCore',
+  CSA_SPOOF: 'CSA Spoof',
+  QUIET_ABUSE: 'Quiet Abuse',
   MESH_SPOOF_SELF: 'Mesh Spoof',
   MESH_FLOOD: 'Mesh Flood',
   MESH_CMD_INJECT: 'Mesh Command Injection',

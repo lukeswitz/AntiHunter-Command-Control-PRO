@@ -4,12 +4,21 @@ import { useNavigate } from 'react-router-dom';
 
 import { apiClient } from '../api/client';
 import { InventoryDevice, SiteSummary } from '../api/types';
+import {
+  ClassFilter,
+  ClassFilterBar,
+  compareClassifications,
+  DeviceClassBadge,
+  FAMILY_HUE,
+  matchesClassFilter,
+} from '../components/device-class';
 import { useAuthStore } from '../stores/auth-store';
 import { useDroneStore } from '../stores/drone-store';
 import { useMapCommandStore } from '../stores/map-command-store';
 
 type InventorySortKey =
   | 'mac'
+  | 'class'
   | 'vendor'
   | 'type'
   | 'channel'
@@ -39,6 +48,7 @@ export function InventoryPage() {
   const [sortKey, setSortKey] = useState<InventorySortKey>('lastSeen');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isAnalyticsOpen, setAnalyticsOpen] = useState(false);
+  const [classFilter, setClassFilter] = useState<ClassFilter>('all');
   const queryClient = useQueryClient();
   const role = useAuthStore((state) => state.user?.role ?? null);
   const gotoOnMap = useMapCommandStore((state) => state.goto);
@@ -158,11 +168,18 @@ export function InventoryPage() {
       return [];
     }
     const multiplier = sortDirection === 'asc' ? 1 : -1;
-    return [...data].sort((a, b) => {
-      const result = compareInventoryDevices(a, b, sortKey, siteLookup);
-      return result * multiplier;
-    });
-  }, [data, sortDirection, sortKey, siteLookup]);
+    return data
+      .filter((device) => matchesClassFilter(device.classification, classFilter))
+      .sort((a, b) => {
+        const result = compareInventoryDevices(a, b, sortKey, siteLookup);
+        return result * multiplier;
+      });
+  }, [data, sortDirection, sortKey, siteLookup, classFilter]);
+
+  const classifications = useMemo(
+    () => (data ?? []).map((device) => device.classification),
+    [data],
+  );
 
   const handleSort = (key: InventorySortKey) => {
     if (sortKey === key) {
@@ -263,6 +280,9 @@ export function InventoryPage() {
         </div>
       </header>
 
+      {data && data.length > 0 ? (
+        <ClassFilterBar items={classifications} value={classFilter} onChange={setClassFilter} />
+      ) : null}
       {isLoading ? (
         <div className="empty-state">
           <div>Loading inventory...</div>
@@ -278,13 +298,18 @@ export function InventoryPage() {
           </div>
         </div>
       ) : (
-        <div className="inventory-table">
+        <div className="inventory-table inventory-table--cards">
           <table>
             <thead>
               <tr>
                 <th aria-sort={ariaSort('mac')}>
                   <button type="button" className="table-sort" onClick={() => handleSort('mac')}>
                     MAC {renderSortIcon('mac')}
+                  </button>
+                </th>
+                <th aria-sort={ariaSort('class')}>
+                  <button type="button" className="table-sort" onClick={() => handleSort('class')}>
+                    Class {renderSortIcon('class')}
                   </button>
                 </th>
                 <th aria-sort={ariaSort('vendor')}>
@@ -297,7 +322,7 @@ export function InventoryPage() {
                     Type {renderSortIcon('type')}
                   </button>
                 </th>
-                <th>Class</th>
+                <th>Signatures</th>
                 <th aria-sort={ariaSort('channel')}>
                   <button
                     type="button"
@@ -369,10 +394,15 @@ export function InventoryPage() {
                   (device.type ?? '').trim().toLowerCase() === 'drone' && locationKnown;
                 return (
                   <tr key={device.mac}>
-                    <td>{device.mac}</td>
-                    <td>{device.vendor ?? 'Unknown'}</td>
-                    <td>{device.type ?? 'N/A'}</td>
-                    <td>
+                    <td data-label="MAC" data-span="half" className="inventory-mac">
+                      {device.mac}
+                    </td>
+                    <td data-label="Class" data-span="half">
+                      <DeviceClassBadge classification={device.classification} />
+                    </td>
+                    <td data-label="Vendor">{device.vendor ?? 'Unknown'}</td>
+                    <td data-label="Type">{device.type ?? 'N/A'}</td>
+                    <td data-label="Signatures">
                       {device.signatures?.length
                         ? device.signatures
                             .map(
@@ -381,11 +411,13 @@ export function InventoryPage() {
                             .join(', ')
                         : '—'}
                     </td>
-                    <td>{device.channel != null ? device.channel : 'N/A'}</td>
-                    <td>{device.ssid ?? 'N/A'}</td>
-                    <td>{device.hits}</td>
-                    <td>{device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'N/A'}</td>
-                    <td>
+                    <td data-label="Channel">{device.channel != null ? device.channel : 'N/A'}</td>
+                    <td data-label="SSID / Name">{device.ssid ?? 'N/A'}</td>
+                    <td data-label="Hits">{device.hits}</td>
+                    <td data-label="Last Seen">
+                      {device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'N/A'}
+                    </td>
+                    <td data-label="RSSI">
                       {[
                         device.maxRSSI != null ? `max ${device.maxRSSI}` : null,
                         device.minRSSI != null ? `min ${device.minRSSI}` : null,
@@ -394,14 +426,14 @@ export function InventoryPage() {
                         .filter(Boolean)
                         .join(' / ') || 'N/A'}
                     </td>
-                    <td>{device.lastNodeId ?? 'N/A'}</td>
-                    <td>{resolveSiteLabel(device.siteId)}</td>
-                    <td>
+                    <td data-label="Last Node">{device.lastNodeId ?? 'N/A'}</td>
+                    <td data-label="Site">{resolveSiteLabel(device.siteId)}</td>
+                    <td data-label="Last Location">
                       {locationKnown
                         ? `${device.lastLat!.toFixed(5)}, ${device.lastLon!.toFixed(5)}`
                         : 'N/A'}
                     </td>
-                    <td>
+                    <td data-label="" data-span="full">
                       <div className="inventory-actions">
                         {isDrone ? (
                           <button
@@ -459,6 +491,11 @@ export function InventoryPage() {
               })}
             </tbody>
           </table>
+          {sortedData.length === 0 ? (
+            <div className="empty-state">
+              <div>No devices in this class.</div>
+            </div>
+          ) : null}
         </div>
       )}
       {isAnalyticsOpen && (
@@ -779,6 +816,36 @@ function InventoryAnalyticsDialog({ devices, sites, onClose }: InventoryAnalytic
 
         <section>
           <header className="inventory-analytics__section-header">
+            <h3>Device classes</h3>
+          </header>
+          {analytics.deviceClasses.length === 0 ? (
+            <p className="empty-state">No classification available.</p>
+          ) : (
+            <ul className="inventory-analytics__legend">
+              {analytics.deviceClasses.map((entry) => {
+                const hue =
+                  entry.label in FAMILY_HUE
+                    ? FAMILY_HUE[entry.label as keyof typeof FAMILY_HUE]
+                    : -1;
+                return (
+                  <li key={entry.label}>
+                    <span
+                      className="inventory-analytics__legend-swatch"
+                      style={{ background: hue >= 0 ? `hsl(${hue} 70% 50%)` : '#94a3b8' }}
+                    />
+                    <span>{entry.label}</span>
+                    <strong>
+                      {entry.value} ({entry.percent?.toFixed(1)}%)
+                    </strong>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <header className="inventory-analytics__section-header">
             <h3>Hourly activity (last 24h)</h3>
           </header>
           {analytics.hourlyTrend.length === 0 ? (
@@ -855,6 +922,7 @@ function computeInventoryAnalytics(devices: InventoryDevice[]) {
   const channelCounts = new Map<string, number>();
   const nodeCounts = new Map<string, number>();
   const typeCounts = new Map<string, number>();
+  const classCounts = new Map<string, number>();
   const siteCounts = new Map<string, number>();
   const rssis: number[] = [];
   const bucketCounts = {
@@ -898,6 +966,9 @@ function computeInventoryAnalytics(devices: InventoryDevice[]) {
 
     const typeLabel = device.type?.trim() || 'Unclassified';
     typeCounts.set(typeLabel, (typeCounts.get(typeLabel) ?? 0) + 1);
+
+    const classLabel = device.classification?.family ?? 'Unclassified';
+    classCounts.set(classLabel, (classCounts.get(classLabel) ?? 0) + 1);
 
     if (typeof device.avgRSSI === 'number' && Number.isFinite(device.avgRSSI)) {
       rssis.push(device.avgRSSI);
@@ -964,6 +1035,14 @@ function computeInventoryAnalytics(devices: InventoryDevice[]) {
       percent: totalDevices ? (value / totalDevices) * 100 : 0,
     }));
 
+  const deviceClasses: AnalyticsStat[] = Array.from(classCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value]) => ({
+      label,
+      value,
+      percent: totalDevices ? (value / totalDevices) * 100 : 0,
+    }));
+
   const siteStats = Array.from(siteCounts.entries())
     .map(([id, count]) => ({
       id,
@@ -984,6 +1063,7 @@ function computeInventoryAnalytics(devices: InventoryDevice[]) {
     topNodes: buildTopList(nodeCounts),
     rssiBuckets,
     deviceTypes,
+    deviceClasses,
     hourlyTrend: hourlyBuckets.map((bucket) => ({
       label: bucket.label,
       count: bucket.count,
@@ -1000,6 +1080,8 @@ function compareInventoryDevices(
   switch (key) {
     case 'mac':
       return compareStrings(a.mac, b.mac);
+    case 'class':
+      return compareClassifications(a.classification, b.classification);
     case 'vendor':
       return compareStrings(a.vendor, b.vendor);
     case 'type':

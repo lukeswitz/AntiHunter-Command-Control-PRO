@@ -20,6 +20,7 @@ export interface SerialNodeTelemetry {
   temperatureC?: number;
   temperatureF?: number;
   temperatureUpdatedAt?: Date;
+  campaign?: string | null;
 }
 
 export interface SerialDeviceSeen {
@@ -40,6 +41,9 @@ export interface SerialTargetDetected {
   rssi?: number;
   type?: string;
   name?: string;
+  vendor?: string;
+  bleClass?: string;
+  probe?: boolean;
   channel?: number;
   lat?: number;
   lon?: number;

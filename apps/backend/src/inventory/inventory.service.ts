@@ -3,6 +3,7 @@ import { InventoryDevice, Prisma } from '@prisma/client';
 import { Observable, Subject } from 'rxjs';
 
 import { loadSignatures, matchSignatures } from './device-signatures';
+import { classifyDeviceType } from '../device-classification/device-class';
 import { DronesService } from '../drones/drones.service';
 import { OuiService } from '../oui/oui.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -41,6 +42,18 @@ export interface InventoryUpsertPayload {
   lastLon?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+export function classifyInventoryDevice(device: InventoryDevice) {
+  return classifyDeviceType({
+    mac: device.mac,
+    type: device.type,
+    name: device.ssid,
+    vendor: device.vendor,
+    bleClass: device.bleClass,
+    locallyAdministered: device.locallyAdministered,
+    probeClient: device.probeClient,
+  });
 }
 
 @Injectable()
@@ -99,7 +112,8 @@ export class InventoryService {
     const lastNodeId = event.nodeId ?? existing?.lastNodeId ?? undefined;
 
     const ouiInfo = await this.ouiService.resolve(normalizedMac);
-    const vendor = ouiInfo.vendor ?? existing?.vendor ?? undefined;
+    const vendor = ouiInfo.vendor ?? existing?.vendor ?? event.vendor ?? undefined;
+    const bleClass = event.bleClass?.trim() || undefined;
     const locallyAdministered = ouiInfo.locallyAdministered;
     const multicast = ouiInfo.multicast;
 
@@ -131,6 +145,8 @@ export class InventoryService {
         avgRSSI: avgRSSI ?? undefined,
         locallyAdministered,
         multicast,
+        bleClass,
+        probeClient: event.probe === true,
         lastNodeId,
         lastLat: latCandidate ?? undefined,
         lastLon: lonCandidate ?? undefined,
@@ -148,6 +164,8 @@ export class InventoryService {
         avgRSSI: avgRSSI ?? existing?.avgRSSI ?? undefined,
         locallyAdministered,
         multicast,
+        bleClass: bleClass ?? existing?.bleClass ?? undefined,
+        probeClient: event.probe === true ? true : undefined,
         lastNodeId,
         lastLat: latCandidate ?? existing?.lastLat ?? undefined,
         lastLon: lonCandidate ?? existing?.lastLon ?? undefined,
@@ -252,6 +270,9 @@ export class InventoryService {
             {
               ssid: { contains: options.search, mode: Prisma.QueryMode.insensitive },
             } as Prisma.InventoryDeviceWhereInput,
+            {
+              bleClass: { contains: options.search, mode: Prisma.QueryMode.insensitive },
+            },
           ],
         }
       : undefined;
@@ -267,6 +288,7 @@ export class InventoryService {
       signatures: catalog
         ? matchSignatures(catalog, { mac: device.mac, type: device.type, name: device.ssid })
         : [],
+      classification: classifyInventoryDevice(device),
     }));
   }
 
