@@ -402,5 +402,13 @@ test('CONFIG_BAND is not on the main firmware dispatcher', () => {
   rejects('@AH01', 'CONFIG_BAND', ['2']);
 });
 
+test('SCHED_ADD options reject a newline that would inject a second command', () => {
+  rejects('@AH01', 'SCHED_ADD', ['2030-01-01T02:00|0|/scan|mode=2\n@AH01 ERASE_FORCE:deadbeef']);
+  assert.equal(
+    line('@AH01', 'SCHED_ADD', ['2030-01-01T02:00|0|/scan|mode=2&secs=600']),
+    '@AH01 SCHED_ADD:2030-01-01T02:00|0|/scan|mode=2&secs=600',
+  );
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -291,6 +291,9 @@ export function buildCommandPayload(input: CommandBuildInput): CommandBuildOutpu
   const rawParams = (input.params ?? []).map((value) => value.trim()).filter(Boolean);
   const params = handler(rawParams);
   const line = params.length ? `${target} ${name}:${params.join(':')}` : `${target} ${name}`;
+  if ([...line].some((ch) => ch.charCodeAt(0) < 0x20)) {
+    throw new BadRequestException('Command line may not contain control characters.');
+  }
   if (line.length > MAX_MESH_LINE) {
     throw new BadRequestException(
       `Command line is ${line.length} characters; the node accepts at most ${MAX_MESH_LINE}. Shorten the parameters.`,
@@ -1148,6 +1151,11 @@ function handleSchedAdd(params: string[]): string[] {
   }
   if (options.length < 1 || options.length > 1024) {
     throw new BadRequestException('SCHED_ADD options must be 1-1024 characters.');
+  }
+  if (!/^[A-Za-z0-9_=&.,%/:+-]+$/.test(options)) {
+    throw new BadRequestException(
+      'SCHED_ADD options may only contain letters, digits and = & . , % / : + - _',
+    );
   }
   return [`${start}|${repeatSeconds}|${route}|${options}`];
 }
