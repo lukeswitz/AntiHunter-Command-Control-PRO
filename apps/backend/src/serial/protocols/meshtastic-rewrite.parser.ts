@@ -7,7 +7,9 @@ import { SerialParseResult, SerialProtocolParser, SerialProbeHit } from '../seri
 const ANSI_REGEX = /\u001b\[[0-9;]*[A-Za-z]/g;
 
 const STATUS_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*STATUS:\s*Mode:(?<mode>\S+)\s+Scan:(?<scan>\S+)\s+Hits:(?<hits>\d+)\s+(?:Targets:(?<targets>\d+)\s+)?Temp:(?:(?<tempC>-?\d+(?:\.\d+)?)|\?)[cC](?:\/(?<tempF>-?\d+(?:\.\d+)?)[Ff])?\s+Up:(?<up>[0-9:]+)(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+HDOP[:=](?<hdop>-?\d+(?:\.\d+)?))?/i;
+  /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*STATUS:\s*Mode:(?<mode>\S+)\s+Scan:(?<scan>\S+)\s+Hits:(?<hits>\d+)\s+(?:Targets:(?<targets>\d+)\s+)?Temp:(?:(?<tempC>-?\d+(?:\.\d+)?)|\?)[cC](?:\/(?<tempF>-?\d+(?:\.\d+)?)[Ff])?\s+Up:(?<up>[0-9:]+)(?:\s+Rst:(?<rst>\S+))?(?:\s+Camp:(?<camp>\S+))?(?:\s+GPS[:=](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+HDOP[:=](?<hdop>-?\d+(?:\.\d+)?))?/i;
+const SUMMARY_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*SUMMARY:\s*Mode:(?<mode>\S+)\s+Scan:(?<scan>\S+)\s+Dev:(?<dev>\d+)\s+Tgt:(?<tgt>\d+)\s+Hits:(?<hits>\d+)(?:\s+Inc:(?<inc>\d+))?(?:\s+Camp:(?<camp>\S+))?\s+Up:(?<up>[0-9:]+)/i;
 const STARTUP_REGEX = /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*STARTUP:\s*(?<msg>.+)$/i;
 const GPS_LOCK_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*GPS:\s*LOCKED\s+Location[=:](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)(?:\s+Satellites[=:](?<sats>\d+))?(?:\s+HDOP[=:](?<hdop>-?\d+(?:\.\d+)?))?/i;
@@ -25,8 +27,13 @@ const TRI_TARGET_DATA_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*(?:TARGET_DATA|T_D):\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)\s+Hits=(?<hits>\d+)\s+Type:(?<type>WiFi|BLE)(?:\s+GPS=(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+HDOP=(?<hdop>-?\d+(?:\.\d+)?))?(?:\s+TS=(?<ts>-?\d+(?:\.\d+)?))?/i;
 const DEVICE_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+(?<band>[A-Za-z])\s+(?<rssi>-?\d+)(?:\s+C(?<channel>\d+))?(?:\s+N:(?<name>.+))?/i;
+const DEVICE_CONT_REGEX =
+  /^(?<mac>[0-9A-Fa-f]{12})\s+(?<band>[WB])\s+(?<rssi>-?\d+)(?:\s+C(?<channel>\d+))?(?:\s+N:(?<name>.+))?$/i;
+const DEVICE_CONT_WINDOW_MS = 30_000;
+const DRONE_LOST_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*DRONE_LOST:\s+(?<mac>\S+)(?:\s+ID:(?<droneId>\S+))?\s+AGE:(?<age>\d+)/i;
 const DRONE_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*DRONE:\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+ID:(?<droneId>[A-Za-z0-9_-]+)\s+R(?<rssi>-?\d+)\s+GPS:(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)(?:\s+ALT:(?<alt>-?\d+(?:\.\d+)?))?(?:\s+SPD:(?<spd>-?\d+(?:\.\d+)?))?(?:\s+OP:(?<opLat>-?\d+(?:\.\d+)?),(?<opLon>-?\d+(?:\.\d+)?))?/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*DRONE:\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+ID:(?<droneId>[A-Za-z0-9_-]+)\s+R(?<rssi>-?\d+)(?:\s+GPS:(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+ALT:(?<alt>-?\d+(?:\.\d+)?))?(?:\s+SPD:(?<spd>-?\d+(?:\.\d+)?))?(?:\s+OP:(?<opLat>-?\d+(?:\.\d+)?),(?<opLon>-?\d+(?:\.\d+)?))?/i;
 
 const ANOMALY_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*ANOMALY-(?<kind>NEW|RETURN|RSSI):\s*(?<type>\w+)\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})(?:\s+RSSI:(?<rssi>-?\d+))?(?:\s+Old:(?<old>-?\d+)\s+New:(?<new>-?\d+)\s+Delta:(?<delta>-?\d+))?(?:\s+Name:(?<name>[^ ]+))?/i;
@@ -69,7 +76,7 @@ const PROBE_HIT_REGEX =
 const HB_ACK_INTERVAL_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*HB_ACK:INTERVAL\s+(?<minutes>\d+)min/i;
 const WIPE_TOKEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*WIPE_TOKEN:(?<token>[A-Za-z0-9_:-]+)/i;
 const ERASE_TOKEN_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*ERASE_TOKEN:(?<token>[A-Za-z0-9_:-]+|\w+)(?:\s+Time:(?<time>\d+)s)?/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*ERASE_TOKEN:(?<token>[A-Za-z0-9_:-]+|\w+)(?:\s+(?:Expires|Time):(?<time>\d+)s)?/i;
 const TRI_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_ACK:(?<target>.+)$/i;
 const TRI_STOP_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_STOP_ACK/i;
 const BASELINE_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*BASELINE_ACK:(?<status>[A-Z_]+)/i;
@@ -92,12 +99,22 @@ const TIME_SYNC_RESP_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*TIME_SYNC_RESP:(?<time>\d+):(?<window>\d+):(?<seq>\d+)(?::(?<offset>-?\d+))?/i;
 
 const DONE_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<op>SCAN|DEAUTH|DRONE|BASELINE|LIST_SCAN|PROBE)_DONE:\s*(?<body>.+)$/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<op>SCAN|DEAUTH|DRONE|BASELINE|LIST_SCAN|PROBE|PCAP)_DONE:\s*(?<body>.+)$/i;
+const PCAP_START_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*PCAP_START:\s*(?<radio>WIFI|BLE)\s+D=(?<secs>\d+)/i;
+const BASELINE_WATCH_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*BASELINE_WATCH:\s*New=(?<added>\d+)\s+Gone=(?<gone>\d+)\s+Moved=(?<moved>\d+)\s+Both=(?<both>\d+)/i;
+const RESULT_LINE_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<command>CAMPAIGN_STATUS|SCHED_LIST|VIBSCAN_STATUS|ATTACKER_TRILAT_STATUS|DETECT_COUNTS):\s*(?<body>.*)$/i;
+const CALIBRATE_DONE_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*CALIBRATE_DONE:(?<result>FAILED|STOPPED|WIFI=(?<wifi>-?\d+(?:\.\d+)?|NONE):BLE=(?<ble>-?\d+(?:\.\d+)?|NONE))/i;
+const EXTRA_ACK_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<kind>(?:CAMPAIGN|SCHED|CALIBRATE|SELF_RADIO|RADIO_KNOWN|VIBSCAN|PCAP_AUTO|SD_REPAIR|DETECT_CLEAR|ATTACKER_TRILAT|MESH_TX_CANCEL|DEVICE_DB_CLEAR|PROBE_DB_CLEAR|BASELINE_RESET|RANDOMIZATION_RESET)_ACK):(?<status>[A-Za-z_=0-9]+)/i;
 
 const CODES_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*CODES:(?<codes>.*)$/i;
 
 const SENTINEL_DETECTION_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>DEAUTH_AP_TARGETED|DEAUTH_FLOOD|DEAUTH_FORGE|PROBE_FLOOD_BEHAVE|PROBE_FLOOD_AP|PROBE_FLOOD|PMKID_FORGE|PMKID_HARVEST|BEACON_FORGE|BEACON_FLOOD|KARMA_CONFIRMED|KARMA_CAND|EVILTWIN|OWE_ABUSE|ASSOC_SLEEP|SSID_CONFUSION|AUTH_FLOOD|SAE_DOS|EAPOL_BAIT|ATTACKER_HUNT|PWNAGOTCHI|HSHK|JAMMING|FRAG|RECON):(?<rest>.*)$/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>DEAUTH_AP_TARGETED|DEAUTH_FLOOD|DEAUTH_FORGE|PROBE_FLOOD_BEHAVE|PROBE_FLOOD_AP|PROBE_FLOOD|PMKID_FORGE|PMKID_HARVEST|BEACON_FORGE|BEACON_FLOOD|KARMA_CONFIRMED|KARMA_CAND|EVILTWIN|OWE_ABUSE|ASSOC_SLEEP|SSID_CONFUSION|AUTH_FLOOD|SAE_DOS|EAPOL_BAIT|ATTACKER_HUNT|PWNAGOTCHI|HSHK|JAMMING_BASELINE|JAMMING|FRAG|RECON|RADIO_DETECTED|CSA_SPOOF|QUIET_ABUSE):(?<rest>.*)$/i;
 
 const SENTINEL_FIELD_SCHEMAS: Record<string, string[]> = {
   EAPOL_BAIT: ['src', 'dst', 'count', 'rssi', 'confidence'],
@@ -120,6 +137,10 @@ const SENTINEL_FIELD_SCHEMAS: Record<string, string[]> = {
   SAE_DOS: ['bssid', 'count'],
   FRAG: ['src', 'info'],
   JAMMING: ['channel', 'pdr', 'errors'],
+  JAMMING_BASELINE: ['channel', 'rule', 'value'],
+  RADIO_DETECTED: ['radio', 'mac', 'rssi', 'name'],
+  CSA_SPOOF: ['bssid', 'value', 'rssi'],
+  QUIET_ABUSE: ['bssid', 'value', 'rssi'],
   KARMA_CAND: ['bssid', 'ssids'],
   KARMA_CONFIRMED: ['bssid', 'rssi'],
   PWNAGOTCHI: ['bssid', 'rssi'],
@@ -142,6 +163,8 @@ const SENTINEL_STRING_FIELDS = new Set([
   'tag',
   'attackType',
   'identityId',
+  'radio',
+  'rule',
 ]);
 const SENTINEL_NOTICE_TYPES = new Set([
   'RECON',
@@ -155,7 +178,7 @@ const NUMERIC_VALUE_REGEX = /^-?\d+(?:\.\d+)?$/;
 const MESH_GUARD_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT):(?<rest>.*)$/i;
 const MESH_COORD_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>TOF_PING|TOF_PONG|BLOOM|IDHASH|CHAN_ASSIGN):(?<rest>.*)$/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>TOF_PING|TOF_PONG|BLOOM|IDHASH|CHAN_ASSIGN|FLEET_AP|FLEET_RADIO):(?<rest>.*)$/i;
 const DEVICE_DISAPPEARED_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE_DISAPPEARED:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+absent:(?<absent>\d+)s/i;
 const RID_RX_REGEX =
@@ -188,6 +211,8 @@ const CSI_LEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*CSI_(?<kind>STATUS|JSON)_LEN:
 const NODE_ID_FALLBACK = /^([A-Za-z0-9_.:-]*[A-Za-z0-9_.-])/;
 
 export class MeshtasticRewriteParser implements SerialProtocolParser {
+  private lastDeviceNode?: { id: string; at: number };
+
   parseLine(rawLine: string): SerialParseResult[] {
     const sanitized = this.normalize(rawLine);
     if (!sanitized) return [];
@@ -264,7 +289,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
   }
 
   reset(): void {
-    // stateless parser
+    this.lastDeviceNode = undefined;
   }
 
   private parseTarget(
@@ -312,20 +337,52 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     nodeId: string | undefined,
     raw: string,
   ): SerialParseResult[] | null {
-    const m = DEVICE_REGEX.exec(payload);
-    if (!m?.groups) return null;
-    return [
-      {
+    const lines = payload.split(/\r?\n/).map((line) => line.trim());
+    const first = DEVICE_REGEX.exec(lines[0]);
+    let rowNode: string;
+    let contStart = 1;
+    const rows: SerialParseResult[] = [];
+    if (first?.groups) {
+      rowNode = nodeId ?? first.groups.id;
+      this.lastDeviceNode = { id: rowNode, at: Date.now() };
+      rows.push({
         kind: 'device-seen',
-        nodeId: nodeId ?? m.groups.id,
-        mac: m.groups.mac.toUpperCase(),
-        rssi: Number(m.groups.rssi),
-        type: this.normalizeBand(m.groups.band),
-        channel: m.groups.channel ? Number(m.groups.channel) : undefined,
-        name: m.groups.name,
+        nodeId: rowNode,
+        mac: first.groups.mac.toUpperCase(),
+        rssi: Number(first.groups.rssi),
+        type: this.normalizeBand(first.groups.band),
+        channel: first.groups.channel ? Number(first.groups.channel) : undefined,
+        name: first.groups.name,
         raw,
-      },
-    ];
+      });
+    } else {
+      const last = this.lastDeviceNode;
+      if (
+        !last ||
+        Date.now() - last.at > DEVICE_CONT_WINDOW_MS ||
+        !DEVICE_CONT_REGEX.test(lines[0])
+      ) {
+        return null;
+      }
+      rowNode = last.id;
+      contStart = 0;
+    }
+    for (const line of lines.slice(contStart)) {
+      const row = DEVICE_CONT_REGEX.exec(line);
+      if (!row?.groups) continue;
+      const hex = row.groups.mac.toUpperCase();
+      rows.push({
+        kind: 'device-seen',
+        nodeId: rowNode,
+        mac: hex.match(/.{2}/g)!.join(':'),
+        rssi: Number(row.groups.rssi),
+        type: this.normalizeBand(row.groups.band),
+        channel: row.groups.channel ? Number(row.groups.channel) : undefined,
+        name: row.groups.name,
+        raw,
+      });
+    }
+    return rows;
   }
 
   private parseTriangulationTarget(
@@ -377,6 +434,28 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
   ): SerialParseResult[] | null {
     const m = DRONE_REGEX.exec(payload);
     if (!m?.groups) return null;
+    if (!m.groups.lat || !m.groups.lon) {
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'drone',
+          nodeId: nodeId ?? m.groups.id,
+          message: payload,
+          raw,
+          data: {
+            event: 'drone-seen',
+            droneId: m.groups.droneId,
+            mac: m.groups.mac.toUpperCase(),
+            rssi: Number(m.groups.rssi),
+            altitude: m.groups.alt ? Number(m.groups.alt) : undefined,
+            speed: m.groups.spd ? Number(m.groups.spd) : undefined,
+            operatorLat: m.groups.opLat ? Number(m.groups.opLat) : undefined,
+            operatorLon: m.groups.opLon ? Number(m.groups.opLon) : undefined,
+          },
+        },
+      ];
+    }
     return [
       {
         kind: 'drone-telemetry',
@@ -653,6 +732,25 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             event: 'device-disappeared',
             mac: disappeared.groups.mac.toUpperCase(),
             absentSeconds: Number(disappeared.groups.absent),
+          },
+          raw,
+        },
+      ];
+    }
+    const droneLost = DRONE_LOST_REGEX.exec(payload);
+    if (droneLost?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'drone',
+          nodeId: nodeId ?? droneLost.groups.id,
+          message: payload,
+          data: {
+            event: 'drone-lost',
+            mac: droneLost.groups.mac.toUpperCase(),
+            droneId: droneLost.groups.droneId,
+            ageSeconds: Number(droneLost.groups.age),
           },
           raw,
         },
@@ -989,6 +1087,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       BASELINE: 'baseline-done',
       LIST_SCAN: 'list-scan-done',
       PROBE: 'probe-done',
+      PCAP: 'pcap-done',
     };
     const ack: SerialParseResult = {
       kind: 'command-ack',
@@ -997,7 +1096,7 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       status: 'DONE',
       raw,
     };
-    if (op !== 'BASELINE') {
+    if (op !== 'BASELINE' && op !== 'PCAP') {
       return [ack];
     }
     return [
@@ -1139,16 +1238,28 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     }
     const erase = ERASE_REGEX.exec(payload);
     if (erase?.groups) {
-      return [
+      const eraseNode = nodeId ?? erase.groups.id;
+      const eraseResults: SerialParseResult[] = [
         {
           kind: 'alert',
           level: 'ALERT',
           category: 'erase',
-          nodeId: nodeId ?? erase.groups.id,
+          nodeId: eraseNode,
           message: payload,
           raw,
         },
       ];
+      if (erase.groups.kind.toUpperCase() === 'ACK' && erase.groups.msg) {
+        const status = erase.groups.msg.trim().split(/\s+/)[0].toUpperCase();
+        eraseResults.push({
+          kind: 'command-ack',
+          nodeId: eraseNode,
+          ackType: status === 'CANCELED' ? 'ERASE_CANCEL_ACK' : 'ERASE_ACK',
+          status,
+          raw,
+        });
+      }
+      return eraseResults;
     }
     const baseline = BASELINE_STATUS_REGEX.exec(payload);
     if (baseline?.groups) {
@@ -1178,6 +1289,18 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     nodeId: string | undefined,
     raw: string,
   ): SerialParseResult[] | null {
+    const summary = SUMMARY_REGEX.exec(payload);
+    if (summary?.groups) {
+      return [
+        {
+          kind: 'command-result',
+          nodeId: nodeId ?? summary.groups.id ?? 'unknown',
+          command: 'SUMMARY',
+          payload: this.stripTrailingHash(payload),
+          raw,
+        },
+      ];
+    }
     const m = STATUS_REGEX.exec(payload);
     if (!m?.groups) return null;
     const resolvedNodeId = nodeId ?? m.groups.id;
@@ -1398,18 +1521,30 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     }
     const eraseToken = ERASE_TOKEN_REGEX.exec(payload);
     if (eraseToken?.groups) {
+      const eraseNode = nodeId ?? eraseToken.groups.id;
+      const rateLimited = eraseToken.groups.token.toUpperCase() === 'RATE_LIMITED';
       return [
         {
           kind: 'alert',
           level: 'NOTICE',
           category: 'erase',
-          nodeId: nodeId ?? eraseToken.groups.id,
+          nodeId: eraseNode,
           message: payload,
           raw,
-          data: {
-            token: eraseToken.groups.token,
-            time: eraseToken.groups.time ? Number(eraseToken.groups.time) : undefined,
-          },
+          data: rateLimited
+            ? { rateLimited: true }
+            : {
+                token: eraseToken.groups.token,
+                time: eraseToken.groups.time ? Number(eraseToken.groups.time) : undefined,
+                expiresSeconds: eraseToken.groups.time ? Number(eraseToken.groups.time) : undefined,
+              },
+        },
+        {
+          kind: 'command-ack',
+          nodeId: eraseNode,
+          ackType: 'ERASE_TOKEN',
+          status: rateLimited ? 'RATE_LIMITED' : 'OK',
+          raw,
         },
       ];
     }
@@ -1515,7 +1650,110 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
         },
       ];
     }
+    return this.parseExtendedReplies(payload, nodeId, raw);
+  }
+
+  private parseExtendedReplies(
+    payload: string,
+    nodeId: string | undefined,
+    raw: string,
+  ): SerialParseResult[] | null {
+    const extraAck = EXTRA_ACK_REGEX.exec(payload);
+    if (extraAck?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? extraAck.groups.id,
+          ackType: extraAck.groups.kind.toUpperCase(),
+          status: extraAck.groups.status.toUpperCase(),
+          raw,
+        },
+      ];
+    }
+    const calibrateDone = CALIBRATE_DONE_REGEX.exec(payload);
+    if (calibrateDone?.groups) {
+      const id = nodeId ?? calibrateDone.groups.id;
+      const failed = /^(FAILED|STOPPED)$/i.test(calibrateDone.groups.result);
+      return [
+        {
+          kind: 'alert',
+          level: failed ? 'NOTICE' : 'INFO',
+          category: 'calibration',
+          nodeId: id,
+          message: payload,
+          raw,
+          data: {
+            result: failed ? calibrateDone.groups.result.toUpperCase() : 'OK',
+            wifiRssi0: this.optionalNumber(calibrateDone.groups.wifi),
+            bleRssi0: this.optionalNumber(calibrateDone.groups.ble),
+          },
+        },
+        {
+          kind: 'command-ack',
+          nodeId: id,
+          ackType: 'CALIBRATE_DONE',
+          status: failed ? 'ERROR' : 'OK',
+          raw,
+        },
+      ];
+    }
+    const resultLine = RESULT_LINE_REGEX.exec(payload);
+    if (resultLine?.groups) {
+      return [
+        {
+          kind: 'command-result',
+          nodeId: nodeId ?? resultLine.groups.id,
+          command: resultLine.groups.command.toUpperCase(),
+          payload: resultLine.groups.body.trim(),
+          raw,
+        },
+      ];
+    }
+    const pcapStart = PCAP_START_REGEX.exec(payload);
+    if (pcapStart?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'INFO',
+          category: 'pcap',
+          nodeId: nodeId ?? pcapStart.groups.id,
+          message: payload,
+          raw,
+          data: {
+            event: 'pcap-start',
+            radio: pcapStart.groups.radio.toUpperCase(),
+            durationSeconds: Number(pcapStart.groups.secs),
+          },
+        },
+      ];
+    }
+    const watch = BASELINE_WATCH_REGEX.exec(payload);
+    if (watch?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'baseline',
+          nodeId: nodeId ?? watch.groups.id,
+          message: payload,
+          raw,
+          data: {
+            event: 'baseline-watch',
+            added: Number(watch.groups.added),
+            gone: Number(watch.groups.gone),
+            moved: Number(watch.groups.moved),
+            both: Number(watch.groups.both),
+          },
+        },
+      ];
+    }
     return null;
+  }
+
+  private optionalNumber(value?: string): number | undefined {
+    if (value === undefined) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
 
   private parseTriangulationMeta(

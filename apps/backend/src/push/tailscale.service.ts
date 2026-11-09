@@ -65,7 +65,8 @@ export class TailscaleService implements OnModuleInit, OnModuleDestroy {
   private binary(): string {
     if (process.env.AHCC_TAILSCALE_BIN?.trim()) return process.env.AHCC_TAILSCALE_BIN.trim();
     const base = join(process.cwd(), 'bin', 'tailscale');
-    const plat = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : 'linux';
+    const plat =
+      process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : 'linux';
     const arch = process.arch === 'arm64' ? 'arm64' : 'amd64';
     const ext = process.platform === 'win32' ? '.exe' : '';
     const specific = join(base, `ahcc-tailscale-${plat}-${arch}${ext}`);

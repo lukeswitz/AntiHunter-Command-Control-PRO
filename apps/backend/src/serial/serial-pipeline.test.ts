@@ -51,13 +51,13 @@ function sanitizeLine(value: string): string {
     cleaned = bracketMatch[2].trim();
   }
 
-  const chanMatch = /^\s*(\d)\s*:\s*(.+)$/.exec(cleaned);
+  const chanMatch = /^\s*(\d)\s*:\s*([\s\S]+)$/.exec(cleaned);
   if (chanMatch && chanMatch[1].length === 1 && Number(chanMatch[1]) <= 7) {
     cleaned = chanMatch[2].trim();
   }
 
   const HOP_KEYWORD_RE =
-    /^(?:STATUS|Target|DEVICE|DRONE|PROBE_HIT|PROBE_ACK|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|PCAP_|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|CSI_|Time:)/i;
+    /^(?:STATUS|Target|DEVICE|DRONE|PROBE_HIT|PROBE_ACK|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|PCAP_|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|CSI_|SUMMARY|CAMPAIGN_|SCHED_|CALIBRATE_|SELF_RADIO_|RADIO_KNOWN_|RADIO_DETECTED|CSA_SPOOF|QUIET_ABUSE|FLEET_|VIBSCAN_|ATTACKER_TRILAT|MESH_TX_CANCEL|DEVICE_DB_CLEAR|PROBE_DB_CLEAR|BASELINE_RESET|BASELINE_WATCH|RANDOMIZATION_RESET|DETECT_CLEAR|DETECT_COUNTS|SD_REPAIR|Time:)/i;
   const hopMatch = /^([A-Za-z0-9_-]{1,6}):\s+([A-Za-z0-9_.:-]+:\s+)(.+)$/i.exec(cleaned);
   if (hopMatch) {
     const secondToken = hopMatch[2].replace(/[:\s]+$/, '');
@@ -82,7 +82,7 @@ interface TestCase {
   expectKinds: string[];
   expectCategory?: string;
   expectNodeId?: string;
-  expectData?: Record<string, string | number>;
+  expectData?: Record<string, string | number | boolean>;
   skipHop?: boolean;
 }
 
@@ -192,8 +192,7 @@ const FIRMWARE_MESSAGES: TestCase[] = [
   },
   {
     name: 'PROBE_HIT with GPS',
-    input:
-      'AH5: PROBE_HIT AA:BB:CC:DD:EE:FF Intel RSSI=-60 CH=6 SSID="CorpNet" GPS=12.345,-54.321',
+    input: 'AH5: PROBE_HIT AA:BB:CC:DD:EE:FF Intel RSSI=-60 CH=6 SSID="CorpNet" GPS=12.345,-54.321',
     expectKinds: ['probe-hit'],
   },
 
@@ -873,6 +872,252 @@ const FIRMWARE_MESSAGES: TestCase[] = [
     input: 'AH5: RID_CLAIM:DRONE1:37.1:-122.2:100.5',
     expectKinds: ['alert'],
     expectCategory: 'drone',
+  },
+
+  // ─── v1.0.5 firmware formats (network_mesh.cpp, detect.cpp, drone_detector.cpp, pcap.cpp) ───
+  {
+    name: 'STATUS with Rst Camp and GPS',
+    input:
+      'AH5: STATUS: Mode:WiFi+BLE Scan:IDLE Hits:0 Temp:41.5C Up:00:12:03 Rst:POWERON Camp:site-a GPS:12.345334,-54.321611 HDOP=0.8',
+    expectKinds: ['node-telemetry', 'command-result'],
+  },
+  {
+    name: 'STATUS with Rst only',
+    input: 'AH5: STATUS: Mode:WiFi Scan:ACTIVE Hits:3 Temp:41.5C Up:00:12:03 Rst:TASK_WDT',
+    expectKinds: ['node-telemetry', 'command-result'],
+  },
+  {
+    name: 'SUMMARY',
+    input:
+      'AH5: SUMMARY: Mode:WiFi+BLE Scan:IDLE Dev:120 Tgt:4 Hits:7 Inc:2 Camp:site-a Up:00:12:03',
+    expectKinds: ['command-result'],
+  },
+  {
+    name: 'DEVICE with continuation rows',
+    input:
+      'AH5: DEVICE:AA:BB:CC:DD:EE:FF W -72 C6 N:HomeRouter\n112233445566 B -85 N:Speaker\n665544332211 W -60 C11',
+    expectKinds: ['device-seen'],
+    skipHop: true,
+  },
+  {
+    name: 'DRONE without GPS',
+    input: 'AH5: DRONE: AA:BB:CC:DD:EE:FF ID:DJI-Mini3 R-75',
+    expectKinds: ['alert'],
+    expectCategory: 'drone',
+  },
+  {
+    name: 'DRONE_LOST',
+    input: 'AH5: DRONE_LOST: AA:BB:CC:DD:EE:FF ID:DJI-Mini3 AGE:45',
+    expectKinds: ['alert'],
+    expectCategory: 'drone',
+  },
+  {
+    name: 'RADIO_DETECTED',
+    input: 'AH5: RADIO_DETECTED:Meshtastic:AA:BB:CC:DD:EE:FF:-70:Meshtastic_1a2b',
+    expectKinds: ['alert'],
+    expectCategory: 'sentinel',
+    expectData: {
+      detectionType: 'RADIO_DETECTED',
+      radio: 'Meshtastic',
+      mac: 'AA:BB:CC:DD:EE:FF',
+      rssi: -70,
+      name: 'Meshtastic_1a2b',
+    },
+  },
+  {
+    name: 'RADIO_DETECTED empty name',
+    input: 'AH5: RADIO_DETECTED:MeshCore:AA:BB:CC:DD:EE:FF:-70:',
+    expectKinds: ['alert'],
+    expectCategory: 'sentinel',
+    expectData: { radio: 'MeshCore', rssi: -70 },
+  },
+  {
+    name: 'JAMMING_BASELINE',
+    input: 'AH5: JAMMING_BASELINE:6:silence:42',
+    expectKinds: ['alert'],
+    expectCategory: 'sentinel',
+    expectData: { detectionType: 'JAMMING_BASELINE', channel: 6, rule: 'silence', value: 42 },
+  },
+  {
+    name: 'CSA_SPOOF',
+    input: 'AH5: CSA_SPOOF:AA:BB:CC:DD:EE:FF:60:-55',
+    expectKinds: ['alert'],
+    expectCategory: 'sentinel',
+    expectData: { detectionType: 'CSA_SPOOF', bssid: 'AA:BB:CC:DD:EE:FF', value: 60, rssi: -55 },
+  },
+  {
+    name: 'QUIET_ABUSE',
+    input: 'AH5: QUIET_ABUSE:AA:BB:CC:DD:EE:FF:1500:-55',
+    expectKinds: ['alert'],
+    expectCategory: 'sentinel',
+    expectData: {
+      detectionType: 'QUIET_ABUSE',
+      bssid: 'AA:BB:CC:DD:EE:FF',
+      value: 1500,
+      rssi: -55,
+    },
+  },
+  {
+    name: 'FLEET_AP',
+    input: 'AH5: FLEET_AP:AA:BB:CC:DD:EE:FF',
+    expectKinds: ['alert'],
+    expectCategory: 'mesh-coordination',
+  },
+  {
+    name: 'FLEET_RADIO',
+    input: 'AH5: FLEET_RADIO:AH7:ah07',
+    expectKinds: ['alert'],
+    expectCategory: 'mesh-coordination',
+  },
+  {
+    name: 'PCAP_START line',
+    input: 'AH5: PCAP_START: WIFI D=300',
+    expectKinds: ['alert'],
+    expectCategory: 'pcap',
+  },
+  {
+    name: 'PCAP_DONE',
+    input: 'AH5: PCAP_DONE: F=1200 B=345678 D=0 R=SIZECAP',
+    expectKinds: ['alert', 'command-ack'],
+    expectCategory: 'pcap-done',
+    expectData: { F: 1200, B: 345678, D: 0, R: 'SIZECAP' },
+  },
+  {
+    name: 'BASELINE_WATCH',
+    input: 'AH5: BASELINE_WATCH: New=3 Gone=1 Moved=2 Both=40',
+    expectKinds: ['alert'],
+    expectCategory: 'baseline',
+    expectData: { added: 3, gone: 1, moved: 2, both: 40 },
+  },
+  {
+    name: 'CAMPAIGN_ACK start',
+    input: 'AH5: CAMPAIGN_ACK:START:site-a',
+    expectKinds: ['command-ack'],
+  },
+  {
+    name: 'CAMPAIGN_ACK stop',
+    input: 'AH5: CAMPAIGN_ACK:STOP:site-a',
+    expectKinds: ['command-ack'],
+  },
+  { name: 'CAMPAIGN_ACK none', input: 'AH5: CAMPAIGN_ACK:NONE', expectKinds: ['command-ack'] },
+  {
+    name: 'CAMPAIGN_STATUS',
+    input: 'AH5: CAMPAIGN_STATUS:site-a',
+    expectKinds: ['command-result'],
+  },
+  { name: 'SCHED_ACK ok', input: 'AH5: SCHED_ACK:OK', expectKinds: ['command-ack'] },
+  { name: 'SCHED_ACK err', input: 'AH5: SCHED_ACK:ERR bad time', expectKinds: ['command-ack'] },
+  { name: 'SCHED_ACK deleted', input: 'AH5: SCHED_ACK:DELETED', expectKinds: ['command-ack'] },
+  { name: 'SCHED_LIST', input: 'AH5: SCHED_LIST:2', expectKinds: ['command-result'] },
+  { name: 'CALIBRATE_ACK', input: 'AH5: CALIBRATE_ACK:STARTED', expectKinds: ['command-ack'] },
+  { name: 'CALIBRATE_ACK reset', input: 'AH5: CALIBRATE_ACK:RESET', expectKinds: ['command-ack'] },
+  {
+    name: 'CALIBRATE_DONE',
+    input: 'AH5: CALIBRATE_DONE:WIFI=-41.5:BLE=NONE',
+    expectKinds: ['alert', 'command-ack'],
+    expectCategory: 'calibration',
+    expectData: { result: 'OK', wifiRssi0: -41.5 },
+  },
+  {
+    name: 'CALIBRATE_DONE failed',
+    input: 'AH5: CALIBRATE_DONE:FAILED',
+    expectKinds: ['alert', 'command-ack'],
+    expectCategory: 'calibration',
+    expectData: { result: 'FAILED' },
+  },
+  { name: 'SELF_RADIO_ACK ok', input: 'AH5: SELF_RADIO_ACK:OK', expectKinds: ['command-ack'] },
+  {
+    name: 'SELF_RADIO_ACK prefix',
+    input: 'AH5: SELF_RADIO_ACK:Meshtastic',
+    expectKinds: ['command-ack'],
+  },
+  { name: 'RADIO_KNOWN_ACK', input: 'AH5: RADIO_KNOWN_ACK:OK:3', expectKinds: ['command-ack'] },
+  {
+    name: 'RADIO_KNOWN_ACK full',
+    input: 'AH5: RADIO_KNOWN_ACK:FAILED:FULL',
+    expectKinds: ['command-ack'],
+  },
+  {
+    name: 'VIBSCAN_ACK',
+    input: 'AH5: VIBSCAN_ACK:OK En:1 Mode:2 Dur:60s Cd:300s Pre:0',
+    expectKinds: ['command-ack'],
+  },
+  {
+    name: 'VIBSCAN_STATUS',
+    input: 'AH5: VIBSCAN_STATUS: En:1 Mode:2 Dur:60s Cd:300s Pre:0',
+    expectKinds: ['command-result'],
+  },
+  {
+    name: 'ATTACKER_TRILAT_ACK',
+    input: 'AH5: ATTACKER_TRILAT_ACK:ON',
+    expectKinds: ['command-ack'],
+  },
+  {
+    name: 'ATTACKER_TRILAT_STATUS',
+    input: 'AH5: ATTACKER_TRILAT_STATUS: ON',
+    expectKinds: ['command-result'],
+  },
+  {
+    name: 'DETECT_COUNTS',
+    input:
+      'AH5: DETECT_COUNTS: karmaCand=1 karmaConf=0 pwna=0 meshradio=2 tsf=0 pg=3 tof=1 hunts=0 hshk=0 peers=1 arPending=0',
+    expectKinds: ['command-result'],
+  },
+  { name: 'DETECT_CLEAR_ACK', input: 'AH5: DETECT_CLEAR_ACK:OK', expectKinds: ['command-ack'] },
+  {
+    name: 'PCAP_AUTO_ACK',
+    input: 'AH5: PCAP_AUTO_ACK:BUDGET=512MB FLOOR=256MB',
+    expectKinds: ['command-ack'],
+  },
+  { name: 'SD_REPAIR_ACK', input: 'AH5: SD_REPAIR_ACK:ON', expectKinds: ['command-ack'] },
+  {
+    name: 'MESH_TX_CANCEL_ACK',
+    input: 'AH5: MESH_TX_CANCEL_ACK:EMPTY',
+    expectKinds: ['command-ack'],
+  },
+  {
+    name: 'DEVICE_DB_CLEAR_ACK',
+    input: 'AH5: DEVICE_DB_CLEAR_ACK:OK',
+    expectKinds: ['command-ack'],
+  },
+  { name: 'PROBE_DB_CLEAR_ACK', input: 'AH5: PROBE_DB_CLEAR_ACK:OK', expectKinds: ['command-ack'] },
+  { name: 'BASELINE_RESET_ACK', input: 'AH5: BASELINE_RESET_ACK:OK', expectKinds: ['command-ack'] },
+  {
+    name: 'RANDOMIZATION_RESET_ACK',
+    input: 'AH5: RANDOMIZATION_RESET_ACK:BUSY',
+    expectKinds: ['command-ack'],
+  },
+  {
+    name: 'ERASE_TOKEN hex with Expires',
+    input: 'AH5: ERASE_TOKEN:AH_0A1B2C3D_4E5F6A7B_0000012C Expires:300s',
+    expectKinds: ['alert', 'command-ack'],
+    expectCategory: 'erase',
+    expectData: { token: 'AH_0A1B2C3D_4E5F6A7B_0000012C', time: 300, expiresSeconds: 300 },
+  },
+  {
+    name: 'ERASE_TOKEN rate limited',
+    input: 'AH5: ERASE_TOKEN:RATE_LIMITED',
+    expectKinds: ['alert', 'command-ack'],
+    expectCategory: 'erase',
+    expectData: { rateLimited: true },
+  },
+  {
+    name: 'ERASE_ACK DENIED',
+    input: 'AH5: ERASE_ACK:DENIED',
+    expectKinds: ['alert', 'command-ack'],
+    expectCategory: 'erase',
+  },
+  {
+    name: 'ERASE_ACK CANCELED',
+    input: 'AH5: ERASE_ACK:CANCELED',
+    expectKinds: ['alert', 'command-ack'],
+    expectCategory: 'erase',
+  },
+  {
+    name: 'ERASE_ACK SET_KEY_FIRST',
+    input: 'AH5: ERASE_ACK:SET_KEY_FIRST',
+    expectKinds: ['alert', 'command-ack'],
+    expectCategory: 'erase',
   },
 ];
 

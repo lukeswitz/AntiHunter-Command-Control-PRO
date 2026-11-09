@@ -1,17 +1,22 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CommandLog, CommandStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { Observable, Subject } from 'rxjs';
 
-import { buildCommandPayload } from './command-builder';
+import {
+  buildCommandPayload,
+  checkCommandPolicy,
+  parseCommandLine,
+  redactCommandParams,
+} from './command-builder';
 import { PrismaService } from '../prisma/prisma.service';
 import { SerialService } from '../serial/serial.service';
 import { SerialCommandAck, SerialCommandResult } from '../serial/serial.types';
 import { TriangulationSessionService } from '../triangulation/triangulation-session.service';
 import { SendCommandDto } from './dto/send-command.dto';
 
-const ACK_TO_COMMAND: Record<string, string> = {
+const ACK_TO_COMMAND: Record<string, string | string[]> = {
   SCAN_ACK: 'SCAN_START',
   DEVICE_SCAN_ACK: 'DEVICE_SCAN_START',
   DRONE_ACK: 'DRONE_START',
@@ -20,10 +25,28 @@ const ACK_TO_COMMAND: Record<string, string> = {
   PCAP_ACK: 'PCAP_START',
   PCAP_STOP_ACK: 'PCAP_STOP',
   PCAP_LIMITS_ACK: 'PCAP_LIMITS',
-  BASELINE_ACK: 'BASELINE_START',
+  BASELINE_ACK: ['BASELINE_START', 'BASELINE_WATCH'],
   TRIANGULATE_ACK: 'TRIANGULATE_START',
   TRIANGULATE_STOP_ACK: 'TRIANGULATE_STOP',
-  ERASE_ACK: 'ERASE_FORCE',
+  ERASE_ACK: ['ERASE_FORCE', 'ERASE_CANCEL'],
+  ERASE_CANCEL_ACK: 'ERASE_CANCEL',
+  ERASE_TOKEN: 'ERASE_REQUEST',
+  CAMPAIGN_ACK: ['CAMPAIGN_START', 'CAMPAIGN_STOP'],
+  SCHED_ACK: ['SCHED_ADD', 'SCHED_DEL'],
+  CALIBRATE_ACK: ['CALIBRATE', 'CALIBRATE_RESET'],
+  CALIBRATE_DONE: 'CALIBRATE',
+  SELF_RADIO_ACK: ['SELF_RADIO_SET', 'SELF_RADIO_CLEAR', 'SELF_RADIO_GET'],
+  RADIO_KNOWN_ACK: ['RADIO_KNOWN_ADD', 'RADIO_KNOWN_DEL', 'RADIO_KNOWN_CLEAR'],
+  VIBSCAN_ACK: 'VIBSCAN_SET',
+  PCAP_AUTO_ACK: 'PCAP_AUTO',
+  SD_REPAIR_ACK: 'SD_REPAIR',
+  DETECT_CLEAR_ACK: 'DETECT_CLEAR',
+  ATTACKER_TRILAT_ACK: 'ATTACKER_TRILAT',
+  MESH_TX_CANCEL_ACK: 'MESH_TX_CANCEL',
+  DEVICE_DB_CLEAR_ACK: 'DEVICE_DB_CLEAR',
+  PROBE_DB_CLEAR_ACK: 'PROBE_DB_CLEAR',
+  BASELINE_RESET_ACK: 'BASELINE_RESET',
+  RANDOMIZATION_RESET_ACK: 'RANDOMIZATION_RESET',
   CHANNELS_ACK: 'CONFIG_CHANNELS',
   TARGETS_ACK: 'CONFIG_TARGETS',
   AUTOERASE_ACK: 'AUTOERASE_ENABLE',
@@ -96,6 +119,7 @@ export interface ExternalCommandEventInput {
 }
 
 export interface CommandInvocationMeta {
+  role?: string | null;
   ip?: string | null;
   userAgent?: string | null;
   fingerprint?: string | null;
@@ -107,6 +131,8 @@ export class CommandsService {
   private readonly updates$ = new Subject<CommandState>();
   private readonly remoteRequests$ = new Subject<RemoteCommandRequest>();
   private readonly localSiteId: string;
+  private readonly allowForever: boolean;
+  private readonly allowEraseForce: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -115,6 +141,23 @@ export class CommandsService {
     configService: ConfigService,
   ) {
     this.localSiteId = configService.get<string>('site.id', 'default');
+    this.allowForever = configService.get<boolean>('commands.allowForever', true);
+    this.allowEraseForce = configService.get<boolean>('commands.allowEraseForce', false);
+  }
+
+  private assertCommandAllowed(
+    built: { name: string; target: string; params: string[] },
+    role?: string | null,
+  ): void {
+    const denied = checkCommandPolicy({
+      ...built,
+      role,
+      allowForever: this.allowForever,
+      allowEraseForce: this.allowEraseForce,
+    });
+    if (denied) {
+      throw new ForbiddenException(denied);
+    }
   }
 
   getUpdatesStream(): Observable<CommandState> {
@@ -138,6 +181,7 @@ export class CommandsService {
       name: dto.name,
       params: dto.params,
     });
+    this.assertCommandAllowed(built, meta?.role ?? null);
 
     await this.ensureSiteRecord(this.localSiteId);
     await this.ensureSiteRecord(targetSiteId);
@@ -150,7 +194,7 @@ export class CommandsService {
         userId,
         target: built.target,
         name: built.name,
-        params: built.params,
+        params: redactCommandParams(built.name, built.params),
         status: 'PENDING',
         requestIp: meta?.ip ?? null,
         userAgent: meta?.userAgent ?? null,
@@ -314,7 +358,7 @@ export class CommandsService {
       originSiteId,
       target: event.target,
       name: event.name,
-      params: event.params,
+      params: redactCommandParams(event.name, event.params),
       status,
       createdAt,
     };
@@ -388,7 +432,7 @@ export class CommandsService {
           originSiteId: request.originSiteId,
           target: request.target,
           name: request.name,
-          params: request.params,
+          params: redactCommandParams(request.name, request.params),
           status: 'PENDING',
           ...(typeof resolvedUserId !== 'undefined' ? { userId: resolvedUserId } : {}),
         },
@@ -397,6 +441,32 @@ export class CommandsService {
 
     if (command.status !== 'PENDING') {
       return this.mapCommand(command);
+    }
+
+    const fromLine = parseCommandLine(request.line);
+    const remoteRole = await this.resolveRemoteRole(resolvedUserId);
+    const denied = [
+      { name: request.name, target: request.target, params: request.params },
+      fromLine,
+    ]
+      .map((candidate) =>
+        candidate
+          ? checkCommandPolicy({
+              ...candidate,
+              role: remoteRole,
+              allowForever: this.allowForever,
+              allowEraseForce: this.allowEraseForce,
+            })
+          : null,
+      )
+      .find((message) => message !== null);
+    if (denied) {
+      const refused = await this.prisma.commandLog.update({
+        where: { id: request.id },
+        data: { status: 'ERROR', errorText: denied, finishedAt: new Date() },
+      });
+      this.emitUpdate(refused);
+      return this.mapCommand(refused);
     }
 
     try {
@@ -450,7 +520,7 @@ export class CommandsService {
       originSiteId,
       target: event.target,
       name: event.name,
-      params: event.params,
+      params: redactCommandParams(event.name, event.params),
       status,
       createdAt,
     };
@@ -507,12 +577,12 @@ export class CommandsService {
     };
   }
 
-  private mapAckTypeToCommand(ackType: string): string | undefined {
+  private mapAckTypeToCommand(ackType: string): string | string[] | undefined {
     return ACK_TO_COMMAND[ackType];
   }
 
   private async findLatestMatchingCommand(
-    name: string,
+    name: string | string[],
     nodeId?: string,
   ): Promise<CommandLog | null> {
     const targets: string[] = [];
@@ -525,7 +595,7 @@ export class CommandsService {
 
     return this.prisma.commandLog.findFirst({
       where: {
-        name,
+        name: Array.isArray(name) ? { in: name } : name,
         status: { in: ['PENDING', 'SENT'] },
         OR:
           nodeId && targets.length > 0
@@ -543,8 +613,28 @@ export class CommandsService {
     if (['COMPLETE', 'STOPPED', 'OK', 'FINISHED'].includes(normalized)) {
       return 'OK';
     }
-    if (['ERROR', 'FAILED', 'TIMEOUT'].includes(normalized)) {
+    if (
+      [
+        'ERROR',
+        'FAILED',
+        'TIMEOUT',
+        'DENIED',
+        'DENIED_NO_PSK',
+        'SET_KEY_FIRST',
+        'BAD_TIER',
+        'BAD_FORMAT',
+        'INVALID',
+        'RATE_LIMITED',
+        'ERR',
+        'NOT_FOUND',
+      ].includes(normalized)
+    ) {
       return 'ERROR';
+    }
+    if (
+      ['START', 'STOP', 'DELETED', 'CLEARED', 'RESET', 'REPAIRED', 'WATCHING'].includes(normalized)
+    ) {
+      return 'OK';
     }
     return current === 'PENDING' ? 'SENT' : current;
   }
@@ -560,6 +650,24 @@ export class CommandsService {
       return normalized as CommandStatus;
     }
     return 'PENDING';
+  }
+
+  private async resolveRemoteRole(userId?: string): Promise<string> {
+    if (!userId) {
+      return 'REMOTE';
+    }
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      return user?.role ?? 'REMOTE';
+    } catch (error) {
+      this.logger.warn(
+        `Failed to resolve role for remote user ${userId}: ${error instanceof Error ? error.message : error}`,
+      );
+      return 'REMOTE';
+    }
   }
 
   private async resolveUserId(userId?: string | null): Promise<string | undefined> {

@@ -430,7 +430,21 @@ export function CommandConsolePage() {
     return Array.from(dedup.values());
   }, [availableNodes, form.siteId]);
 
-  const singleNodeCommands = useMemo(() => new Set(['CONFIG_NODEID', 'TRIANGULATE_START']), []);
+  const singleNodeCommands = useMemo(
+    () =>
+      new Set([
+        'CONFIG_NODEID',
+        'TRIANGULATE_START',
+        'ERASE_REQUEST',
+        'ERASE_FORCE',
+        'ERASE_CANCEL',
+        'AUTOERASE_ENABLE',
+        'AUTOERASE_DISABLE',
+        'FACTORY_RESET',
+        'CONFIG_ERASE_PSK',
+      ]),
+    [],
+  );
   const isSingleNodeCommand = singleNodeCommands.has(selectedCommand.name);
   const isTriangulateCommand = selectedCommand.name === 'TRIANGULATE_START';
 
@@ -883,10 +897,13 @@ export function CommandConsolePage() {
                             onChange={(event) => handleParamInputChange(param, event.target.value)}
                             placeholder={param.placeholder}
                             type={
-                              param.type === 'duration' || param.type === 'number'
-                                ? 'number'
-                                : 'text'
+                              param.secret
+                                ? 'password'
+                                : param.type === 'duration' || param.type === 'number'
+                                  ? 'number'
+                                  : 'text'
                             }
+                            autoComplete={param.secret ? 'off' : undefined}
                             inputMode={
                               param.type === 'duration' || param.type === 'number'
                                 ? 'numeric'

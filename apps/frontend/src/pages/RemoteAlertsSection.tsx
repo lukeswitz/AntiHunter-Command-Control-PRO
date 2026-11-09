@@ -185,7 +185,14 @@ function AdminCards({ view }: { view: 'alerts' | 'access' }) {
 
   if (view === 'access') {
     return (
-      <TailscaleAccessPanel config={config} form={form} set={set} save={save} busy={busy} noticeFor={noticeFor} />
+      <TailscaleAccessPanel
+        config={config}
+        form={form}
+        set={set}
+        save={save}
+        busy={busy}
+        noticeFor={noticeFor}
+      />
     );
   }
   return (
@@ -546,14 +553,11 @@ function TailscaleAccessPanel({
       </label>
       <p className="config-hint">
         Get a key at{' '}
-        <a
-          href="https://login.tailscale.com/admin/settings/keys"
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noreferrer">
           Tailscale → Settings → Keys
         </a>{' '}
-        — click "Generate auth key", turn on <strong>Tags</strong> and pick <code>tag:ahcc</code>.
+        — click &quot;Generate auth key&quot;, turn on <strong>Tags</strong> and pick{' '}
+        <code>tag:ahcc</code>.
       </p>
       <label className="form-field">
         <FieldLabel
