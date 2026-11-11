@@ -1,5 +1,7 @@
+import { validateSync } from 'class-validator';
 import assert from 'node:assert/strict';
 
+import { UpdateSerialConfigDto } from './dto/update-serial-config.dto';
 import { encodeMeshcoreFrame, MC, MeshcoreFrameParser } from './meshcore-frame-parser';
 import { SerialService } from './serial.service';
 import { SerialParseResult } from './serial.types';
@@ -51,6 +53,13 @@ async function main() {
   const tick = () => new Promise((resolve) => setImmediate(resolve));
 
   console.log('meshcore');
+  await test('config DTO accepts the meshcore send mode and rejects others', () => {
+    const dto = (sendMode: string) => Object.assign(new UpdateSerialConfigDto(), { sendMode });
+    assert.equal(validateSync(dto('meshcore')).length, 0);
+    assert.equal(validateSync(dto('protobuf')).length, 0);
+    assert.ok(validateSync(dto('bogus')).length > 0);
+  });
+
   await test('parser reassembles a frame split across chunks and skips noise', () => {
     const parser = new MeshcoreFrameParser();
     const frames: Buffer[] = [];
