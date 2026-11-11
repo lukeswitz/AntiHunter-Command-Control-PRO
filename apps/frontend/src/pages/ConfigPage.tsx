@@ -1396,7 +1396,8 @@ export function ConfigPage() {
     onSuccess: (state) => {
       if (state.connected) {
         const mode = serialConfig?.sendMode ?? 'protobuf';
-        const modeLabel = mode === 'plain' ? 'plain text' : 'protobuf';
+        const modeLabel =
+          mode === 'plain' ? 'plain text' : mode === 'meshcore' ? 'MeshCore' : 'protobuf';
         setSerialTestStatus({
           status: 'success',
           message:
@@ -3230,10 +3231,11 @@ export function ConfigPage() {
                 >
                   <option value="protobuf">Protobuf packet</option>
                   <option value="plain">Plain text line</option>
+                  <option value="meshcore">MeshCore companion</option>
                 </select>
                 <span className="config-hint">
-                  Protobuf for a Meshtastic radio on USB. Plain for an AntiHunter node wired
-                  directly.
+                  Protobuf for a Meshtastic radio on USB. MeshCore for a MeshCore companion radio on
+                  USB. Plain for an AntiHunter node wired directly.
                 </span>
               </div>
               <div className="config-row">
