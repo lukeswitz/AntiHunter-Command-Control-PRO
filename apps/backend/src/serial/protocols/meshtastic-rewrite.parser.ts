@@ -178,7 +178,7 @@ const NUMERIC_VALUE_REGEX = /^-?\d+(?:\.\d+)?$/;
 const MESH_GUARD_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT):(?<rest>.*)$/i;
 const MESH_COORD_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>TOF_PING|TOF_PONG|BLOOM|IDHASH|CHAN_ASSIGN|FLEET_AP|FLEET_RADIO):(?<rest>.*)$/i;
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>TOF_PING|TOF_PONG|BLOOM|IDHASH|CHAN_ASSIGN|FLEET_AP|FLEET_RADIO|CSI_PEER):(?<rest>.*)$/i;
 const DEVICE_DISAPPEARED_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE_DISAPPEARED:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+absent:(?<absent>\d+)s/i;
 const RID_RX_REGEX =

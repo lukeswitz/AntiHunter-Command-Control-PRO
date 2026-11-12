@@ -1347,6 +1347,15 @@ The script prints a deployment summary (URLs, generated credentials). Store it s
 3. The backend connects and sends the Meshtastic API handshake; its log prints `Meshtastic config complete` with the radio's node count. Config → Serial Connection → **Radio** then shows the radio.
 4. Test: send `@ALL STATUS` from the **Console** page. Each AntiHunter node on the mesh replies with a `STATUS` line.
 
+### Connect a MeshCore radio (Beta and C5 nodes)
+
+1. On each node, type `MESHCORE_ON` on its USB serial port. The node replies `MESHCORE_ACK:ON` and keeps the setting after a reboot. It does not work over the mesh. See [MeshCore radio setup](https://github.com/lukeswitz/AntiHunter/wiki/MeshCore-radio-setup).
+2. Set up a MeshCore companion radio with the same radio settings and the same channel 0 key as the nodes' radios.
+3. Plug it into the host by USB. In **Config → Serial Connection**, pick the port, leave baud at `115200`, set **Send Mode** to `meshcore` and **Command Channel** to `0`. Nodes send and read only channel 0.
+4. The backend log prints `MeshCore radio answered, text limit 150 bytes`. Test with `@ALL STATUS` from the **Console** page.
+
+A node splits a reply longer than the radio's text limit into parts, and each part arrives as its own message.
+
 `SERIAL_DEVICE` / `SERIAL_BAUD` in the backend `.env` only set first-start defaults; the UI values are saved in the database and win after that.
 
 ### Send Mode

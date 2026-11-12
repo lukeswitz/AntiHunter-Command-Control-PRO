@@ -252,9 +252,13 @@ test('radio, jamming baseline, CSA and quiet alerts carry their fields', () => {
   assert.equal(data('AH01: JAMMING:6:noise_rise:12').detectionType, 'JAMMING');
 });
 
-test('FLEET_AP and FLEET_RADIO are coordination alerts', () => {
+test('FLEET_AP, FLEET_RADIO and CSI_PEER are coordination alerts', () => {
   const parser = new MeshtasticRewriteParser();
-  for (const line of ['AH01: FLEET_AP:AA:BB:CC:DD:EE:FF', 'AH01: FLEET_RADIO:AH07:ah07']) {
+  for (const line of [
+    'AH01: FLEET_AP:AA:BB:CC:DD:EE:FF',
+    'AH01: FLEET_RADIO:AH07:ah07',
+    'AH01: CSI_PEER:AA:BB:CC:DD:EE:FF',
+  ]) {
     const alert = only(parser.parseLine(line), 'alert') as SerialAlertEvent;
     assert.equal(alert.category, 'mesh-coordination', line);
     assert.equal(alert.level, 'INFO');

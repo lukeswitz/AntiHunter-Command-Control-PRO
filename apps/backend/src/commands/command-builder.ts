@@ -55,6 +55,7 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['CONFIG_CHANNELS', handleConfigChannels],
   ['CONFIG_TARGETS', handleConfigTargets],
   ['CONFIG_RSSI', handleConfigRssi],
+  ['CONFIG_BAND', handleConfigBand],
   ['CONFIG_NODEID', handleConfigNodeId],
   ['SCAN_START', handleScanStart],
   ['DEVICE_SCAN_START', handleDeviceScanStart],
@@ -1061,6 +1062,14 @@ function parseBinaryFlag(value: string, command: string): '0' | '1' {
   if (['1', 'on', 'true'].includes(normalized)) return '1';
   if (['0', 'off', 'false'].includes(normalized)) return '0';
   throw new BadRequestException(`${command} must be 0 or 1.`);
+}
+
+function handleConfigBand(params: string[]): string[] {
+  const band = expectSingleParam(params, 'CONFIG_BAND', 'a band of 0, 1 or 2');
+  if (!['0', '1', '2'].includes(band)) {
+    throw new BadRequestException('CONFIG_BAND must be 0 (2.4 GHz), 1 (5 GHz) or 2 (both).');
+  }
+  return [band];
 }
 
 function handleBleClassify(params: string[]): string[] {

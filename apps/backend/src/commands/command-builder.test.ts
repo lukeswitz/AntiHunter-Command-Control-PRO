@@ -398,8 +398,12 @@ test('PCAP_AUTO and SD_REPAIR', () => {
   rejects('@ALL', 'SD_REPAIR', ['MAYBE']);
 });
 
-test('CONFIG_BAND is not on the main firmware dispatcher', () => {
-  rejects('@AH01', 'CONFIG_BAND', ['2']);
+test('CONFIG_BAND takes 0, 1 or 2 for the C5 firmware', () => {
+  assert.equal(line('@AH01', 'CONFIG_BAND', ['0']), '@AH01 CONFIG_BAND:0');
+  assert.equal(line('@ALL', 'CONFIG_BAND', ['2']), '@ALL CONFIG_BAND:2');
+  rejects('@AH01', 'CONFIG_BAND', ['3']);
+  rejects('@AH01', 'CONFIG_BAND', ['5GHz']);
+  rejects('@AH01', 'CONFIG_BAND', []);
 });
 
 test('SCHED_ADD options reject a newline that would inject a second command', () => {
