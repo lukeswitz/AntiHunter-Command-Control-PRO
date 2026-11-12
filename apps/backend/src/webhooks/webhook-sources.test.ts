@@ -122,6 +122,30 @@ async function main() {
     await dispatcher.dispatchNodeAlert(nodeEvent('tamper', 'ALERT'));
     assert.equal(delivered.length, 1);
   });
+  await test('a drone sighting with GPS goes to the Drone alert source', async () => {
+    const { dispatcher } = harness();
+    const alerts: Array<{ source: string; severity: string; body: string }> = [];
+    (
+      dispatcher as unknown as {
+        channels: { alert: (t: string, b: string, s: string, src: string) => Promise<void> };
+      }
+    ).channels.alert = async (_title, body, severity, source) => {
+      alerts.push({ source, severity, body });
+    };
+    await dispatcher.dispatchDroneTelemetry({
+      kind: 'drone-telemetry',
+      nodeId: 'AH61',
+      droneId: 'UAV1',
+      mac: 'AA:BB:CC:DD:EE:FF',
+      lat: 1.5,
+      lon: 2.5,
+      raw: 'AH61: DRONE: AA:BB:CC:DD:EE:FF ID:UAV1 R-60 GPS:1.5,2.5',
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].source, 'node:drone');
+    assert.equal(alerts[0].severity, 'NOTICE');
+  });
 
   console.log('coordinates');
   await test('stripCoords removes every parser coordinate format', () => {

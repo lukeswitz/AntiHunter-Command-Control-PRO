@@ -352,6 +352,22 @@ export class WebhookDispatcherService {
     } = {},
   ): Promise<void> {
     const timestamp = options.timestamp ?? new Date();
+    // The node sends a drone's line once per sighting (fw drone_detector.cpp droneMeshShouldAnnounce), so this cannot flood.
+    this.pushAlert(
+      {
+        event: 'node.alert',
+        eventType: WebhookEventType.NODE_ALERT,
+        timestamp,
+        nodeId: options.nodeId ?? event.nodeId ?? null,
+        severity: 'NOTICE',
+        message: event.raw,
+        mac: event.mac ?? undefined,
+        rssi: event.rssi ?? null,
+        lat: event.lat ?? null,
+        lon: event.lon ?? null,
+      },
+      'node:drone',
+    );
     await this.dispatchToSubscribers(WebhookEventType.DRONE_TELEMETRY, {
       event: 'drone.telemetry',
       eventType: WebhookEventType.DRONE_TELEMETRY,
