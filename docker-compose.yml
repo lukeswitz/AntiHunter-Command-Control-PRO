@@ -135,7 +135,7 @@ services:
       - signal-state:/home/.local/share/signal-cli
 
   signal-proxy:
-    image: node:20-bookworm-slim
+    image: node:24.22.3-bookworm-slim
     container_name: cc_signal_proxy
     profiles: ['signal']
     restart: unless-stopped
