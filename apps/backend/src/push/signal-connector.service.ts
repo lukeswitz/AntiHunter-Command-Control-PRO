@@ -34,7 +34,7 @@ const SIGNAL_NET = 'ahcc-signal';
 const SIGNAL_NET_INTERNAL = 'ahcc-signal-internal';
 const SIGNAL_IMAGE =
   'bbernhard/signal-cli-rest-api:0.100@sha256:2399d449123cdad56c4d859277e3b9127e1a00c4d2ab4601c239882609286cf8';
-const PROXY_IMAGE = 'node:20-bookworm-slim';
+const PROXY_IMAGE = 'node:24.22.3-bookworm-slim';
 
 function findProxyScript(): string | null {
   let dir = process.cwd();
