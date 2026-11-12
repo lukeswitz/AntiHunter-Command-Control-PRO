@@ -1354,7 +1354,7 @@ The script prints a deployment summary (URLs, generated credentials). Store it s
 3. Plug it into the host by USB. In **Config → Serial Connection**, pick the port, leave baud at `115200`, set **Send Mode** to `meshcore` and **Command Channel** to `0`. Nodes send and read only channel 0.
 4. The backend log prints `MeshCore radio answered, text limit 150 bytes`. Test with `@ALL STATUS` from the **Console** page.
 
-A node splits a reply longer than the radio's text limit into parts, and each part arrives as its own message.
+A node splits a reply longer than the radio's text limit into parts, and ends each part cut mid-line with ` +`. AHCC joins those parts back into one line. A part with no follow-up within 10 seconds is shown on its own.
 
 `SERIAL_DEVICE` / `SERIAL_BAUD` in the backend `.env` only set first-start defaults; the UI values are saved in the database and win after that.
 

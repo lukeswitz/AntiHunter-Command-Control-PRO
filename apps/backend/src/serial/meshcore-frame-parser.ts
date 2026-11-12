@@ -86,6 +86,50 @@ export function meshcoreTextCap(selfInfo: Buffer): number | undefined {
   return Math.max(1, Math.min(cap, MC.MAX_FRAME - SEND_HEADER_LEN));
 }
 
+export const MESHCORE_CONT = ' +';
+
+// A node ends a reply part cut at a space with " +" and repeats "<node>: " on the next part (fw meshcore_link.cpp meshcoreWriteText).
+export class MeshcoreReplyJoiner {
+  private readonly pending = new Map<string, { text: string; timer: NodeJS.Timeout }>();
+
+  constructor(
+    private readonly emit: (text: string) => void,
+    private readonly holdMs = 10_000,
+  ) {}
+
+  push(text: string): void {
+    const sep = text.indexOf(': ');
+    const node = sep > 0 ? text.slice(0, sep) : '';
+    const held = node ? this.pending.get(node) : undefined;
+    let full = text;
+    if (held) {
+      clearTimeout(held.timer);
+      this.pending.delete(node);
+      full = `${held.text} ${text.slice(sep + 2)}`;
+    }
+    if (node && full.endsWith(MESHCORE_CONT)) {
+      const body = full.slice(0, -MESHCORE_CONT.length);
+      const timer = setTimeout(() => {
+        this.pending.delete(node);
+        this.emit(body);
+      }, this.holdMs);
+      timer.unref?.();
+      this.pending.set(node, { text: body, timer });
+      return;
+    }
+    this.emit(full);
+  }
+
+  flush(): void {
+    const held = [...this.pending.values()];
+    this.pending.clear();
+    for (const part of held) {
+      clearTimeout(part.timer);
+      this.emit(part.text);
+    }
+  }
+}
+
 // The radio prepends "<sender radio name>: " to every channel message (BaseChatMesh.cpp sendGroupMessage).
 export function meshcoreChannelMessage(
   frame: Buffer,

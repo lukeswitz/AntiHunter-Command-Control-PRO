@@ -28,6 +28,7 @@ import {
   meshcoreChannelMessage,
   meshcoreChannelText,
   MeshcoreFrameParser,
+  MeshcoreReplyJoiner,
   meshcoreTextCap,
 } from './meshcore-frame-parser';
 import { MeshtasticFrameEvent, MeshtasticFrameParser } from './meshtastic-frame-parser';
@@ -328,6 +329,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private meshcoreParser?: MeshcoreFrameParser;
   private meshcoreCap: number = MC.DEFAULT_TEXT_CAP;
   private meshcoreReply?: (code: number) => void;
+  private readonly meshcoreJoiner = new MeshcoreReplyJoiner((text) => this.handleMeshText(text));
   private readonly meshNodeNames = new Map<number, string>();
   private localRadio: LocalRadioInfo = {};
   private radioConfig: Record<string, unknown> = {};
@@ -1314,6 +1316,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       this.meshcoreParser = undefined;
     }
     this.meshcoreReply?.(-1);
+    this.meshcoreJoiner.flush();
     this.meshcoreCap = MC.DEFAULT_TEXT_CAP;
     if (this.port) {
       this.port.removeAllListeners();
@@ -1491,7 +1494,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         );
         const msg = meshcoreChannelMessage(frame);
         if (msg?.text && msg.channel === this.sendChannelIndex()) {
-          this.handleMeshText(msg.text);
+          this.meshcoreJoiner.push(msg.text);
         }
         return;
       }

@@ -2,7 +2,12 @@ import { validateSync } from 'class-validator';
 import assert from 'node:assert/strict';
 
 import { UpdateSerialConfigDto } from './dto/update-serial-config.dto';
-import { encodeMeshcoreFrame, MC, MeshcoreFrameParser } from './meshcore-frame-parser';
+import {
+  encodeMeshcoreFrame,
+  MC,
+  MeshcoreFrameParser,
+  MeshcoreReplyJoiner,
+} from './meshcore-frame-parser';
 import { SerialService } from './serial.service';
 import { SerialParseResult } from './serial.types';
 
@@ -89,6 +94,32 @@ async function main() {
       ['node-telemetry', 'command-result'],
     );
     assert.deepEqual(written, [encodeMeshcoreFrame(Buffer.from([MC.CMD_SYNC_NEXT]))]);
+  });
+
+  await test('a reply part ending in " +" is joined to the next part from that node', async () => {
+    parsed.length = 0;
+    internals.handleMeshcoreFrame(channelMsg(0, 'MyRadio1: AH5: STATUS: Mode:BLE Scan:IDLE +'));
+    await tick();
+    assert.equal(parsed.length, 0);
+    internals.handleMeshcoreFrame(channelMsg(0, 'MyRadio1: AH5: Hits:0 Temp:25.0C Up:00:05:00'));
+    await tick();
+    assert.deepEqual(
+      parsed.map((e) => e.kind),
+      ['node-telemetry', 'command-result'],
+    );
+  });
+
+  await test('a held part is sent alone after the hold time or on flush', async () => {
+    const out: string[] = [];
+    const joiner = new MeshcoreReplyJoiner((text) => out.push(text), 5);
+    joiner.push('AH5: first half +');
+    joiner.push('AH7: other node line');
+    assert.deepEqual(out, ['AH7: other node line']);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(out, ['AH7: other node line', 'AH5: first half']);
+    joiner.push('AH5: again +');
+    joiner.flush();
+    assert.deepEqual(out.at(-1), 'AH5: again');
   });
 
   await test('message on another channel is ignored but still synced', async () => {
