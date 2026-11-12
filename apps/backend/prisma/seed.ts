@@ -37,9 +37,9 @@ async function main() {
     create: {},
   });
 
-  const seedSiteId = process.env.SITE_ID ?? 'default';
+  const seedSiteId = process.env.SITE_ID?.trim() || 'default';
   const seedSiteName =
-    process.env.SITE_NAME ?? (seedSiteId === 'default' ? 'Default Site' : seedSiteId);
+    process.env.SITE_NAME?.trim() || (seedSiteId === 'default' ? 'Default Site' : seedSiteId);
 
   await prisma.site.upsert({
     where: { id: seedSiteId },

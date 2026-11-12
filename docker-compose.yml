@@ -35,6 +35,8 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      SITE_ID: ${SITE_ID:-default}
+      SITE_NAME: ${SITE_NAME:-}
       DATABASE_URL: postgresql://command_center:command_center@postgres:5432/command_center
       PORT: 3000
       HTTP_PREFIX: api

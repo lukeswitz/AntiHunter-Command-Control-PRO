@@ -347,7 +347,14 @@ Configure federation per site in **Config -> MQTT Federation** (or directly via 
 **Environment defaults:**  
 Set `SITE_ID` to the local site identifier (defaults to `default`). Each Command Center deployment **must use a unique `SITE_ID`** so MQTT replication distinguishes the origin site (e.g., `SITE_ID=alpha`, `SITE_ID=bravo`). Restart the backend after changing it. Optional flags like `MQTT_ENABLED`, `MQTT_COMMANDS_ENABLED`, and `MQTT_NAMESPACE` seed runtime config before any database records exist.
 
-> **Tip:** Set `SITE_ID` (and optionally `SITE_NAME`) in the root `.env` **before** running `pnpm prisma db seed`. The seed script creates the initial `Site`, `SerialConfig`, and `MqttConfig` rows with that identifier.
+> **Tip:** Set `SITE_ID` (and optionally `SITE_NAME`) **before** the first start, in the file your install reads. The seed script creates the initial `Site`, `SerialConfig`, and `MqttConfig` rows with that identifier, and the backend creates the `Site` row at startup if it is missing.
+
+| Install | File for `SITE_ID` and `SITE_NAME` |
+| ------- | ---------------------------------- |
+| Docker (`docker-compose`) | Root `.env`. Compose passes both to the backend. |
+| Native (`setup-local.sh`, `deploy-production.sh`, `pnpm`) | `apps/backend/.env`. The backend, Prisma and the seed read it. |
+
+> **Docker upgrade:** earlier `docker-compose.yml` files did not pass `SITE_ID`, so Docker installs ran as `default` whatever the root `.env` said. If your root `.env` sets another `SITE_ID`, set it to `default` to keep existing data under the same site.
 
 ## Security & Hardening
 

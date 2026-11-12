@@ -12,7 +12,7 @@ const parseListEnv = (value: string | undefined): string[] =>
 export default () => ({
   env: process.env.NODE_ENV ?? 'development',
   site: {
-    id: process.env.SITE_ID ?? 'default',
+    id: process.env.SITE_ID?.trim() || 'default',
   },
   commands: {
     allowForever: process.env.ALLOW_FOREVER?.trim().toLowerCase() !== 'false',

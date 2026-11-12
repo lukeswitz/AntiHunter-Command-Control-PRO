@@ -19,7 +19,7 @@ export class SitesService implements OnModuleInit {
       await this.prisma.site.upsert({
         where: { id },
         update: {},
-        create: { id, name, color: '#2563EB' },
+        create: { id, name, color: '#2E7D32' },
       });
     } catch (err) {
       if ((err as { code?: string }).code !== 'P2002') throw err;
