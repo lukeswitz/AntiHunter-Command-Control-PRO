@@ -265,6 +265,17 @@ test('FLEET_AP, FLEET_RADIO and CSI_PEER are coordination alerts', () => {
   }
 });
 
+test('GPS LOCKED without a location carries satellites and HDOP', () => {
+  const parser = new MeshtasticRewriteParser();
+  const alert = only(
+    parser.parseLine('AH68: GPS: LOCKED Satellites:9 HDOP:1.60'),
+    'alert',
+  ) as SerialAlertEvent;
+  assert.equal(alert.category, 'gps');
+  assert.equal(alert.nodeId, 'AH68');
+  assert.deepEqual(alert.data, { lat: undefined, lon: undefined, hdop: 1.6, sats: 9 });
+});
+
 test('PCAP_START and PCAP_DONE', () => {
   const parser = new MeshtasticRewriteParser();
   const start = only(parser.parseLine('AH01: PCAP_START: BLE D=120'), 'alert') as SerialAlertEvent;

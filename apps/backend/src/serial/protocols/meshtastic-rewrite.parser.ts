@@ -12,7 +12,7 @@ const SUMMARY_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*SUMMARY:\s*Mode:(?<mode>\S+)\s+Scan:(?<scan>\S+)\s+Dev:(?<dev>\d+)\s+Tgt:(?<tgt>\d+)\s+Hits:(?<hits>\d+)(?:\s+Inc:(?<inc>\d+))?(?:\s+Camp:(?<camp>\S+))?\s+Up:(?<up>[0-9:]+)/i;
 const STARTUP_REGEX = /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*STARTUP:\s*(?<msg>.+)$/i;
 const GPS_LOCK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*GPS:\s*LOCKED\s+Location[=:](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?)(?:\s+Satellites[=:](?<sats>\d+))?(?:\s+HDOP[=:](?<hdop>-?\d+(?:\.\d+)?))?/i;
+  /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*GPS:\s*LOCKED(?:\s+Location[=:](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?(?:\s+Satellites[=:](?<sats>\d+))?(?:\s+HDOP[=:](?<hdop>-?\d+(?:\.\d+)?))?/i;
 const GPS_LOST_REGEX = /^(?<id>[A-Za-z0-9_.:-]*[A-Za-z0-9_.-])?:?\s*GPS:\s*LOST/i;
 const NODE_HB_REGEX =
   /^\[NODE_HB\]\s*(?<id>[A-Za-z0-9_.:-]+)\s+Time:(?<time>[^ ]+)\s+Temp:(?<tempC>-?\d+(?:\.\d+)?)(?:[cCfF])?(?:\/(?<tempF>-?\d+(?:\.\d+)?)[fF])?(?:\s+GPS:(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
@@ -1371,30 +1371,32 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     }
     const gpsLock = GPS_LOCK_REGEX.exec(payload);
     if (gpsLock?.groups) {
-      const results: SerialParseResult[] = [
-        {
+      const hasFix = gpsLock.groups.lat !== undefined;
+      const results: SerialParseResult[] = [];
+      if (hasFix) {
+        results.push({
           kind: 'node-telemetry',
           nodeId: nodeId ?? gpsLock.groups.id,
           lat: Number(gpsLock.groups.lat),
           lon: Number(gpsLock.groups.lon),
           raw,
           lastMessage: payload,
+        });
+      }
+      results.push({
+        kind: 'alert',
+        level: 'NOTICE',
+        category: 'gps',
+        nodeId: nodeId ?? gpsLock.groups.id,
+        message: payload,
+        raw,
+        data: {
+          lat: hasFix ? Number(gpsLock.groups.lat) : undefined,
+          lon: hasFix ? Number(gpsLock.groups.lon) : undefined,
+          hdop: gpsLock.groups.hdop ? Number(gpsLock.groups.hdop) : undefined,
+          sats: gpsLock.groups.sats ? Number(gpsLock.groups.sats) : undefined,
         },
-        {
-          kind: 'alert',
-          level: 'NOTICE',
-          category: 'gps',
-          nodeId: nodeId ?? gpsLock.groups.id,
-          message: payload,
-          raw,
-          data: {
-            lat: Number(gpsLock.groups.lat),
-            lon: Number(gpsLock.groups.lon),
-            hdop: gpsLock.groups.hdop ? Number(gpsLock.groups.hdop) : undefined,
-            sats: gpsLock.groups.sats ? Number(gpsLock.groups.sats) : undefined,
-          },
-        },
-      ];
+      });
       return results;
     }
     if (GPS_LOST_REGEX.test(payload)) {

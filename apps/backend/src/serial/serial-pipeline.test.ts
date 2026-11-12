@@ -346,6 +346,11 @@ const FIRMWARE_MESSAGES: TestCase[] = [
     expectKinds: ['node-telemetry', 'alert'],
   },
   {
+    name: 'GPS LOCKED as the firmware sends it (no location)',
+    input: 'AH68: GPS: LOCKED Satellites:9 HDOP:1.60',
+    expectKinds: ['alert'],
+  },
+  {
     name: 'GPS LOST',
     input: 'AH5: GPS: LOST',
     expectKinds: ['alert'],
