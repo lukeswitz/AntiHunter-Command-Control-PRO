@@ -1255,6 +1255,26 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     examples: [{ target: '@ALL', params: ['1'] }],
   },
   {
+    name: 'BLE_LONGRANGE',
+    group: 'Configuration',
+    description:
+      'Also listen for Bluetooth 5 long range. Ordinary BLE gets less listening time. Off by default.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'enabled',
+        label: 'BLE Long Range',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'On', value: '1' },
+          { label: 'Off', value: '0' },
+        ],
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['0'] }],
+  },
+  {
     name: 'CAMPAIGN_START',
     group: 'Configuration',
     description: 'Start a named campaign. Logged events carry the name. Ends a running campaign.',
