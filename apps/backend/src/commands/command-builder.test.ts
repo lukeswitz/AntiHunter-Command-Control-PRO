@@ -310,6 +310,10 @@ test('BLE_CLASSIFY and ATTACKER_TRILAT', () => {
   assert.equal(line('@ALL', 'BLE_CLASSIFY', ['0']), '@ALL BLE_CLASSIFY:0');
   assert.equal(line('@ALL', 'BLE_CLASSIFY', ['1']), '@ALL BLE_CLASSIFY:1');
   rejects('@ALL', 'BLE_CLASSIFY', ['2']);
+  assert.equal(line('@ALL', 'BLE_LONGRANGE', ['1']), '@ALL BLE_LONGRANGE:1');
+  assert.equal(line('@AH01', 'BLE_LONGRANGE', ['0']), '@AH01 BLE_LONGRANGE:0');
+  rejects('@ALL', 'BLE_LONGRANGE', ['2']);
+  rejects('@ALL', 'BLE_LONGRANGE', []);
   assert.equal(line('@ALL', 'ATTACKER_TRILAT', ['on']), '@ALL ATTACKER_TRILAT:1');
   assert.equal(line('@ALL', 'ATTACKER_TRILAT', ['off']), '@ALL ATTACKER_TRILAT:0');
   rejects('@ALL', 'ATTACKER_TRILAT', ['maybe']);

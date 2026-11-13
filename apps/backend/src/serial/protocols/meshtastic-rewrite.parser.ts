@@ -73,6 +73,7 @@ const ACK_REGEX =
 
 const PROBE_HIT_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*PROBE_HIT:?\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})(?:\s+(?<vendor>.+?))?\s+RSSI[=:](?<rssi>-?\d+)(?:\s+CH[=:](?<channel>\d+))?(?:\s+SSID[=:"]*(?<ssid>[^"\s]+)"?)?(?:\s+(?<ghost>GHOST))?(?:\s+(?<dst>DST))?(?:\s+GPS[=:](?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
+const CONFIG_SUB_ACK_REGEX = /^[A-Za-z0-9_.:-]+?:\s*CONFIG_ACK:(?<name>[A-Z_]+):(?<detail>.*)$/i;
 const HB_ACK_INTERVAL_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*HB_ACK:INTERVAL\s+(?<minutes>\d+)min/i;
 const WIPE_TOKEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*WIPE_TOKEN:(?<token>[A-Za-z0-9_:-]+)/i;
 const ERASE_TOKEN_REGEX =
@@ -1460,6 +1461,19 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     }
     const ack = ACK_REGEX.exec(payload);
     if (ack?.groups) {
+      const configSub = CONFIG_SUB_ACK_REGEX.exec(payload);
+      if (configSub?.groups) {
+        const detail = configSub.groups.detail.trim();
+        return [
+          {
+            kind: 'command-ack',
+            nodeId: nodeId ?? ack.groups.id,
+            ackType: `${configSub.groups.name.toUpperCase()}_ACK`,
+            status: /^(INVALID|DENIED|FAILED)/i.test(detail) ? 'ERROR' : 'OK',
+            raw,
+          },
+        ];
+      }
       return [
         {
           kind: 'command-ack',

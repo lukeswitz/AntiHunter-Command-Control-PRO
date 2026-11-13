@@ -112,6 +112,7 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['SUMMARY', expectNoParams],
   ['MESH_TX_CANCEL', expectNoParams],
   ['BLE_CLASSIFY', handleBleClassify],
+  ['BLE_LONGRANGE', handleBleLongRange],
   ['CAMPAIGN_START', handleCampaignStart],
   ['CAMPAIGN_STOP', expectNoParams],
   ['CAMPAIGN_STATUS', expectNoParams],
@@ -1074,6 +1075,10 @@ function handleConfigBand(params: string[]): string[] {
 
 function handleBleClassify(params: string[]): string[] {
   return [parseBinaryFlag(expectSingleParam(params, 'BLE_CLASSIFY', '0 or 1'), 'BLE_CLASSIFY')];
+}
+
+function handleBleLongRange(params: string[]): string[] {
+  return [parseBinaryFlag(expectSingleParam(params, 'BLE_LONGRANGE', '0 or 1'), 'BLE_LONGRANGE')];
 }
 
 function handleAttackerTrilat(params: string[]): string[] {

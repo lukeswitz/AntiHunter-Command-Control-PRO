@@ -381,6 +381,31 @@ test('CALIBRATE_DONE results', () => {
   }
 });
 
+test('CONFIG_ACK with a setting name maps to that setting ack', () => {
+  const parser = new MeshtasticRewriteParser();
+  const cases: Array<[string, string, string]> = [
+    ['AH01: CONFIG_ACK:BLE_LONGRANGE:1', 'BLE_LONGRANGE_ACK', 'OK'],
+    ['AH01: CONFIG_ACK:BLE_CLASSIFY:0', 'BLE_CLASSIFY_ACK', 'OK'],
+    ['AH01: CONFIG_ACK:SESSION_DEDUP:1', 'SESSION_DEDUP_ACK', 'OK'],
+    ['AH01: CONFIG_ACK:DEDUP_TTL:300', 'DEDUP_TTL_ACK', 'OK'],
+    ['AH01: CONFIG_ACK:DEDUP_TTL:INVALID', 'DEDUP_TTL_ACK', 'ERROR'],
+    ['AH01: CONFIG_ACK:NODE_ID:OK', 'NODE_ID_ACK', 'OK'],
+    ['AH01: CONFIG_ACK:NODE_ID:INVALID_LENGTH', 'NODE_ID_ACK', 'ERROR'],
+    ['AH01: CONFIG_ACK:RSSI:INVALID_RANGE', 'RSSI_ACK', 'ERROR'],
+    ['AH01: CONFIG_ACK:CHANNELS:1..11', 'CHANNELS_ACK', 'OK'],
+    ['AH01: CONFIG_ACK:TARGETS:FAILED', 'TARGETS_ACK', 'ERROR'],
+    ['AH01: CONFIG_ACK:ERASE_PSK:DENIED', 'ERASE_PSK_ACK', 'ERROR'],
+    ['AH01: CONFIG_ACK:BAND:2', 'BAND_ACK', 'OK'],
+    ['AH01: CONFIG_ACK:OK', 'CONFIG_ACK', 'OK'],
+  ];
+  for (const [line, ackType, status] of cases) {
+    const parsed = only(parser.parseLine(line), 'command-ack') as SerialCommandAck;
+    assert.equal(parsed.ackType, ackType, line);
+    assert.equal(parsed.status, status, line);
+    assert.equal(parsed.nodeId, 'AH01', line);
+  }
+});
+
 test('BASELINE_WATCH summary', () => {
   const parser = new MeshtasticRewriteParser();
   const alert = only(
