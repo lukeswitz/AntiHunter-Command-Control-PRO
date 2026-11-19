@@ -40,6 +40,7 @@ import { useTrackingBannerStore } from '../stores/tracking-banner-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
 import { useTriangulationStore } from '../stores/triangulation-store';
 import { decryptText } from '../utils/chat-crypto';
+import { fleetCoordinationText } from '../utils/fleet-lines';
 
 const NOTIFICATION_CATEGORIES = new Set(['gps', 'status', 'console']);
 const DEVICE_LINE_REGEX =
@@ -931,7 +932,17 @@ function parseEventPayload(
       const category = typeof base.category === 'string' ? base.category.toLowerCase() : undefined;
 
       if (category === 'mesh-coordination') {
-        return null;
+        const fleetText = fleetCoordinationText(base.data);
+        if (!fleetText) {
+          return null;
+        }
+        return {
+          message: fleetText,
+          level: 'notice',
+          source: 'notification',
+          timestamp: typeof base.timestamp === 'string' ? base.timestamp : undefined,
+          siteId: base.siteId,
+        };
       }
 
       const baseMessage = base.message ?? `Alert from ${base.nodeId ?? 'unknown node'}`;
