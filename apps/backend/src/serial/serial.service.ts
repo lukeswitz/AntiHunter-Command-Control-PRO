@@ -33,6 +33,7 @@ import {
 } from './meshcore-frame-parser';
 import { MeshtasticFrameEvent, MeshtasticFrameParser } from './meshtastic-frame-parser';
 import { createParser, ProtocolKey } from './protocol-registry';
+import { stripRelayPrefix } from './relay-prefix';
 import {
   deserializeSerialParseResult,
   serializeSerialParseResult,
@@ -2825,18 +2826,7 @@ function sanitizeLine(value: string): string {
   // "RLAY: AH5: TAMPER_DETECTED:..."). The original format is "nodeId: KEYWORD"
   // and the hop adds "relayName: " in front. We detect by checking if the second
   // token is a plain node ID (not a keyword) and the third token IS a keyword.
-  const HOP_KEYWORD_RE =
-    /^(?:STATUS|Target|DEVICE|DRONE|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|PROBE_HIT|PROBE_ACK|PCAP_|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|CSI_|SUMMARY|CAMPAIGN_|SCHED_|CALIBRATE_|SELF_RADIO_|RADIO_KNOWN_|RADIO_DETECTED|CSA_SPOOF|QUIET_ABUSE|FLEET_|VIBSCAN_|ATTACKER_TRILAT|MESH_TX_CANCEL|DEVICE_DB_CLEAR|PROBE_DB_CLEAR|BASELINE_RESET|BASELINE_WATCH|RANDOMIZATION_RESET|DETECT_CLEAR|DETECT_COUNTS|SD_REPAIR|BATTERY_SAVER|DETECT_|QUORUM_|HUNT_COOLDOWN|TRI_ACK|Time:)/i;
-  const hopMatch = /^([A-Za-z0-9_-]{1,6}):\s+([A-Za-z0-9_.:-]+:\s+)(.+)$/i.exec(cleaned);
-  if (hopMatch) {
-    const secondToken = hopMatch[2].replace(/[:\s]+$/, '');
-    const thirdPart = hopMatch[3].trim();
-    const secondIsKeyword = HOP_KEYWORD_RE.test(secondToken);
-    const thirdIsKeyword = HOP_KEYWORD_RE.test(thirdPart);
-    if (!secondIsKeyword && thirdIsKeyword) {
-      cleaned = (hopMatch[2] + hopMatch[3]).trim();
-    }
-  }
+  cleaned = stripRelayPrefix(cleaned);
 
   // Strip leading ANSI fragment residue like "0m"
   cleaned = cleaned.replace(/^0m\s*/i, '');

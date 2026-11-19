@@ -7,6 +7,7 @@
  */
 
 import { MeshtasticRewriteParser } from './protocols/meshtastic-rewrite.parser';
+import { stripRelayPrefix } from './relay-prefix';
 import type { SerialAlertEvent, SerialParseResult } from './serial.types';
 
 // ── sanitizeLine (exact copy from serial.service.ts) ──
@@ -56,18 +57,7 @@ function sanitizeLine(value: string): string {
     cleaned = chanMatch[2].trim();
   }
 
-  const HOP_KEYWORD_RE =
-    /^(?:STATUS|Target|DEVICE|DRONE|PROBE_HIT|PROBE_ACK|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|PCAP_|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|CSI_|SUMMARY|CAMPAIGN_|SCHED_|CALIBRATE_|SELF_RADIO_|RADIO_KNOWN_|RADIO_DETECTED|CSA_SPOOF|QUIET_ABUSE|FLEET_|VIBSCAN_|ATTACKER_TRILAT|MESH_TX_CANCEL|DEVICE_DB_CLEAR|PROBE_DB_CLEAR|BASELINE_RESET|BASELINE_WATCH|RANDOMIZATION_RESET|DETECT_CLEAR|DETECT_COUNTS|SD_REPAIR|Time:)/i;
-  const hopMatch = /^([A-Za-z0-9_-]{1,6}):\s+([A-Za-z0-9_.:-]+:\s+)(.+)$/i.exec(cleaned);
-  if (hopMatch) {
-    const secondToken = hopMatch[2].replace(/[:\s]+$/, '');
-    const thirdPart = hopMatch[3].trim();
-    const secondIsKeyword = HOP_KEYWORD_RE.test(secondToken);
-    const thirdIsKeyword = HOP_KEYWORD_RE.test(thirdPart);
-    if (!secondIsKeyword && thirdIsKeyword) {
-      cleaned = (hopMatch[2] + hopMatch[3]).trim();
-    }
-  }
+  cleaned = stripRelayPrefix(cleaned);
 
   cleaned = cleaned.replace(/^0m\s*/i, '');
 
@@ -84,6 +74,7 @@ interface TestCase {
   expectNodeId?: string;
   expectData?: Record<string, string | number | boolean>;
   skipHop?: boolean;
+  exact?: boolean;
 }
 
 const FIRMWARE_MESSAGES: TestCase[] = [
@@ -1124,6 +1115,167 @@ const FIRMWARE_MESSAGES: TestCase[] = [
     expectKinds: ['alert', 'command-ack'],
     expectCategory: 'erase',
   },
+
+  // ─── fleet relay formats (firmware feat/c5 db5f2b61) ───
+  {
+    name: 'FLEET_CMD relayed command',
+    input: 'AH3: FLEET_CMD:AH1-1a2b:2:@AH7 STATUS',
+    expectKinds: ['alert'],
+    exact: true,
+    expectCategory: 'mesh-coordination',
+    expectNodeId: 'AH3',
+    expectData: {
+      coordinationType: 'FLEET_CMD',
+      relayer: 'AH3',
+      tag: 'AH1-1a2b',
+      origin: 'AH1',
+      hops: 2,
+      target: 'AH7',
+      command: 'STATUS',
+    },
+  },
+  {
+    name: 'FLEET_CMD empty origin',
+    input: 'AH3: FLEET_CMD:-0f9e:1:@ALL SCAN_START:2:60',
+    expectKinds: ['alert'],
+    exact: true,
+    expectCategory: 'mesh-coordination',
+    expectNodeId: 'AH3',
+    expectData: {
+      coordinationType: 'FLEET_CMD',
+      hops: 1,
+      target: 'ALL',
+      command: 'SCAN_START:2:60',
+    },
+  },
+  {
+    name: 'relayed STATUS',
+    input: 'AH3: AH7: STATUS: Mode:WiFi Scan:IDLE Hits:0 Temp:25.0C Up:00:05:00',
+    expectKinds: ['node-telemetry', 'command-result'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed STOP_ACK',
+    input: 'AH3: AH7: STOP_ACK:OK',
+    expectKinds: ['command-ack'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed DEVICE_SCAN_ACK',
+    input: 'AH3: AH7: DEVICE_SCAN_ACK:OK',
+    expectKinds: ['command-ack'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed SCAN_ACK',
+    input: 'AH3: AH7: SCAN_ACK:STARTED',
+    expectKinds: ['command-ack'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed SCHED_ACK',
+    input: 'AH3: AH7: SCHED_ACK:OK',
+    expectKinds: ['command-ack'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed SCHED_LIST',
+    input: 'AH3: AH7: SCHED_LIST:2',
+    expectKinds: ['command-result'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed CAMPAIGN_ACK',
+    input: 'AH3: AH7: CAMPAIGN_ACK:START:site-a',
+    expectKinds: ['command-ack'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed CAMPAIGN_STATUS',
+    input: 'AH3: AH7: CAMPAIGN_STATUS:site-a',
+    expectKinds: ['command-result'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed CONFIG_ACK BLE_CLASSIFY',
+    input: 'AH3: AH7: CONFIG_ACK:BLE_CLASSIFY:1',
+    expectKinds: ['command-ack'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'relayed CALIBRATE_ACK',
+    input: 'AH3: AH7: CALIBRATE_ACK:STARTED',
+    expectKinds: ['command-ack'],
+    exact: true,
+    expectNodeId: 'AH7',
+    skipHop: true,
+  },
+  {
+    name: 'FLEET_WHAT query',
+    input: '@AH7 FLEET_WHAT:AH7: STATUS',
+    expectKinds: ['alert'],
+    exact: true,
+    expectCategory: 'mesh-coordination',
+    expectData: { coordinationType: 'FLEET_WHAT', target: 'AH7', replyPrefix: 'AH7: STATUS' },
+    skipHop: true,
+  },
+  {
+    name: 'FLEET_WHAT query with sender',
+    input: 'AH1: @AH7 FLEET_WHAT:AH7: STATUS',
+    expectKinds: ['alert'],
+    exact: true,
+    expectCategory: 'mesh-coordination',
+    expectNodeId: 'AH1',
+    expectData: { coordinationType: 'FLEET_WHAT', sender: 'AH1', target: 'AH7' },
+    skipHop: true,
+  },
+  {
+    name: 'SCHED_ITEM',
+    input: 'AH7: SCHED_ITEM:1:2026-11-20T10:00|3600|/scan|SCAN_START:2:60',
+    expectKinds: ['alert'],
+    exact: true,
+    expectCategory: 'schedule',
+    expectNodeId: 'AH7',
+    expectData: {
+      index: 1,
+      nextStart: '2026-11-20T10:00',
+      periodSeconds: 3600,
+      path: '/scan',
+      body: 'SCAN_START:2:60',
+    },
+  },
+  {
+    name: 'command with sender id',
+    input: 'AH1: @AH7 SCAN_START:2:60',
+    expectKinds: ['raw'],
+    exact: true,
+    skipHop: true,
+  },
+  {
+    name: 'status command with sender id',
+    input: 'AH1: @ALL STATUS',
+    expectKinds: ['raw'],
+    exact: true,
+    skipHop: true,
+  },
 ];
 
 // ── Wrapper formats ──
@@ -1177,6 +1329,25 @@ function runTest(label: string, rawInput: string, tc: TestCase): void {
     failed++;
     failures.push(`FAIL [${label}]: expected [${tc.expectKinds}] got [${resultKinds}]`);
     return;
+  }
+
+  if (tc.exact && resultKinds.join() !== tc.expectKinds.join()) {
+    failed++;
+    failures.push(`FAIL [${label}]: expected exactly [${tc.expectKinds}] got [${resultKinds}]`);
+    return;
+  }
+
+  if (tc.expectNodeId) {
+    const wrongNode = results.find(
+      (r) => 'nodeId' in r && r.nodeId !== undefined && r.nodeId !== tc.expectNodeId,
+    );
+    if (wrongNode) {
+      failed++;
+      failures.push(
+        `FAIL [${label}]: nodeId "${(wrongNode as { nodeId?: string }).nodeId}" != "${tc.expectNodeId}"`,
+      );
+      return;
+    }
   }
 
   if (tc.expectCategory) {

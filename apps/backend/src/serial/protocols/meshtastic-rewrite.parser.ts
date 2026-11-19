@@ -1,3 +1,4 @@
+import { stripRelayPrefix } from '../relay-prefix';
 import { SerialParseResult, SerialProtocolParser, SerialProbeHit } from '../serial.types';
 
 // Parser rewritten from catalog in meshmessages.xlsx/README.
@@ -85,7 +86,7 @@ const TRI_RESULTS_START_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS
 const TRI_RESULTS_END_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS_END/i;
 const TRI_RESULTS_NO_DATA_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*TRIANGULATE_RESULTS:NO_DATA/i;
 // Matches echoed @ALL TRIANGULATE_START commands to ignore them
-const TRI_START_ECHO_REGEX = /^@ALL\s+TRIANGULATE_START:/i;
+const TRI_START_ECHO_REGEX = /^(?:[A-Za-z0-9_.-]+:\s*)?@ALL\s+TRIANGULATE_START:/i;
 // Matches broadcast TRIANGULATE_START messages (without @ prefix): ALL TRIANGULATE_START:MAC:duration:nodeId:rfEnv
 const TRI_START_BROADCAST_REGEX =
   /^ALL\s+TRIANGULATE_START:(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}):(?<duration>\d+):(?<originNode>[A-Za-z0-9_-]+):(?<rfEnv>[0-4])$/i;
@@ -180,6 +181,12 @@ const MESH_GUARD_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT):(?<rest>.*)$/i;
 const MESH_COORD_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>TOF_PING|TOF_PONG|BLOOM|IDHASH|CHAN_ASSIGN|FLEET_AP|FLEET_RADIO|CSI_PEER):(?<rest>.*)$/i;
+const FLEET_CMD_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*FLEET_CMD:(?<tag>(?<origin>[A-Za-z0-9_.]*)-[0-9A-Fa-f]{4}):(?<hops>\d+):@(?<target>[A-Za-z0-9_.-]+)\s+(?<command>\S.*)$/i;
+const FLEET_WHAT_REGEX =
+  /^(?:(?<sender>[A-Za-z0-9_.-]+):\s*)?@(?<target>[A-Za-z0-9_.-]+)\s+FLEET_WHAT:(?<prefix>.*)$/i;
+const SCHED_ITEM_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*SCHED_ITEM:(?<index>\d+):(?<next>\d{4}-\d{2}-\d{2}T\d{2}:\d{2})\|(?<period>\d+)\|(?<path>[^|]*)\|(?<body>.*)$/i;
 const DEVICE_DISAPPEARED_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE_DISAPPEARED:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+absent:(?<absent>\d+)s/i;
 const RID_RX_REGEX =
@@ -249,8 +256,9 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       .replace(/\r?\n\s*Type:/g, ' Type:')
       .replace(/\r?\n\s*RSSI:/g, ' RSSI:')
       .replace(/\r?\n\s*GPS=/g, ' GPS=');
-    const payload = this.stripTrailingHash(normalizedPayloadRaw.replace(/^0m\s*/i, ''));
-    const sourceId = this.extractSourceId(sanitized);
+    const relayedPayload = this.stripTrailingHash(normalizedPayloadRaw.replace(/^0m\s*/i, ''));
+    const payload = stripRelayPrefix(relayedPayload);
+    const sourceId = this.extractSourceId(payload === relayedPayload ? sanitized : payload);
 
     // Ignore echoed TRIANGULATE_START commands (sent by app, echoed back by mesh)
     if (TRI_START_ECHO_REGEX.test(payload) || TRI_START_ECHO_REGEX.test(sanitized)) {
@@ -700,6 +708,47 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     nodeId: string | undefined,
     raw: string,
   ): SerialParseResult[] | null {
+    const fleetCmd = FLEET_CMD_REGEX.exec(payload);
+    if (fleetCmd?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'INFO',
+          category: 'mesh-coordination',
+          nodeId: nodeId ?? fleetCmd.groups.id,
+          message: payload,
+          data: {
+            coordinationType: 'FLEET_CMD',
+            relayer: fleetCmd.groups.id,
+            tag: fleetCmd.groups.tag,
+            origin: fleetCmd.groups.origin || undefined,
+            hops: Number(fleetCmd.groups.hops),
+            target: fleetCmd.groups.target,
+            command: fleetCmd.groups.command.trim(),
+          },
+          raw,
+        },
+      ];
+    }
+    const fleetWhat = FLEET_WHAT_REGEX.exec(payload);
+    if (fleetWhat?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'INFO',
+          category: 'mesh-coordination',
+          nodeId: nodeId ?? fleetWhat.groups.sender,
+          message: payload,
+          data: {
+            coordinationType: 'FLEET_WHAT',
+            sender: fleetWhat.groups.sender,
+            target: fleetWhat.groups.target,
+            replyPrefix: fleetWhat.groups.prefix.trim(),
+          },
+          raw,
+        },
+      ];
+    }
     const m = MESH_COORD_REGEX.exec(payload);
     if (!m?.groups) return null;
     return [
@@ -1710,6 +1759,26 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
           ackType: 'CALIBRATE_DONE',
           status: failed ? 'ERROR' : 'OK',
           raw,
+        },
+      ];
+    }
+    const schedItem = SCHED_ITEM_REGEX.exec(payload);
+    if (schedItem?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'INFO',
+          category: 'schedule',
+          nodeId: nodeId ?? schedItem.groups.id,
+          message: payload,
+          raw,
+          data: {
+            index: Number(schedItem.groups.index),
+            nextStart: schedItem.groups.next,
+            periodSeconds: Number(schedItem.groups.period),
+            path: schedItem.groups.path,
+            body: schedItem.groups.body.trim(),
+          },
         },
       ];
     }
