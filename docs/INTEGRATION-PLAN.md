@@ -61,6 +61,9 @@ on the map.
   `CHAN_ASSIGN` emit as `mesh-coordination` alerts. Feed `TOF_*` into the
   existing `TriangulationResult` path; surface `CHAN_ASSIGN`/`IDHASH` on the
   fleet view (`FleetIdentity`/`FleetChannel` models exist).
+- **Fleet relay:** `FLEET_CMD` and `FLEET_WHAT` also emit as
+  `mesh-coordination`; the terminal shows them as notices
+  (`utils/fleet-lines.ts`). Other coordination types stay hidden.
 
 ## Track 5 — Auto-load OUI vendors
 
